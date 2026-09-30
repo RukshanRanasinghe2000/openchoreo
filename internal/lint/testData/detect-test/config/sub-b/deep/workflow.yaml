@@ -1,0 +1,28 @@
+apiVersion: openchoreo.dev/v1alpha1
+kind: Workflow
+metadata:
+  name: test2
+  namespace: default
+  annotations:
+    openchoreo.dev/display-name: Test2
+    openchoreo.dev/description: This is first test 2 project
+  labels:
+    openchoreo.dev/workflow-type: component
+spec:
+  schema:
+    parameters: {}
+  runTemplate:
+    apiVersion: argoproj.io/v1alpha1
+    kind: Workflow
+    metadata:
+      name: ${metadata.workflowRunName}
+      namespace: ${metadata.namespace}
+    spec:
+      entrypoint: main
+      templates:
+        - name: main
+          container:
+            image: alpine
+            command:
+              - echo
+              - hello

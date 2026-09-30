@@ -1,0 +1,42 @@
+apiVersion: openchoreo.dev/v1alpha1
+kind: Component
+metadata:
+  annotations:
+    openchoreo.dev/description: This is first test project
+    openchoreo.dev/display-name: Test1
+  creationTimestamp: 2026-07-28T04:27:07Z
+  labels:
+    openchoreo.dev/project: default
+  name: test
+  namespace: default
+  uid: fd7294d5-cfa3-4b01-89e3-d638073dbc73
+spec:
+  componentType:
+    kind: ClusterComponentType
+    name: deployment/service
+  owner:
+    projectName: default
+  parameters: {}
+  workflow:
+    kind: ClusterWorkflow
+    name: dockerfile-builder
+    parameters:
+      buildArgs: []
+      buildEnv: []
+      docker:
+        context: .
+        filePath: ./Dockerfile
+      repository:
+        appPath: .tool-palette-backend
+        revision:
+          branch: main
+        url: https://github.com/RukshanRanasinghe2000/tool-palette.git
+status:
+  conditions:
+    - lastTransitionTime: 2026-07-28T04:27:07Z
+      message: Workload for component "test" not found, waiting for workload to be created
+      observedGeneration: 1
+      reason: WorkloadNotFound
+      status: "False"
+      type: Ready
+  observedGeneration: 1

@@ -1,0 +1,361 @@
+{
+  "actions": "Actions is the list of actions this role can perform",
+  "address": "Address is the env var name for the protocol-appropriate connection string. For HTTP/HTTPS/WS/WSS: scheme://host:port/basePath For gRPC/TCP/UDP: host:port",
+  "agentConnection": "AgentConnection tracks the status of cluster agent connections to this data plane",
+  "allowedTraits": "AllowedTraits restricts which ClusterTrait CRs developers can attach to Components of this type. When specified, only ClusterTraits listed here (matched by name) may be attached beyond those already embedded in spec.traits. ClusterTrait references listed here must not overlap with traits already embedded in spec.traits. If empty or omitted, no additional component-level traits are allowed.",
+  "allowedWorkflows": "AllowedWorkflows restricts which ClusterWorkflow CRs developers can use for building components of this type. If empty, no workflows are allowed. References must point to ClusterWorkflow resources.",
+  "annotations": "Annotations to add to the secret",
+  "apiVersion": "APIVersion is the API version of the referenced resource.",
+  "args": "Container entrypoint & args.",
+  "auth": "Auth defines SMTP authentication credentials",
+  "authentication": "Authentication the authentication information to access the Git repository If not provided, the Git repository should be public",
+  "autoBuild": "AutoBuild enables automatic builds when code is pushed to the repository When enabled, webhook events will trigger builds automatically Users must manually configure webhooks in their Git provider",
+  "autoDeploy": "AutoDeploy indicates whether the component should be deployed automatically when created When not specified, defaults to false (zero value)",
+  "backendMonitorId": "BackendMonitorID is the identifier assigned by the backend observability tool.",
+  "basePath": "BasePath is the base path of the API exposed via the endpoint.",
+  "body": "Body is the email body template using CEL expressions Example: \"Alert: ${alert.name} triggered at ${alert.startsAt}.\\nSummary: ${alert.description}\"",
+  "channels": "Channels defines the channels to send notifications to. +listType=set",
+  "clientCA": "ClientCA contains the CA certificate used to verify the agent's client certificate This allows per-plane CA configuration for enhanced security",
+  "clusterAgent": "ClusterAgent specifies the configuration for cluster agent-based communication The cluster agent establishes a WebSocket connection to the control plane's cluster gateway This field is mandatory - all data planes must use cluster agent communication",
+  "command": "Container entrypoint & args.",
+  "completedAt": "CompletedAt is the timestamp when the task finished execution.",
+  "component": "Component scopes to a specific component (optional)",
+  "componentName": "ComponentName is the name of the component",
+  "componentProfile": "ComponentProfile contains the immutable snapshot of parameter values and trait configs specified for this component at release time == oldSelf\",message=\"spec.componentProfile is immutable\"",
+  "componentType": "ComponentType specifies the component type reference with kind and name. Name is in the format: {workloadType}/{componentTypeName} Example: kind=ComponentType, name=\"deployment/web-app\" == oldSelf\",message=\"spec.componentType cannot be changed after creation\"",
+  "componentTypeEnvironmentConfigs": "ComponentTypeEnvironmentConfigs for ComponentType environmentConfigs parameters These values override the defaults defined in the Component for this specific environment",
+  "condition": "Condition controls how the rule should be evaluated against the source.",
+  "conditions": "Conditions define attribute-based restrictions on specific actions granted by the role. Multiple entries whose actions match the request are combined with OR semantics — at least one matching entry must pass for the action to be permitted. If omitted, no attribute restrictions apply — the RBAC grant stands as-is.",
+  "configMapKeyRef": "ConfigMapKeyRef is the resolved {name, key} reference to a DP-side ConfigMap.",
+  "connected": "Connected indicates whether any cluster agent is currently connected",
+  "connectedAgents": "ConnectedAgents is the number of cluster agents currently connected",
+  "connectionTargets": "ConnectionTargets lists the connection targets derived from the workload connections. Used as an index source for finding consumer ReleaseBindings when a provider's endpoints change.",
+  "container": "Container override for env and file configurations.",
+  "containerRegistry": "ContainerRegistry specifies the configuration for the component source to be a container image indicating that the component should be deployed using the provided image. This field is mutually exclusive with the other source types.",
+  "creates": "Creates defines new Kubernetes resources to create when this trait is applied",
+  "data": "Data contains the mapping of secret keys to external secret references",
+  "dataPlaneRef": "DataPlaneRef references the DataPlane or ClusterDataPlane for this environment. If not specified, defaults to a DataPlane named \"default\" in the same namespace. Immutable once set.",
+  "dependencies": "Dependencies define the dependencies of this workload on other components.",
+  "deploymentPipelineRef": "DeploymentPipelineRef references the DeploymentPipeline that defines the environments and deployment progression for components in this project.",
+  "description": "Description is a human-readable description of the role",
+  "displayName": "DisplayName is an optional human-readable name for the endpoint.",
+  "effect": "Effect indicates whether this binding allows or denies access (default: allow)",
+  "egress": "Ingress defines the ingress gateway configuration. Egress defines the egress gateway configuration.",
+  "emailConfig": "EmailConfig contains the email notification channel configuration Required when type is \"email\"",
+  "enabled": "Enabled toggles whether this alert rule should be evaluated.",
+  "endpoint": "Endpoint is the name of the endpoint on the target component.",
+  "endpoints": "Endpoints contains the resolved invoke URLs for each named workload endpoint, keyed by endpoint name. Populated once the component is deployed and the corresponding HTTPRoutes are available.",
+  "entitlement": "Entitlement defines the subject (from JWT claims) to grant the role to",
+  "env": "Explicit environment variables.",
+  "envBindings": "EnvBindings maps semantic URL components to environment variable names.",
+  "environment": "Environment is the name of the openchoreo environment this notification channel belongs to == oldSelf\",message=\"spec.environment is immutable\"",
+  "environmentConfigs": "EnvironmentConfigs defines per-environment configurations developers can set via ReleaseBinding.",
+  "environmentName": "== oldSelf\",message=\"spec.owner is immutable\"",
+  "external": "External defines the externally accessible gateway endpoint.",
+  "externalRefs": "ExternalRefs declares references to external CRs that are resolved at runtime. +listType=map +listMapKey=id",
+  "externalURLs": "ExternalURLs holds the resolved external gateway URLs.",
+  "fileBindings": "FileBindings maps a ResourceType output name to a container mount path. The referenced output's source kind must be secretKeyRef or configMapKeyRef; value-kind outputs cannot be mounted as files because there is no DP-side object to mount. k.size() > 0 && self[k].size() > 0)\",message=\"fileBindings keys (output names) and values (mount paths) cannot be empty\"",
+  "files": "File configurations.",
+  "finOpsAgentURL": "FinOpsAgentURL is the base URL of the FinOps Agent API in the observability plane cluster",
+  "forEach": "ForEach enables generating multiple resources from a list using CEL expression Example: \"${spec.configurations}\" to iterate over a list",
+  "from": "From is the sender email address Required when type is \"email\"",
+  "gateway": "Gateway specifies the configuration for the API gateway in this DataPlane.",
+  "gitRepository": "GitRepository specifies the configuration for the component source to be a Git repository indicating that the component should be built from the source code. This field is mutually exclusive with the other source types.",
+  "group": "Group is the API group of the resource (e.g., \"apps\", \"batch\") Empty string for core resources",
+  "hash": "Hash is the spec hash that produced the release. The Project controller cuts a new ProjectRelease when this drifts from the recomputed hash on a reconcile.",
+  "headers": "Headers are optional HTTP headers to include in the webhook request Headers can be provided inline or via secret references",
+  "healthStatus": "HealthStatus indicates the health of the resource in the data plane.",
+  "host": "ListenerName is the name of the listener on the Gateway resource. Port is the port number for this listener. Host is the virtual host for this listener.",
+  "http": "Name is the name of the Gateway resource. Namespace is the namespace of the Gateway resource. HTTP defines the HTTP listener configuration.",
+  "https": "Name is the name of the Gateway resource. Namespace is the namespace of the Gateway resource. HTTP defines the HTTP listener configuration. HTTPS defines the HTTPS listener configuration.",
+  "id": "ID uniquely identifies this resource within the component type For the primary workload resource, this must match the workloadType",
+  "image": "OCI image to run (digest or tag).",
+  "imageName": "Image name of the container image. Format: <registry>/<image> without the tag. Example: docker.io/library/nginx",
+  "incident": "Incident defines the incident to trigger when the alert rule is triggered.",
+  "includeWhen": "IncludeWhen is a CEL expression that determines if this resource should be created If not specified, the resource is always created Example: \"${spec.autoscaling.enabled}\"",
+  "ingress": "Ingress defines the ingress gateway configuration.",
+  "insecureSkipVerify": "InsecureSkipVerify skips TLS certificate verification (not recommended for production)",
+  "instanceName": "InstanceName uniquely identifies this trait instance within the component Allows the same trait to be used multiple times with different configurations Must be unique across all traits in the component",
+  "internal": "External defines the externally accessible gateway endpoint. Internal defines the internally accessible gateway endpoint.",
+  "internalURLs": "InternalURLs holds the resolved internal gateway URLs.",
+  "interval": "Interval dictates how often the alert rule is evaluated.",
+  "invokeURL": "InvokeURL is the resolved public URL for this endpoint, derived from the rendered HTTPRoute whose backendRef port matches the endpoint port.",
+  "isEnvDefault": "IsEnvDefault indicates if this is the default notification channel for the environment There can be only one default notification channel for an environment First notification channel created for an environment will be the default unless otherwise specified",
+  "isProduction": "DataPlaneRef references the DataPlane or ClusterDataPlane for this environment. If not specified, defaults to a DataPlane named \"default\" in the same namespace. Immutable once set.",
+  "key": "Name of the secret Namespace of the secret (optional, defaults to same namespace as parent resource) Key is the key within the secret",
+  "kind": "Kind is the kind of workflow (Workflow or ClusterWorkflow).",
+  "labels": "Labels to add to the secret",
+  "lastConnectedTime": "LastConnectedTime is when an agent last successfully connected",
+  "lastDisconnectedTime": "LastDisconnectedTime is when the last agent disconnected",
+  "lastHeartbeatTime": "LastHeartbeatTime is when the control plane last received any communication from an agent",
+  "lastObservedTime": "LastObservedTime stores the last time the status was observed",
+  "lastReconcileTime": "LastReconcileTime records the last time the controller reconciled this object.",
+  "lastRefreshTime": "LastRefreshTime indicates when the secret reference was last processed",
+  "lastSpecUpdateTime": "LastSpecUpdateTime is the timestamp of the last spec change observed by the controller. Updated when the controller detects a new generation (i.e., spec was modified).",
+  "lastSyncTime": "LastSyncTime records when the rule was pushed to the backend observability tool.",
+  "latestRelease": "LatestRelease keeps the information of the latest ComponentRelease created for this component This is used to make sure the component's latest ComponentRelease is always deployed to the first environment, if the autoDeploy flag is set to true",
+  "listenerName": "ListenerName is the name of the listener on the Gateway resource.",
+  "message": "Message is the error message shown when the rule evaluates to false.",
+  "metadata": "Metadata to add to the generated secret",
+  "metric": "Metric specifies the metric to alert on. This is required for metric-based alerting.",
+  "mountPath": "The mount path where the file will be mounted.",
+  "mustMatch": "MustMatch requires at least one rendered resource to match this target. When true (the default) and no resource matches, the validation fails. This catches the case where an earlier/later trait removed the target resource.",
+  "name": "Name references the Workflow or ClusterWorkflow CR to use for building the component. The Workflow must be in the allowedWorkflows list of the ComponentType.",
+  "namespace": "Namespace scopes to a specific namespace (optional)",
+  "notifications": "Notifications defines the notifications to send when the alert rule is triggered.",
+  "object": "Object contains the complete Kubernetes resource definition",
+  "observabilityPlaneRef": "ObservabilityPlaneRef specifies the ClusterObservabilityPlane for this ClusterDataPlane. Since this is a cluster-scoped resource, it can only reference cluster-scoped ClusterObservabilityPlane. Namespace-scoped ObservabilityPlane references are NOT supported for cluster-scoped resources. Default behavior: - If not specified, the system looks for a ClusterObservabilityPlane named \"default\" - If \"default\" ClusterObservabilityPlane doesn't exist, observability features are disabled The kind field must be \"ClusterObservabilityPlane\". || self.kind == 'ClusterObservabilityPlane'\",message=\"ClusterDataPlane can only reference ClusterObservabilityPlane\"",
+  "observedGeneration": "ObservedGeneration reflects the generation of the most recently observed ClusterDataPlane.",
+  "observerURL": "ObserverURL is the base URL of the Observer API in the observability plane cluster",
+  "op": "Op is the operation type Standard operations: add, replace, remove (RFC 6902)",
+  "openAPIV3Schema": "OpenAPIV3Schema defines the schema using standard OpenAPI V3 / JSON Schema format.",
+  "operations": "Operations is the list of JSONPatch operations to apply to the target resource",
+  "operator": "Operator describes the comparison used when evaluating the threshold.",
+  "outputs": "Outputs declares values that workloads consume via Workload.spec.dependencies.resources[].envBindings or fileBindings. Each entry is identified by a unique name and picks exactly one of value, secretKeyRef, or configMapKeyRef. Output value, name, and key fields support ${...} CEL templating evaluated against metadata.*, parameters.*, environmentConfigs.*, and applied.<id>.status.*. +listType=map +listMapKey=name",
+  "owner": "Owner defines the ownership information for the component == oldSelf\",message=\"spec.owner is immutable\"",
+  "parameters": "Parameters defines what developers can configure when creating components of this type.",
+  "password": "Password for SMTP authentication Provided via secret reference (TODO: Support inline password)",
+  "patches": "Patches defines modifications to existing resources generated by the ComponentType",
+  "path": "Path is the URL path.",
+  "payloadTemplate": "PayloadTemplate is an optional JSON payload template using CEL expressions If not provided, the raw alertDetails object will be sent as JSON CEL expressions use ${...} syntax and have access to alert fields: - ${alertName}, ${alertDescription}, ${alertSeverity}, ${alertValue}, etc. Example for Slack: {\"text\": \"Alert: ${alertName}\", \"blocks\": [...]}",
+  "pendingConnections": "PendingConnections contains the connections that could not be resolved.",
+  "pendingResourceDependencies": "PendingResourceDependencies contains the resource dependencies that could not be resolved.",
+  "phase": "Phase indicates the current lifecycle phase.",
+  "planeID": "PlaneID identifies the logical plane this CR connects to. Multiple ClusterDataPlane CRs can share the same planeID to connect to the same physical cluster while maintaining separate configurations for multi-tenancy scenarios. This field is required and must uniquely identify the physical cluster agent connection. Format: lowercase alphanumeric characters, hyphens allowed, max 63 characters. Examples: \"prod-cluster\", \"shared-dataplane\", \"us-east-1\"",
+  "port": "ListenerName is the name of the listener on the Gateway resource. Port is the port number for this listener.",
+  "postRenderValidations": "PostRenderValidations are CEL-based rules evaluated after all traits are applied, against the final rendered Kubernetes resources.",
+  "preRenderValidations": "PreRenderValidations are CEL-based rules evaluated before rendering, against the component context (parameters/environmentConfigs/workload/metadata). All rules must evaluate to true for rendering to proceed. Replaces Validations.",
+  "progressingInterval": "ProgressingInterval watch interval for the release resources when transitioning. Defaults to 10s if not specified.",
+  "project": "Project scopes to a specific project (optional)",
+  "projectName": "",
+  "projectRelease": "ProjectRelease is the name of the ProjectRelease pinned by this binding. Leave unset to have the Project controller seed it once with the project's latest release; the binding stays pending until the pin is set. A set pin is never touched by controllers — advancing it is left to whoever drives promotion (occ, GitOps, manual kubectl edit).",
+  "projectType": "ProjectType is a frozen snapshot of the ProjectType or ClusterProjectType resource at the time of the release. Records the kind and name of the original resource alongside its full spec so consumers can distinguish namespace-scoped ProjectTypes from cluster-scoped ClusterProjectTypes.",
+  "promotionPaths": "PromotionPaths defines the available paths for promotion between environments",
+  "property": "Property is the specific field within the secret (e.g., \"token\")",
+  "query": "Query defines the query or filter to locate relevant events. This is required for log-based alerting.",
+  "rcaAgentURL": "RCAAgentURL is the base URL of the RCA Agent API in the observability plane cluster",
+  "readyWhen": "ReadyWhen is an optional ${...}-wrapped CEL expression that determines whether this entry contributes to ResourceBinding.status.conditions[ResourcesReady]. Evaluated against metadata.*, parameters.*, environmentConfigs.*, dataplane.*, and applied.<id>.* once the manifest has been applied. If unset, falls back to RenderedRelease per-Kind health inference. Must evaluate to a boolean. Example: \"${applied.claim.status.conditions.exists(c, c.type == 'Ready' && c.status == 'True')}\".",
+  "reason": "Reason describes why the connection could not be resolved.",
+  "ref": "Ref is the name of the Resource to consume. The Resource must live in the same project as the consuming Component (cross-project consumption is deferred to a later release).",
+  "refreshInterval": "RefreshInterval specifies how often to reconcile/refresh the secret",
+  "releaseHash": "ReleaseHash record the hash value of the spec of ComponentRelease.",
+  "releaseName": "ReleaseName is the name of the ComponentRelease to bind When ComponentSpec.AutoDeploy is enabled, this field will be handled by the controller",
+  "remoteRef": "RemoteRef points to the external secret location",
+  "removes": "Removes deletes whole resources previously produced by the ComponentType or earlier traits. Workload resources (e.g. Deployment, StatefulSet, CronJob) cannot be removed.",
+  "resolvedConnections": "ResolvedConnections contains the connections that have been successfully resolved.",
+  "resource": "Resource scopes to a specific resource (optional)",
+  "resourceDependencyTargets": "ResourceDependencyTargets lists the resource dependency targets derived from the workload's dependencies.resources[]. Used as an index source for finding consumer ReleaseBindings when a provider ResourceReleaseBinding's status.outputs change.",
+  "resourceName": "ResourceName is the name of the target Resource.",
+  "resourceRelease": "ResourceRelease is the name of the ResourceRelease pinned by this binding. The release pin is advanced manually (e.g. via `occ resource promote` or `kubectl edit`). Unset before the first ResourceRelease is cut; the controller leaves the binding pending until set.",
+  "resourceType": "ResourceType is a frozen snapshot of the ResourceType or ClusterResourceType resource at the time of the release. Records the kind and name of the original resource alongside its full spec so consumers can distinguish namespace-scoped ResourceTypes from cluster-scoped ClusterResourceTypes.",
+  "resourceTypeEnvironmentConfigs": "ResourceTypeEnvironmentConfigs provides per-environment values for the schema declared on the referenced ResourceType (or ClusterResourceType). Validated against ResourceType.spec.environmentConfigs by the binding controller; failures surface via status.conditions.",
+  "resources": "Resources are templates that generate Kubernetes resources dynamically. At least one resource template is required. For non-proxy workload types, one resource must have an id matching the workloadType. When workloadType is \"proxy\", a matching resource id is not required.",
+  "retainPolicy": "RetainPolicy is the default retention for ResourceBindings of this type. Per-env override is available via ResourceBinding.spec.retainPolicy.",
+  "roleMappings": "RoleMappings is the list of role-scope pairs this binding grants",
+  "roleRef": "RoleRef references the role to bind",
+  "rule": "Rule is a CEL expression wrapped in ${...} that must evaluate to true. Uses the same syntax as includeWhen and where fields.",
+  "runReference": "RunReference contains a reference to the workflow run resource that was applied to the cluster. This tracks the actual workflow execution instance (e.g., Argo Workflow) in the target cluster.",
+  "runTemplate": "RunTemplate is the Kubernetes resource template to be rendered and applied to the cluster. Template variables are substituted with context and parameter values. Supported template variables: - ${metadata.workflowRunName} - WorkflowRun name (the execution instance) - ${metadata.namespaceName} - Namespace name - ${metadata.namespace} - Enforced workflow execution namespace (e.g., \"workflows-<namespaceName>\") - ${metadata.labels['key']} - WorkflowRun labels - ${parameters.*} - Developer-provided parameter values - ${workflowplane.secretStore} - ESO ClusterSecretStore name from the WorkflowPlane - ${externalRefs['<id>'].spec.*} - Resolved external CR specs (declared via externalRefs)",
+  "schema": "Schema for the endpoint API definition.",
+  "scheme": "Scheme is the URL scheme (e.g., http, https, tcp, udp, ws, wss, grpc, grpcs, tls).",
+  "scope": "Scope defines the target scope within the ownership hierarchy",
+  "secretKey": "SecretKey is the key name in the Kubernetes Secret",
+  "secretKeyRef": "SecretKeyRef is a reference to a secret containing the value",
+  "secretRef": "SecretRef is a reference to the secret containing Git credentials",
+  "secretReferenceNames": "SecretReferenceNames lists the names of SecretReferences used by this ReleaseBinding's workload. Used as an index source for finding affected ReleaseBindings when a SecretReference changes.",
+  "secretStoreRef": "SecretStoreRef specifies the ESO ClusterSecretStore to use in the data plane",
+  "secretStores": "SecretStores tracks which secret stores are using this reference",
+  "serviceURL": "ServiceURL is the in-cluster service URL for this endpoint.",
+  "severity": "Severity describes how urgent the alert is.",
+  "smtp": "SMTP configuration for sending emails Required when type is \"email\"",
+  "source": "Source specifies the origin and query that drives the rule.",
+  "sourceEnvironmentRef": "SourceEnvironmentRef is the reference to the source environment",
+  "spec": "Spec is the frozen specification of the component type at the time of this ComponentRelease.",
+  "startedAt": "StartedAt is the timestamp when the task started execution.",
+  "state": "State controls the state of the Release created by this binding. Active: Resources are deployed normally Undeploy: Resources are removed from the data plane",
+  "status": "Status captures the entire .status field of the resource applied to the data plane.",
+  "subject": "Subject is the email subject line template using CEL expressions Example: \"[${alert.severity}] - ${alert.name} Triggered\"",
+  "target": "Target selects which rendered resources this validation applies to.",
+  "targetEnvironmentRefs": "SourceEnvironmentRef is the reference to the source environment TargetEnvironmentRefs is the list of target environments",
+  "targetPlane": "TargetPlane specifies which plane this resource should be deployed to Defaults to \"dataplane\" if not specified",
+  "targetPort": "TargetPort maps to the container listening port. Optional — defaults to port.",
+  "tasks": "Tasks contains the list of workflow tasks with their execution status. This provides a vendor-neutral view of the workflow steps regardless of the underlying workflow engine (e.g., Argo Workflows, Tekton). Tasks are ordered by their execution sequence.",
+  "template": "Template contains the Kubernetes resource with CEL expressions CEL expressions are enclosed in ${...} and will be evaluated at runtime",
+  "threshold": "Threshold is the trigger value for the configured operator.",
+  "tls": "Name is the name of the Gateway resource. Namespace is the namespace of the Gateway resource. HTTP defines the HTTP listener configuration. HTTPS defines the HTTPS listener configuration. TLS defines the TLS listener configuration.",
+  "to": "To is the list of recipient email addresses Required when type is \"email\"",
+  "traitEnvironmentConfigs": "TraitEnvironmentConfigs provides environment-specific overrides for trait configurations Keyed by instanceName (which must be unique across all traits in the component) Structure: map[instanceName]overrideValues",
+  "traits": "Traits are pre-configured trait instances embedded in the ClusterComponentType. Only ClusterTrait references are allowed since ClusterComponentType is cluster-scoped. The PE binds trait parameters using concrete values or CEL expressions referencing the ComponentType schema (e.g., \"${parameters.storage.mountPath}\"). These traits are automatically applied to all Components of this type.",
+  "triggerAiCostAnalysis": "TriggerAiCostAnalysis toggles whether an AI cost analysis should be triggered when an incident is created. To set this to true, Enabled must also be set to true.",
+  "triggerAiRca": "TriggerAiRca toggles whether an AI root cause analysis should be triggered when an incident is created. To set this to true, Enabled must also be set to true.",
+  "ttlAfterCompletion": "TTLAfterCompletion defines the time-to-live for WorkflowRun instances after completion.",
+  "type": "Type specifies the telemetry source type (log, metric).",
+  "url": "URL the Git repository URL Examples: - https://github.com/jhonb2077/customer-service - https://gitlab.com/jhonb2077/customer-service",
+  "username": "Username for SMTP authentication Provided via secret reference (TODO: Support inline username)",
+  "validations": "Validations are CEL-based rules evaluated during rendering. Deprecated: use PreRenderValidations. Retained for backward compatibility; it is mutually exclusive with PreRenderValidations and has identical semantics.",
+  "value": "SecretKeyRef is a reference to a secret containing the value Value is the inline value (optional fallback)",
+  "valueFrom": "ValueFrom references a secret containing the header value Mutually exclusive with value",
+  "var": "Var is the loop variable name when using forEach Example: \"config\" will make each item available as ${config} in templates",
+  "version": "Version is the API version of the resource (e.g., \"v1\", \"v1beta1\")",
+  "visibility": "Visibility is the desired visibility level for resolving the endpoint URL.",
+  "webhookConfig": "WebhookConfig contains the webhook notification channel configuration Required when type is \"webhook\"",
+  "when": "When is an optional CEL guard evaluated once against the trait context (the loop variable is NOT in scope here). If set and it evaluates to false, this validation is skipped entirely.",
+  "where": "Where is an optional CEL expression to filter which resources to patch Example: ${resource.metadata.name.endsWith(\"-secret-envs\")}",
+  "window": "Window is the time window that is aggregated before a comparison is made.",
+  "workflow": "Workflow defines the workflow configuration for building the component. This references a Workflow CR and provides parameter values. The Workflow must be in the allowedWorkflows list of the ComponentType.",
+  "workflowPlaneRef": "WorkflowPlaneRef references the ClusterWorkflowPlane for this workflow's operations. Defaults to ClusterWorkflowPlane named \"default\" when omitted. \"ClusterWorkflowPlane\", name: \"default\"} == oldSelf\",message=\"spec.workflowPlaneRef is immutable\"",
+  "workload": "Workload is a full embedded copy of the Workload This preserves the workload spec with the built image == oldSelf\",message=\"spec.workload is immutable\"",
+  "workloadOverrides": "WorkloadOverrides provides environment-specific overrides for the entire workload spec These values override the workload specification for this specific environment",
+  "workloadType": "WorkloadType must be one of: deployment, statefulset, cronjob, job, proxy This determines the primary workload resource type for this component type == oldSelf\",message=\"spec.workloadType cannot be changed after creation\"",
+  
+  "goToDefinitions": {
+    "Project": {
+      "description": "A Project represents a cloud-native application composed of multiple components in OpenChoreo.",
+      "url": "https://openchoreo.dev/docs/reference/api/application/project/"
+    },
+    "Component": {
+      "description": "A Component represents a deployable unit of an application in OpenChoreo.",
+      "url": "https://openchoreo.dev/docs/reference/api/application/component/"
+    },
+    "WorkflowRun": {
+      "description": "A WorkflowRun represents a single execution instance of a Workflow in OpenChoreo.",
+      "url": "https://openchoreo.dev/docs/reference/api/application/workflowrun/"
+    },
+    "Workload": {
+      "description": "A Workload defines the runtime specification for a Component in OpenChoreo, including container configuration, network endpoints, and dependencies on other services.",
+      "url": "https://openchoreo.dev/docs/reference/api/application/workload/"
+    },
+    "Resource": {
+      "description": "A Resource represents a developer-declared dependency on managed infrastructure (database, queue, cache, object store) provisioned through a ResourceType or ClusterResourceType template.",
+      "url": "https://openchoreo.dev/docs/reference/api/application/resource/"
+    },
+    "DataPlane": {
+      "description": "A DataPlane represents a Kubernetes cluster where application workloads are deployed.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/dataplane/"
+    },
+    "ClusterDataPlane": {
+      "description": "A ClusterDataPlane is a cluster-scoped variant of DataPlane that represents a Kubernetes cluster where application workloads are deployed.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/clusterdataplane/"
+    },
+    "WorkflowPlane": {
+      "description": "A WorkflowPlane represents the infrastructure layer responsible for executing workflow workloads in OpenChoreo.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/workflowplane/"
+    },
+    "ClusterWorkflowPlane": {
+      "description": "A ClusterWorkflowPlane is a cluster-scoped variant of WorkflowPlane that represents the infrastructure layer responsible for executing workflow workloads in OpenChoreo.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/clusterworkflowplane/"
+    },
+    "ObservabilityPlane": {
+      "description": "An ObservabilityPlane represents the infrastructure layer responsible for collecting, storing, and analyzing observability data (metrics, logs, and traces) from OpenChoreo workloads.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/observabilityplane/"
+    },
+    "ClusterObservabilityPlane": {
+      "description": "A ClusterObservabilityPlane is a cluster-scoped variant of ObservabilityPlane that represents the infrastructure layer responsible for collecting, storing, and analyzing observability data (metrics, logs, and traces) from OpenChoreo workloads.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/clusterobservabilityplane/"
+    },
+    "ComponentType": {
+      "description": "A ComponentType is a platform-defined template that determines how components are deployed and what resources are generated for them.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/componenttype/"
+    },
+    "ClusterComponentType": {
+      "description": "A ClusterComponentType is a cluster-scoped variant of ComponentType that defines reusable deployment templates available across all namespaces.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/clustercomponenttype/"
+    },
+    "Trait": {
+      "description": "A Trait represents a cross-cutting concern that can be attached to components to add additional capabilities like persistent storage, observability, security policies, or service mesh integration.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/trait/"
+    },
+    "ClusterTrait": {
+      "description": "A ClusterTrait is a cluster-scoped variant of Trait that defines reusable cross-cutting concerns available across namespaces.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/clustertrait/"
+    },
+    "ResourceType": {
+      "description": "A ResourceType is a platform-defined template that governs how managed infrastructure (databases, queues, caches, object stores) is provisioned on the data plane and exposed to consumers.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/resourcetype/"
+    },
+    "ClusterResourceType": {
+      "description": "A ClusterResourceType is the cluster-scoped variant of ResourceType.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/clusterresourcetype/"
+    },
+    "ProjectType": {
+      "description": "A ProjectType is the platform-engineer-defined infrastructure template for a project.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/projecttype/"
+    },
+    "ClusterProjectType": {
+      "description": "A ClusterProjectType is the cluster-scoped sibling of ProjectType.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/clusterprojecttype/"
+    },
+    "Workflow": {
+      "description": "A Workflow is a platform engineer-defined template for running automation tasks in OpenChoreo.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/workflow/"
+    },
+    "ClusterWorkflow": {
+      "description": "A ClusterWorkflow is a cluster-scoped variant of Workflow that defines reusable automation templates available across all namespaces.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/clusterworkflow/"
+    },
+    "SecretReference": {
+      "description": "A SecretReference defines a mapping between external secret store entries and Kubernetes Secrets.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/secretreference/"
+    },
+    "DeploymentPipeline": {
+      "description": "A DeploymentPipeline defines the promotion paths for deploying applications across different environments in OpenChoreo.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/deployment-pipeline/"
+    },
+    "Environment": {
+      "description": "An Environment represents a runtime context (e.g., dev, test, staging, production) where workloads are deployed and executed.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/environment/"
+    },
+    "ReleaseBinding": {
+      "description": "A ReleaseBinding represents an environment-specific deployment of a Component.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/releasebinding/"
+    },
+    "ResourceReleaseBinding": {
+      "description": "A ResourceReleaseBinding pins a specific ResourceRelease to an Environment and carries per-environment overrides for the referenced ResourceType template.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/resourcereleasebinding/"
+    },
+    "ProjectReleaseBinding": {
+      "description": "A ProjectReleaseBinding pins a ProjectRelease to an Environment, owns the cell namespace for that project and environment pair, and applies the project-type resources from the inlined snapshot to that namespace.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/projectreleasebinding/"
+    },
+    "ObservabilityAlertRule": {
+      "description": "An ObservabilityAlertRule defines a rule for monitoring runtime observability data (metrics or logs) and triggering alerts when specific conditions are met.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/observabilityalertrule/"
+    },
+    "ObservabilityAlertsNotificationChannel": {
+      "description": "An ObservabilityAlertsNotificationChannel defines a destination for alert notifications.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/observabilityalertsnotificationchannel/"
+    },
+    "AuthzRole": {
+      "description": "An AuthzRole defines a namespace-scoped authorization role containing a set of permitted actions.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/authzrole/"
+    },
+    "ClusterAuthzRole": {
+      "description": "A ClusterAuthzRole defines a cluster-scoped authorization role containing a set of permitted actions.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/clusterauthzrole/"
+    },
+    "AuthzRoleBinding": {
+      "description": "An AuthzRoleBinding connects a subject (identified by a JWT claim-value pair) to one or more roles within a namespace.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/authzrolebinding/"
+    },
+    "ClusterAuthzRoleBinding": {
+      "description": "A ClusterAuthzRoleBinding connects a subject (identified by a JWT claim-value pair) to one or more ClusterAuthzRole resources, granting or denying the roles' permissions.",
+      "url": "https://openchoreo.dev/docs/reference/api/platform/clusterauthzrolebinding/"
+    },
+    "ComponentRelease": {
+      "description": "A ComponentRelease represents an immutable snapshot of a component's configuration at a specific point in time in OpenChoreo.",
+      "url": "https://openchoreo.dev/docs/reference/api/runtime/componentrelease/"
+    },
+    "ResourceRelease": {
+      "description": "A ResourceRelease is an immutable snapshot of a Resource and the referenced ResourceType or ClusterResourceType at the moment it was cut.",
+      "url": "https://openchoreo.dev/docs/reference/api/runtime/resourcerelease/"
+    },
+    "ProjectRelease": {
+      "description": "A ProjectRelease is an immutable snapshot of a Project and its referenced ProjectType (or ClusterProjectType) at a point in time.",
+      "url": "https://openchoreo.dev/docs/reference/api/runtime/projectrelease/"
+    },
+    "RenderedRelease": {
+      "description": "A RenderedRelease represents the actual deployment of application resources to a target plane (DataPlane or ObservabilityPlane) in OpenChoreo.",
+      "url": "https://openchoreo.dev/docs/reference/api/runtime/renderedrelease/"
+    }
+  }
+}
