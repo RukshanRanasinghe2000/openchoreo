@@ -1,0 +1,13 @@
+apiVersion: openchoreo.dev/v1alpha1
+kind: Environment
+metadata:
+  name: env-test
+  namespace: default
+  annotations:
+    openchoreo.dev/display-name: "test env "
+    openchoreo.dev/description: "This is a test env "
+spec:
+  dataPlaneRef:
+    kind: ClusterDataPlane
+    name: default
+  isProduction: true

@@ -10,7 +10,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/openchoreo/openchoreo/internal/lsp"
+	"github.com/openchoreo/openchoreo/tools/lsp"
 )
 
 // Flags accepted for vscode-languageclient compatibility. Declared package-level

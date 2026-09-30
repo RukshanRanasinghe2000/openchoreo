@@ -166,6 +166,12 @@ linters:
           - dupl
           - lll
         path: ^internal/
+      # tools/lint and tools/lsp are the vendored linter/LSP sources; they carry
+      # the same generated-table and long-schema-literal shape as internal/.
+      - linters:
+          - dupl
+          - lll
+        path: ^tools/(lint|lsp)/
       # MCP scope-collapsed tool registration files and their spec-test fixtures
       # are intentionally parallel per resource family (project types mirror
       # resource types, etc.). dupl flags this structural repetition with no value.
