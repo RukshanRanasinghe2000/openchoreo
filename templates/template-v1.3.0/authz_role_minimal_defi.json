@@ -1,0 +1,65 @@
+{
+  "type": "object",
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "required": true,
+      "default": "openchoreo.dev/v1alpha1"
+    },
+    "kind": {
+      "type": "string",
+      "required": true,
+      "default": "AuthzRole"
+    },
+    "metadata": {
+      "type": "object",
+      "required": false,
+      "properties": {
+        "annotations": {
+          "type": "object",
+          "required": false,
+          "preserveUnknownFields": true
+        },
+        "creationTimestamp": {
+          "type": "string",
+          "required": false
+        },
+        "labels": {
+          "type": "object",
+          "required": false,
+          "preserveUnknownFields": true
+        },
+        "name": {
+          "type": "string",
+          "required": false
+        },
+        "namespace": {
+          "type": "string",
+          "required": false
+        },
+        "uid": {
+          "type": "string",
+          "required": false
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": false,
+      "properties": {
+        "actions": {
+          "type": "array",
+          "required": true,
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "description": {
+          "type": "string",
+          "required": false
+        }
+      }
+    }
+  }
+}

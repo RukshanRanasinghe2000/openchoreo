@@ -1,0 +1,229 @@
+{
+  "type": "object",
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "required": true,
+      "default": "openchoreo.dev/v1alpha1"
+    },
+    "kind": {
+      "type": "string",
+      "required": true,
+      "default": "Component"
+    },
+    "metadata": {
+      "type": "object",
+      "required": false,
+      "properties": {
+        "annotations": {
+          "type": "object",
+          "required": false,
+          "preserveUnknownFields": true
+        },
+        "creationTimestamp": {
+          "type": "string",
+          "required": false
+        },
+        "labels": {
+          "type": "object",
+          "required": false,
+          "preserveUnknownFields": true
+        },
+        "name": {
+          "type": "string",
+          "required": false
+        },
+        "namespace": {
+          "type": "string",
+          "required": false
+        },
+        "uid": {
+          "type": "string",
+          "required": false
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": false,
+      "properties": {
+        "autoBuild": {
+          "type": "boolean",
+          "required": false
+        },
+        "autoDeploy": {
+          "type": "boolean",
+          "required": false
+        },
+        "componentType": {
+          "type": "object",
+          "required": true,
+          "properties": {
+            "kind": {
+              "type": "string",
+              "required": false,
+              "default": "ComponentType",
+              "enum": [
+                "ComponentType",
+                "ClusterComponentType"
+              ]
+            },
+            "name": {
+              "type": "string",
+              "required": true,
+              "pattern": "^(deployment|statefulset|cronjob|job|proxy)/[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+            }
+          }
+        },
+        "owner": {
+          "type": "object",
+          "required": true,
+          "properties": {
+            "projectName": {
+              "type": "string",
+              "required": true,
+              "minLength": 1
+            }
+          }
+        },
+        "parameters": {
+          "type": "object",
+          "required": false,
+          "preserveUnknownFields": true
+        },
+        "traits": {
+          "type": "array",
+          "required": false,
+          "items": {
+            "type": "object",
+            "properties": {
+              "instanceName": {
+                "type": "string",
+                "required": true,
+                "minLength": 1
+              },
+              "kind": {
+                "type": "string",
+                "required": false,
+                "default": "Trait",
+                "enum": [
+                  "Trait",
+                  "ClusterTrait"
+                ]
+              },
+              "name": {
+                "type": "string",
+                "required": true,
+                "minLength": 1
+              },
+              "parameters": {
+                "type": "object",
+                "required": false,
+                "preserveUnknownFields": true
+              }
+            }
+          }
+        },
+        "workflow": {
+          "type": "object",
+          "required": false,
+          "properties": {
+            "kind": {
+              "type": "string",
+              "required": false,
+              "default": "ClusterWorkflow",
+              "enum": [
+                "Workflow",
+                "ClusterWorkflow"
+              ]
+            },
+            "name": {
+              "type": "string",
+              "required": true,
+              "minLength": 1
+            },
+            "parameters": {
+              "type": "object",
+              "required": false,
+              "preserveUnknownFields": true
+            }
+          }
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "required": false,
+      "properties": {
+        "conditions": {
+          "type": "array",
+          "required": false,
+          "items": {
+            "type": "object",
+            "properties": {
+              "lastTransitionTime": {
+                "type": "string",
+                "required": false,
+                "format": "date-time"
+              },
+              "message": {
+                "type": "string",
+                "required": false,
+                "maxLength": 32768
+              },
+              "observedGeneration": {
+                "type": "integer",
+                "required": false,
+                "format": "int64",
+                "minimum": 0
+              },
+              "reason": {
+                "type": "string",
+                "required": false,
+                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                "minLength": 1,
+                "maxLength": 1024
+              },
+              "status": {
+                "type": "string",
+                "required": false,
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "required": false,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                "maxLength": 316
+              }
+            }
+          }
+        },
+        "latestRelease": {
+          "type": "object",
+          "required": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "required": true,
+              "minLength": 1
+            },
+            "releaseHash": {
+              "type": "string",
+              "required": true,
+              "minLength": 1
+            }
+          }
+        },
+        "observedGeneration": {
+          "type": "integer",
+          "required": false,
+          "format": "int64"
+        }
+      }
+    }
+  }
+}

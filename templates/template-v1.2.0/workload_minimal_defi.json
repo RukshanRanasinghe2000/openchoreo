@@ -1,0 +1,270 @@
+{
+  "type": "object",
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "required": true,
+      "default": "openchoreo.dev/v1alpha1"
+    },
+    "kind": {
+      "type": "string",
+      "required": true,
+      "default": "Workload"
+    },
+    "metadata": {
+      "type": "object",
+      "required": false,
+      "properties": {
+        "annotations": {
+          "type": "object",
+          "required": false,
+          "preserveUnknownFields": true
+        },
+        "creationTimestamp": {
+          "type": "string",
+          "required": false
+        },
+        "labels": {
+          "type": "object",
+          "required": false,
+          "preserveUnknownFields": true
+        },
+        "name": {
+          "type": "string",
+          "required": false
+        },
+        "namespace": {
+          "type": "string",
+          "required": false
+        },
+        "uid": {
+          "type": "string",
+          "required": false
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": false,
+      "properties": {
+        "container": {
+          "type": "object",
+          "required": true,
+          "properties": {
+            "args": {
+              "type": "array",
+              "required": false,
+              "items": {
+                "type": "string"
+              }
+            },
+            "command": {
+              "type": "array",
+              "required": false,
+              "items": {
+                "type": "string"
+              }
+            },
+            "env": {
+              "type": "array",
+              "required": false,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "required": true
+                  },
+                  "value": {
+                    "type": "string",
+                    "required": false
+                  },
+                  "valueFrom": {
+                    "type": "object",
+                    "required": false,
+                    "properties": {
+                      "secretKeyRef": {
+                        "type": "object",
+                        "required": false,
+                        "properties": {
+                          "key": {
+                            "type": "string",
+                            "required": true,
+                            "minLength": 1
+                          },
+                          "name": {
+                            "type": "string",
+                            "required": true,
+                            "minLength": 1
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "files": {
+              "type": "array",
+              "required": false,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "required": true
+                  },
+                  "mountPath": {
+                    "type": "string",
+                    "required": true
+                  },
+                  "value": {
+                    "type": "string",
+                    "required": false
+                  },
+                  "valueFrom": {
+                    "type": "object",
+                    "required": false,
+                    "properties": {
+                      "secretKeyRef": {
+                        "type": "object",
+                        "required": false,
+                        "properties": {
+                          "key": {
+                            "type": "string",
+                            "required": true,
+                            "minLength": 1
+                          },
+                          "name": {
+                            "type": "string",
+                            "required": true,
+                            "minLength": 1
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "image": {
+              "type": "string",
+              "required": true,
+              "minLength": 1
+            }
+          }
+        },
+        "dependencies": {
+          "type": "object",
+          "required": false,
+          "properties": {
+            "endpoints": {
+              "type": "array",
+              "required": false,
+              "maxItems": 50,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "component": {
+                    "type": "string",
+                    "required": true,
+                    "minLength": 1
+                  },
+                  "envBindings": {
+                    "type": "object",
+                    "required": true,
+                    "properties": {
+                      "address": {
+                        "type": "string",
+                        "required": false
+                      },
+                      "basePath": {
+                        "type": "string",
+                        "required": false
+                      },
+                      "host": {
+                        "type": "string",
+                        "required": false
+                      },
+                      "port": {
+                        "type": "string",
+                        "required": false
+                      }
+                    }
+                  },
+                  "name": {
+                    "type": "string",
+                    "required": true,
+                    "minLength": 1
+                  },
+                  "project": {
+                    "type": "string",
+                    "required": false
+                  },
+                  "visibility": {
+                    "type": "string",
+                    "required": true,
+                    "enum": [
+                      "project",
+                      "namespace"
+                    ]
+                  }
+                }
+              }
+            },
+            "resources": {
+              "type": "array",
+              "required": false,
+              "maxItems": 50,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "envBindings": {
+                    "type": "object",
+                    "required": false,
+                    "preserveUnknownFields": true
+                  },
+                  "fileBindings": {
+                    "type": "object",
+                    "required": false,
+                    "preserveUnknownFields": true
+                  },
+                  "ref": {
+                    "type": "string",
+                    "required": true,
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "endpoints": {
+          "type": "object",
+          "required": false,
+          "preserveUnknownFields": true
+        },
+        "owner": {
+          "type": "object",
+          "required": true,
+          "properties": {
+            "componentName": {
+              "type": "string",
+              "required": true,
+              "minLength": 1
+            },
+            "projectName": {
+              "type": "string",
+              "required": true,
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "required": false
+    }
+  }
+}

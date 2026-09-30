@@ -1,0 +1,204 @@
+{
+  "type": "object",
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "required": true,
+      "default": "openchoreo.dev/v1alpha1"
+    },
+    "kind": {
+      "type": "string",
+      "required": true,
+      "default": "ObservabilityAlertsNotificationChannel"
+    },
+    "metadata": {
+      "type": "object",
+      "required": false,
+      "properties": {
+        "annotations": {
+          "type": "object",
+          "required": false,
+          "preserveUnknownFields": true
+        },
+        "creationTimestamp": {
+          "type": "string",
+          "required": false
+        },
+        "labels": {
+          "type": "object",
+          "required": false,
+          "preserveUnknownFields": true
+        },
+        "name": {
+          "type": "string",
+          "required": false
+        },
+        "namespace": {
+          "type": "string",
+          "required": false
+        },
+        "uid": {
+          "type": "string",
+          "required": false
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": false,
+      "properties": {
+        "emailConfig": {
+          "type": "object",
+          "required": false,
+          "properties": {
+            "from": {
+              "type": "string",
+              "required": true
+            },
+            "smtp": {
+              "type": "object",
+              "required": true,
+              "properties": {
+                "auth": {
+                  "type": "object",
+                  "required": true,
+                  "properties": {
+                    "password": {
+                      "type": "object",
+                      "required": true,
+                      "properties": {
+                        "secretKeyRef": {
+                          "type": "object",
+                          "required": false,
+                          "properties": {
+                            "key": {
+                              "type": "string",
+                              "required": true,
+                              "minLength": 1
+                            },
+                            "name": {
+                              "type": "string",
+                              "required": true,
+                              "minLength": 1
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "username": {
+                      "type": "object",
+                      "required": true,
+                      "properties": {
+                        "secretKeyRef": {
+                          "type": "object",
+                          "required": false,
+                          "properties": {
+                            "key": {
+                              "type": "string",
+                              "required": true,
+                              "minLength": 1
+                            },
+                            "name": {
+                              "type": "string",
+                              "required": true,
+                              "minLength": 1
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "host": {
+                  "type": "string",
+                  "required": true
+                },
+                "port": {
+                  "type": "integer",
+                  "required": true,
+                  "format": "int32",
+                  "minimum": 1,
+                  "maximum": 65535
+                },
+                "tls": {
+                  "type": "object",
+                  "required": true,
+                  "properties": {
+                    "insecureSkipVerify": {
+                      "type": "boolean",
+                      "required": true,
+                      "default": false
+                    }
+                  }
+                }
+              }
+            },
+            "template": {
+              "type": "object",
+              "required": true,
+              "properties": {
+                "body": {
+                  "type": "string",
+                  "required": true
+                },
+                "subject": {
+                  "type": "string",
+                  "required": true
+                }
+              }
+            },
+            "to": {
+              "type": "array",
+              "required": true,
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "environment": {
+          "type": "string",
+          "required": true
+        },
+        "isEnvDefault": {
+          "type": "boolean",
+          "required": false,
+          "default": false
+        },
+        "type": {
+          "type": "string",
+          "required": true,
+          "enum": [
+            "email",
+            "webhook"
+          ]
+        },
+        "webhookConfig": {
+          "type": "object",
+          "required": false,
+          "properties": {
+            "headers": {
+              "type": "object",
+              "required": false,
+              "preserveUnknownFields": true
+            },
+            "payloadTemplate": {
+              "type": "string",
+              "required": false
+            },
+            "url": {
+              "type": "string",
+              "required": true,
+              "format": "uri"
+            }
+          }
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "required": false
+    }
+  }
+}

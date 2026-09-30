@@ -1,0 +1,11 @@
+apiVersion: openchoreo.dev/v1alpha1
+kind: Project
+metadata:
+  name: proj-a
+spec: {}
+---
+apiVersion: openchoreo.dev/v1alpha1
+kind: Component
+metadata:
+  name: comp-a
+spec: {}
