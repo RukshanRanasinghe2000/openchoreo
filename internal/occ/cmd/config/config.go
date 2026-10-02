@@ -257,6 +257,36 @@ func (c *Config) UseContext(params UseContextParams) error {
 // leaves such a command's flags untouched.
 const SkipContextDefaultsAnnotation = "occ.openchoreo.dev/skip-context-defaults"
 
+// SkipContextBootstrapAnnotation marks commands that do not need an occ context.
+// It prevents creating ~/.openchoreo/config or applying context defaults.
+//
+// This is separate from SkipContextDefaultsAnnotation:
+// - SkipContextDefaultsAnnotation skips flag defaults.
+// - SkipContextBootstrapAnnotation skips the context completely.
+//
+// Cobra does not automatically pass annotations from parent to child commands.
+// So we check the command and its parents. This makes sure both
+// `occ lint` and `occ lint vali` skip context setup.
+// See skipContextBootstrap.
+const SkipContextBootstrapAnnotation = "occ.openchoreo.dev/skip-context-bootstrap"
+
+// ShouldSkipContextBootstrap checks whether the command or any of its parents
+// does not need an occ context.
+//
+// We check the parent commands too, so the annotation can apply to a whole
+// group of commands, not just one command.
+//
+// cmd/occ/main.go uses this to skip EnsureContext, and ApplyContextDefaults
+// uses it to avoid trying to read a context that does not exist.
+func ShouldSkipContextBootstrap(cmd *cobra.Command) bool {
+	for c := cmd; c != nil; c = c.Parent() {
+		if _, ok := c.Annotations[SkipContextBootstrapAnnotation]; ok {
+			return true
+		}
+	}
+	return false
+}
+
 // ApplyContextDefaults loads the stored config and sets default flag values
 // from the current context, if not already provided.
 func ApplyContextDefaults(cmd *cobra.Command) error {
@@ -265,6 +295,11 @@ func ApplyContextDefaults(cmd *cobra.Command) error {
 		return nil
 	}
 	if _, skip := cmd.Annotations[SkipContextDefaultsAnnotation]; skip {
+		return nil
+	}
+	// A command that needs no context at all must not have defaults pulled from
+	// one either, so the stronger annotation subsumes the weaker check above.
+	if ShouldSkipContextBootstrap(cmd) {
 		return nil
 	}
 

@@ -18,6 +18,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/openchoreo/openchoreo/internal/occ/cmd/config"
+	lintcmd "github.com/openchoreo/openchoreo/internal/occ/cmd/lint"
 	"github.com/openchoreo/openchoreo/internal/occ/resources/client"
 	"github.com/openchoreo/openchoreo/internal/openchoreo-api/api/gen"
 )
@@ -57,6 +58,14 @@ func Apply(c *client.Client, params Params) error {
 	var errs []string
 
 	for _, filePath := range resourceFiles {
+		// Lint the file before applying. RunValidateWithObj prints the same JSON
+		// report as `occ linter vali -obj` when the file has errors, so the only
+		// thing left here is to skip the file rather than push it to the server.
+		if err := lintcmd.RunValidateWithObj(filePath); err != nil {
+			errs = append(errs, fmt.Sprintf("%s: lint validation failed", filePath))
+			continue
+		}
+
 		content, err := readResourceContent(ctx, filePath)
 		if err != nil {
 			errs = append(errs, fmt.Sprintf("failed to read %s: %v", filePath, err))

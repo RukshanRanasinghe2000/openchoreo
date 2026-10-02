@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/openchoreo/openchoreo/internal/occ/auth"
+	lintcmd "github.com/openchoreo/openchoreo/internal/occ/cmd/lint"
 	"github.com/openchoreo/openchoreo/internal/occ/resources/client"
 )
 
@@ -19,7 +20,15 @@ func NewApplyCmd(f client.NewClientFunc) *cobra.Command {
 Examples:
   # Apply a namespace configuration
   occ apply -f namespace.yaml`,
-		PreRunE: auth.RequireLogin(),
+			PreRunE: func(cmd *cobra.Command, args []string) error {
+			filePath, _ := cmd.Flags().GetString("file")
+			if filePath != "" {
+				if err := lintcmd.RunValidateWithObj(filePath); err != nil {
+					return err
+				}
+			}
+			return auth.RequireLogin()(cmd, args)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			filePath, _ := cmd.Flags().GetString("file")
 			cl, err := f()
