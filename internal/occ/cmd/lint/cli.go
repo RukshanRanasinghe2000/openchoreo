@@ -14,7 +14,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -396,30 +395,17 @@ func runValidate(f validateFlags, path string) error {
 	return nil
 }
 
-// RunValidateWithObj validates path the same way `occ linter vali -obj` does and
-// returns nil when the file is clean. When validation finds errors it returns an
-// ExitError and the JSON report is written to stdout, exactly as the linter
-// command would print it; on success nothing is printed.
-//
-// It exists so a command that must gate on validation, such as `occ apply`, can
-// reuse the linter without shelling out or duplicating its rules. Because the
-// report is buffered, a clean run stays quiet.
-func RunValidateWithObj(path string) error {
-	f := validateFlags{
-		obj:      true,
-		parallel: runtime.GOMAXPROCS(0),
+// // RunValidate validates a single path and prints a human-readable report
+// to stdout (like `occ linter vali`), returning nil if clean and an error if
+// validation finds issues or fails.
+func RunValidate(path string) error {
+	err, warns, wrote := validateFile(path, false, buildNamesForFile(path), fixConfig{})
+	if err > 0 {
+		fmt.Printf("Validation failed: %d error(s), %d warning(s)%s\n", err, warns, summaryNote(fixConfig{}, countRewritten(wrote)))
+		return ErrFindings
 	}
-
-	var buf bytes.Buffer
-	prev := reportWriter
-	reportWriter = &buf
-	defer func() { reportWriter = prev }()
-
-	err := runValidate(f, path)
-	if err != nil {
-		fmt.Fprint(os.Stdout, buf.String())
-	}
-	return err
+	fmt.Printf("Validation passed: %d warning(s)%s\n", warns, summaryNote(fixConfig{}, countRewritten(wrote)))
+	return nil
 }
 
 // countRewritten turns a single file's rewritten flag into the count the

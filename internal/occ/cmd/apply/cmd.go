@@ -23,7 +23,7 @@ Examples:
 			PreRunE: func(cmd *cobra.Command, args []string) error {
 			filePath, _ := cmd.Flags().GetString("file")
 			if filePath != "" {
-				if err := lintcmd.RunValidateWithObj(filePath); err != nil {
+				if err := lintcmd.RunValidate(filePath); err != nil {
 					return err
 				}
 			}
