@@ -376,6 +376,7 @@ func runValidate(f validateFlags, path string) error {
 		errs, warns, wrote := validateFile(path, false, nil, cfg)
 		if errs > 0 {
 			fmt.Printf("Validation failed: %d error(s), %d warning(s)%s\n", errs, warns, summaryNote(cfg, countRewritten(wrote)))
+			fmt.Printf("Hint: try 'occ lint vali -fix <folder path>'\n")
 			return exitErrorf(1)
 		}
 		fmt.Printf("Validation passed: %d warning(s)%s\n", warns, summaryNote(cfg, countRewritten(wrote)))
@@ -389,6 +390,7 @@ func runValidate(f validateFlags, path string) error {
 	errs, warns, wrote := validateFile(path, false, buildNamesForFile(path), cfg)
 	if errs > 0 {
 		fmt.Printf("Validation failed: %d error(s), %d warning(s)%s\n", errs, warns, summaryNote(cfg, countRewritten(wrote)))
+		fmt.Printf("Hint: try 'occ lint vali -fix <folder path>'\n")
 		return exitErrorf(1)
 	}
 	fmt.Printf("Validation passed: %d warning(s)%s\n", warns, summaryNote(cfg, countRewritten(wrote)))
@@ -402,6 +404,7 @@ func RunValidate(path string) error {
 	err, warns, wrote := validateFile(path, false, buildNamesForFile(path), fixConfig{})
 	if err > 0 {
 		fmt.Printf("Validation failed: %d error(s), %d warning(s)%s\n", err, warns, summaryNote(fixConfig{}, countRewritten(wrote)))
+		fmt.Printf("Hint: try 'occ lint vali -fix %s'\n", path)
 		return ErrFindings
 	}
 	fmt.Printf("Validation passed: %d warning(s)%s\n", warns, summaryNote(fixConfig{}, countRewritten(wrote)))
