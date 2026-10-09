@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/openchoreo/openchoreo/tools/lint/cel-validator"
 	"github.com/openchoreo/openchoreo/tools/lint/parser"
 	"github.com/openchoreo/openchoreo/tools/lint/ruleengine"
 	"github.com/openchoreo/openchoreo/tools/lint/ruleengine/template"
@@ -603,13 +604,73 @@ func TestKindRules_NoKindRulesForUnknown(t *testing.T) {
 	}
 }
 
+// TestCELRules_TypeChecksTemplateExpressions verifies the CEL rule surfaces
+// schema-aware findings for CEL-bearing kinds through the engine wiring.
+func TestCELRules_TypeChecksTemplateExpressions(t *testing.T) {
+	doc := parse(t, `apiVersion: openchoreo.dev/v1alpha1
+kind: ComponentType
+metadata:
+  name: svc
+spec:
+  resources:
+    - id: deployment
+      template:
+        metadata:
+          name: ${metadata.nmae}
+`)
+
+	rule := &ruleengine.CELRules{}
+	diags := rule.Evaluate(doc)
+
+	if !hasCode(diags, "cel-type-error") {
+		t.Fatalf("expected a cel-type-error diagnostic, got %v", diags)
+	}
+	for _, d := range diags {
+		if d.Severity != ruleengine.SeverityError {
+			t.Errorf("CEL diagnostics must be errors, got %v", d)
+		}
+	}
+}
+
+// TestCELRules_NoopOutsideCELKinds verifies the CEL rule ignores documents of
+// kinds that carry no template expressions, so it can be registered broadly.
+func TestCELRules_NoopOutsideCELKinds(t *testing.T) {
+	doc := parse(t, `apiVersion: openchoreo.dev/v1alpha1
+kind: Component
+metadata:
+  name: my-app
+spec:
+  componentType:
+    name: deployment/service
+`)
+	rule := &ruleengine.CELRules{}
+	if diags := rule.Evaluate(doc); len(diags) != 0 {
+		t.Fatalf("expected no diagnostics for a Component, got %v", diags)
+	}
+}
+
 // TestKindRules_SelectorReturnsCorrectCount verifies that RulesForKind
-// returns exactly one rule per known kind.
+// returns the schema rule for every known kind, plus the CEL rule for the
+// CEL-bearing kinds.
 func TestKindRules_SelectorReturnsCorrectCount(t *testing.T) {
+	celKinds := map[string]bool{
+		celvalidator.KindComponentType:        true,
+		celvalidator.KindClusterComponentType: true,
+		celvalidator.KindTrait:                true,
+		celvalidator.KindClusterTrait:         true,
+		celvalidator.KindResourceType:         true,
+		celvalidator.KindClusterResourceType:  true,
+		celvalidator.KindWorkflow:             true,
+		celvalidator.KindClusterWorkflow:      true,
+	}
 	for _, k := range template.AllKinds() {
 		rules := template.RulesForKind(k)
-		if len(rules) != 1 {
-			t.Errorf("kind %s: expected 1 rule, got %d", k, len(rules))
+		want := 1
+		if celKinds[k] {
+			want = 2
+		}
+		if len(rules) != want {
+			t.Errorf("kind %s: expected %d rules, got %d", k, want, len(rules))
 		}
 	}
 }
