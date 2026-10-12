@@ -307,6 +307,100 @@ spec:
       name: ${parameters.componentName}-ref
 `
 
+// blockScalarWorkflow places a CEL expression on the single content line of a
+// literal block scalar (value: |), the shape that previously mis-located CEL
+// diagnostics onto the "value: |" header line.
+const blockScalarWorkflow = `apiVersion: openchoreo.dev/v1alpha1
+kind: Workflow
+spec:
+  parameters:
+    openAPIV3Schema:
+      type: object
+      properties:
+        componentName:
+          type: string
+  runTemplate:
+    apiVersion: argoproj.io/v1alpha1
+    kind: Workflow
+    metadata:
+      name: ${metadata.workflowRunName}
+    spec:
+      arguments:
+        parameters:
+          - name: script
+            value: |
+              ${metadata.nosuchfield}
+`
+
+// blockScalarContentLine is the 1-indexed line holding the block scalar body
+// (the "value: |" header is the line above it).
+const blockScalarContentLine = 20
+
+func TestValidateDocumentBlockScalarPosition(t *testing.T) {
+	findings := validateParses(t, blockScalarWorkflow)
+	if len(findings) != 1 {
+		t.Fatalf("expected one finding, got %+v", findings)
+	}
+	r := findings[0].Range
+	if r.Start.Line != blockScalarContentLine {
+		t.Fatalf("block scalar finding must land on content line %d, got %+v", blockScalarContentLine, r)
+	}
+	if r.End.Line != blockScalarContentLine {
+		t.Fatalf("block scalar finding must end on content line %d, got %+v", blockScalarContentLine, r)
+	}
+	if r.End.Column <= r.Start.Column {
+		t.Fatalf("expected a token-width range, got %+v", r)
+	}
+	if r.Start.Column <= 15 {
+		t.Fatalf("finding should point inside the expression (past ${), got %+v", r)
+	}
+}
+
+func TestValidateDocumentBlockScalarStrayBrace(t *testing.T) {
+	body := strings.Replace(blockScalarWorkflow, "${metadata.nosuchfield}", "${metadata.namespace}}", 1)
+	findings := validateParses(t, body)
+	if len(findings) != 1 || findings[0].Code != CodeCELParseError {
+		t.Fatalf("expected one %s finding, got %+v", CodeCELParseError, findings)
+	}
+	r := findings[0].Range
+	if r.Start.Line != blockScalarContentLine || r.End.Line != blockScalarContentLine {
+		t.Fatalf("stray brace should stay on content line %d, got %+v", blockScalarContentLine, r)
+	}
+	if r.End.Column <= r.Start.Column {
+		t.Fatalf("stray brace should span the marker and extra brace, got %+v", r)
+	}
+}
+
+func TestValidateDocumentUnclosedBlockScalar(t *testing.T) {
+	body := strings.Replace(blockScalarWorkflow, "${metadata.nosuchfield}", "${metadata.namespace", 1)
+	findings := validateParses(t, body)
+	if len(findings) != 1 || findings[0].Code != CodeCELParseError {
+		t.Fatalf("expected one %s finding, got %+v", CodeCELParseError, findings)
+	}
+	r := findings[0].Range
+	if r.Start.Line != blockScalarContentLine {
+		t.Fatalf("unclosed marker should start on line %d, got %+v", blockScalarContentLine, r)
+	}
+	if r.End.Line != blockScalarContentLine || r.End.Column <= r.Start.Column {
+		t.Fatalf("unclosed marker should span the rest of the content line, got %+v", r)
+	}
+}
+
+func TestValidateDocumentPlainScalarTokenExtent(t *testing.T) {
+	body := strings.Replace(cleanWorkflow, "${metadata.workflowRunName}", "${metadata.nosuchfield}", 1)
+	findings := validateParses(t, body)
+	if len(findings) != 1 {
+		t.Fatalf("expected one finding, got %+v", findings)
+	}
+	r := findings[0].Range
+	if r.Start.Line != r.End.Line {
+		t.Fatalf("plain scalar finding should stay on one line, got %+v", r)
+	}
+	if r.End.Column <= r.Start.Column {
+		t.Fatalf("expected a token-width range, got %+v", r)
+	}
+}
+
 func TestValidateDocumentWorkflowClean(t *testing.T) {
 	findings := validateParses(t, cleanWorkflow)
 	if len(findings) != 0 {

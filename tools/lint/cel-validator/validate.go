@@ -47,9 +47,12 @@ type Finding struct {
 // webhook validation in internal/validation. Kinds that carry no template CEL
 // (Project, Component, ComponentRelease, ...) yield no findings.
 //
-// The reported position is the exact location of the first parser/checker
-// issue within the expression; for structural issues (e.g. a boolean field
-// that does not return a boolean) it is the start of the enclosing field.
+// The reported range covers the offending token (identifier/dotted path, or a
+// call and its arguments) at its exact document location; parse errors and
+// structural issues (e.g. a boolean field that does not return a boolean) span
+// the whole ${...} marker instead. Block scalar values are mapped through the
+// source indentation so the underline lands inside the expression, not on the
+// args: | header.
 func ValidateDocument(doc *parser.DocumentNode, pair SchemaPair) ([]Finding, error) {
 	switch doc.Kind {
 	case KindComponentType, KindClusterComponentType:
@@ -74,6 +77,233 @@ type checker struct {
 	// appliedIDs, when non-nil, enables the applied.<id> declaration check
 	// (ResourceType/ClusterResourceType only).
 	appliedIDs map[string]bool
+
+	// lines holds the raw document source split into lines. Block scalar
+	// values (args: |) are de-indented by yaml.v3 and positioned at the |>,
+	// so recovering the absolute column of a token inside them requires the
+	// real indentation, which only the source text can provide.
+	lines []string
+}
+
+// newChecker builds a checker with the document's source lines loaded.
+func newChecker(doc *parser.DocumentNode) *checker {
+	return &checker{lines: sourceLines(doc.Source)}
+}
+
+// sourceLines splits raw source bytes into lines (kept 1-indexed by slice
+// position). A nil/empty source yields nil, which the position helpers treat
+// as "no indentation information".
+func sourceLines(src []byte) []string {
+	if len(src) == 0 {
+		return nil
+	}
+	return strings.Split(string(src), "\n")
+}
+
+// isBlockScalar reports whether a scalar node's text does not begin at its
+// yaml position: literal/folded block scalars position the node at the |/>>
+// header (scannerc.go) and store de-indented content that starts on the next
+// line. Plain and quoted scalars start exactly at node.Line/Column.
+func isBlockScalar(node *yaml.Node) bool {
+	return node.Style == yaml.LiteralStyle || node.Style == yaml.FoldedStyle
+}
+
+// lineIndent returns the number of leading spaces on the 1-indexed source
+// line, or 0 when the line is unknown or empty.
+func (c *checker) lineIndent(line int) int {
+	if line <= 0 || line > len(c.lines) {
+		return 0
+	}
+	n := 0
+	for _, r := range c.lines[line-1] {
+		if r != ' ' {
+			break
+		}
+		n++
+	}
+	return n
+}
+
+// markerOffset returns the byte offset of full (a ${...} marker, or the entire
+// scalar value for whole-value callers) within node.Value, or 0 when absent.
+func markerOffset(node *yaml.Node, full string) int {
+	if full == "" || full == node.Value {
+		return 0
+	}
+	if off := strings.Index(node.Value, full); off >= 0 {
+		return off
+	}
+	return 0
+}
+
+// innerOffset locates expr within node.Value and returns the byte offset at
+// which it begins. It prefers the full ${expr} marker so embedded text is
+// unambiguous, and falls back to a bare expr for unwrapped values (a where:
+// filter may legally omit ${...}). Returns 0 when neither is found.
+func innerOffset(node *yaml.Node, expr string) int {
+	if expr == "" {
+		return 0
+	}
+	if idx := strings.Index(node.Value, "${"+expr+"}"); idx >= 0 {
+		return idx + len("${")
+	}
+	if idx := strings.Index(node.Value, expr); idx >= 0 {
+		return idx
+	}
+	return 0
+}
+
+// valueOffsetToPos maps a byte offset into a scalar node's Value back to
+// absolute document coordinates. For plain/quoted scalars the value begins at
+// the node's own position; for literal/folded block scalars it begins on the
+// line after the header and is re-aligned with the file's real indentation
+// (recovered from the source lines).
+func (c *checker) valueOffsetToPos(node *yaml.Node, off int) parser.Position {
+	value := node.Value
+	if off < 0 {
+		off = 0
+	}
+	if off > len(value) {
+		off = len(value)
+	}
+
+	linesBefore := 0
+	for _, b := range value[:off] {
+		if b == '\n' {
+			linesBefore++
+		}
+	}
+	lineStart := strings.LastIndex(value[:off], "\n") + 1
+	valueCol := off - lineStart
+
+	line := node.Line + linesBefore
+	colZero := node.Column - 1
+	if isBlockScalar(node) {
+		line = node.Line + 1 + linesBefore
+		colZero = c.lineIndent(line)
+	}
+	if line < 1 {
+		line = 1
+	}
+	return parser.Position{Line: line, Column: colZero + valueCol + 1}
+}
+
+// valueLineEndPos returns the document position of the last character of the
+// value line containing off (used to widen an unclosed-marker diagnostic).
+func (c *checker) valueLineEndPos(node *yaml.Node, off int) parser.Position {
+	value := node.Value
+	if off >= 0 && off < len(value) {
+		if idx := strings.IndexByte(value[off:], '\n'); idx > 0 {
+			return c.valueOffsetToPos(node, off+idx-1)
+		}
+	}
+	return c.valueOffsetToPos(node, len(value))
+}
+
+// markerSpan returns the positions of a ${...} marker's first and last
+// characters. Without a recognized marker (whole-value callers) the whole
+// scalar value is spanned.
+func (c *checker) markerSpan(node *yaml.Node, full string) parser.Range {
+	off := markerOffset(node, full)
+	start := c.valueOffsetToPos(node, off)
+	end := start
+	if full != "" && full != node.Value && off+len(full)-1 < len(node.Value) {
+		end = c.valueOffsetToPos(node, off+len(full)-1)
+	} else if node.Value != "" {
+		end = c.valueOffsetToPos(node, len(node.Value)-1)
+	}
+	return parser.Range{Start: start, End: end}
+}
+
+// exprOffset maps a CEL issue location (1-based line, 0-based column within
+// expr) to a byte offset in expr, or -1 when the location is out of range.
+func exprOffset(expr string, loc common.Location) int {
+	line := loc.Line()
+	if line < 1 {
+		line = 1
+	}
+	col := loc.Column()
+	if col < 0 {
+		col = 0
+	}
+	off := 0
+	for i := 1; i < line; i++ {
+		idx := strings.IndexByte(expr[off:], '\n')
+		if idx < 0 {
+			return -1
+		}
+		off += idx + 1
+	}
+	off += col
+	if off > len(expr) {
+		off = len(expr)
+	}
+	return off
+}
+
+// celdTokenEnd returns the byte offset (within node.Value) just past the CEL
+// token beginning at off: a quoted string literal, an identifier/dotted path
+// (numeric literals too), and — when the token is a call — its balanced
+// argument list. It returns off unchanged when no token characters follow.
+func celdTokenEnd(value string, off int) int {
+	n := len(value)
+	i := off
+	var quote byte
+	for i < n {
+		ch := value[i]
+		if quote != 0 {
+			if ch == quote {
+				quote = 0
+			} else if ch == '\\' && i+1 < n {
+				i++
+			}
+			i++
+			continue
+		}
+		switch {
+		case ch == '\'' || ch == '"':
+			quote = ch
+			i++
+		case (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+			(ch >= '0' && ch <= '9') || ch == '_' || ch == '.':
+			i++
+		default:
+			goto afterIdent
+		}
+	}
+
+afterIdent:
+	if i < n && value[i] == '(' {
+		depth := 0
+		for i < n {
+			switch value[i] {
+			case '(':
+				depth++
+			case ')':
+				depth--
+				if depth == 0 {
+					i++
+					goto done
+				}
+			case '\'', '"':
+				q := value[i]
+				i++
+				for i < n && value[i] != q {
+					if value[i] == '\\' && i+1 < n {
+						i++
+					}
+					i++
+				}
+				if i < n {
+					i++
+				}
+				continue
+			}
+			i++
+		}
+	}
+done:
+	return i
 }
 
 // checkCompile parses and type-checks expr against env, emitting one finding
@@ -111,7 +341,7 @@ func (c *checker) checkBoolean(node *yaml.Node, env *cel.Env, expr, full string)
 	}
 	outputType := checked.OutputType()
 	if !outputType.IsExactType(cel.BoolType) && outputType != cel.DynType {
-		c.reportAt(node, nodeStart(node), CodeCELTypeError,
+		c.reportAt(c.markerSpan(node, full), CodeCELTypeError,
 			fmt.Sprintf("expression must return boolean, got %s", outputType))
 	}
 }
@@ -126,7 +356,7 @@ func (c *checker) checkIterable(node *yaml.Node, env *cel.Env, expr, full string
 	outputType := checked.OutputType()
 	kind := outputType.Kind()
 	if kind != types.ListKind && kind != types.MapKind && outputType != cel.DynType {
-		c.reportAt(node, nodeStart(node), CodeCELTypeError,
+		c.reportAt(c.markerSpan(node, full), CodeCELTypeError,
 			fmt.Sprintf("forEach expression must return list or map, got %s", outputType))
 	}
 }
@@ -142,7 +372,7 @@ func (c *checker) checkIterable(node *yaml.Node, env *cel.Env, expr, full string
 func (c *checker) checkString(node *yaml.Node, env *cel.Env) {
 	matches, err := template.FindCELExpressions(node.Value)
 	if err != nil {
-		c.reportAt(node, nodeStart(node), CodeCELParseError,
+		c.reportAt(c.markerSpan(node, node.Value), CodeCELParseError,
 			fmt.Sprintf("failed to parse CEL expressions: %v", err))
 		return
 	}
@@ -154,9 +384,11 @@ func (c *checker) checkString(node *yaml.Node, env *cel.Env) {
 			matchStart = offset + idx
 		}
 		if end := matchStart + len(m.FullExpr); end < len(node.Value) && node.Value[end] == '}' {
-			c.reportAt(node, positionOf(node, node.Value, common.NewLocation(1, matchStart)),
-				CodeCELParseError,
-				fmt.Sprintf("stray '}' after CEL expression (did you add an extra brace?)"))
+			c.reportAt(parser.Range{
+				Start: c.valueOffsetToPos(node, matchStart),
+				End:   c.valueOffsetToPos(node, end),
+			}, CodeCELParseError,
+				"stray '}' after CEL expression (did you add an extra brace?)")
 		}
 		if idx >= 0 {
 			offset = matchStart + len(m.FullExpr)
@@ -164,8 +396,11 @@ func (c *checker) checkString(node *yaml.Node, env *cel.Env) {
 		c.checkAny(node, env, m.InnerExpr, m.FullExpr)
 	}
 	if rest := strings.Index(node.Value[offset:], "${"); rest >= 0 {
-		c.reportAt(node, positionOf(node, node.Value, common.NewLocation(1, offset+rest)),
-			CodeCELParseError,
+		at := offset + rest
+		c.reportAt(parser.Range{
+			Start: c.valueOffsetToPos(node, at),
+			End:   c.valueLineEndPos(node, at),
+		}, CodeCELParseError,
 			"unclosed CEL expression marker (missing closing '}')")
 	}
 }
@@ -202,7 +437,7 @@ func (c *checker) templateBool(node *yaml.Node, env *cel.Env, what string) {
 	}
 	inner, ok := extractTemplate(node.Value)
 	if !ok {
-		c.reportAt(node, nodeStart(node), CodeCELParseError,
+		c.reportAt(c.markerSpan(node, node.Value), CodeCELParseError,
 			fmt.Sprintf("%s must be a template expression wrapped in ${...}", what))
 		return
 	}
@@ -250,7 +485,7 @@ func (c *checker) forEachEnv(env *cel.Env, provider *apiservercel.DeclTypeProvid
 	}
 	inner, ok := extractTemplate(forEach.Value)
 	if !ok {
-		c.reportAt(forEach, nodeStart(forEach), CodeCELParseError,
+		c.reportAt(c.markerSpan(forEach, forEach.Value), CodeCELParseError,
 			"forEach must be a template expression wrapped in ${...}")
 		return nil
 	}
@@ -258,7 +493,7 @@ func (c *checker) forEachEnv(env *cel.Env, provider *apiservercel.DeclTypeProvid
 
 	info, err := analyzeForEachExpression(inner, scalarString(varNode), env)
 	if err != nil && !strings.Contains(err.Error(), "type check") {
-		c.reportAt(forEach, nodeStart(forEach), CodeCELTypeError,
+		c.reportAt(c.markerSpan(forEach, forEach.Value), CodeCELTypeError,
 			fmt.Sprintf("failed to analyze forEach: %v", err))
 		return nil
 	}
@@ -268,7 +503,7 @@ func (c *checker) forEachEnv(env *cel.Env, provider *apiservercel.DeclTypeProvid
 
 	ext, err := extendEnvWithForEach(env, info, provider)
 	if err != nil {
-		c.reportAt(forEach, nodeStart(forEach), CodeCELTypeError,
+		c.reportAt(c.markerSpan(forEach, forEach.Value), CodeCELTypeError,
 			fmt.Sprintf("failed to extend environment with forEach: %v", err))
 		return nil
 	}
@@ -347,15 +582,13 @@ func (c *checker) operations(seq *yaml.Node, env *cel.Env) {
 
 // validateComponent validates a (Cluster)ComponentType document.
 func validateComponent(doc *parser.DocumentNode, pair SchemaPair) ([]Finding, error) {
-	env, provider, err := NewComponentEnv(SchemaOptions{
-		ParametersSchema:         pair.Parameters,
-		EnvironmentConfigsSchema: pair.EnvironmentConfigs,
-	})
+	built, err := envFor(doc.Kind, pair)
 	if err != nil {
 		return nil, fmt.Errorf("build CEL env: %w", err)
 	}
+	env, provider := built.env, built.provider
 
-	c := &checker{}
+	c := newChecker(doc)
 	spec := specMapping(doc)
 	if spec == nil {
 		return c.findings, nil
@@ -370,15 +603,13 @@ func validateComponent(doc *parser.DocumentNode, pair SchemaPair) ([]Finding, er
 
 // validateTrait validates a (Cluster)Trait document.
 func validateTrait(doc *parser.DocumentNode, pair SchemaPair) ([]Finding, error) {
-	env, provider, err := NewTraitEnv(SchemaOptions{
-		ParametersSchema:         pair.Parameters,
-		EnvironmentConfigsSchema: pair.EnvironmentConfigs,
-	})
+	built, err := envFor(doc.Kind, pair)
 	if err != nil {
 		return nil, fmt.Errorf("build CEL env: %w", err)
 	}
+	env, provider := built.env, built.provider
 
-	c := &checker{}
+	c := newChecker(doc)
 	spec := specMapping(doc)
 	if spec == nil {
 		return c.findings, nil
@@ -417,19 +648,17 @@ func (c *checker) patchEntries(seq *yaml.Node, env *cel.Env, provider *apiserver
 // against the env-with-applied, and applied.<id> references against the
 // declared resources[].id set.
 func validateResourceType(doc *parser.DocumentNode, pair SchemaPair) ([]Finding, error) {
-	base, err := NewResourceEnv(SchemaOptions{
-		ParametersSchema:         pair.Parameters,
-		EnvironmentConfigsSchema: pair.EnvironmentConfigs,
-	})
+	built, err := envFor(doc.Kind, pair)
 	if err != nil {
 		return nil, fmt.Errorf("build CEL env: %w", err)
 	}
+	base := built.env
 	applied, err := WithApplied(base)
 	if err != nil {
 		return nil, fmt.Errorf("extend CEL env with applied: %w", err)
 	}
 
-	c := &checker{}
+	c := newChecker(doc)
 	spec := specMapping(doc)
 	if spec == nil {
 		return c.findings, nil
@@ -465,12 +694,13 @@ func validateResourceType(doc *parser.DocumentNode, pair SchemaPair) ([]Finding,
 // base env applies throughout. Mirrors
 // internal/pipeline/workflow.(*Pipeline).BuildCELContext's declared surface.
 func validateWorkflow(doc *parser.DocumentNode, pair SchemaPair) ([]Finding, error) {
-	env, err := NewWorkflowEnv(SchemaOptions{ParametersSchema: pair.Parameters})
+	built, err := envFor(doc.Kind, pair)
 	if err != nil {
 		return nil, fmt.Errorf("build CEL env: %w", err)
 	}
+	env := built.env
 
-	c := &checker{}
+	c := newChecker(doc)
 	spec := specMapping(doc)
 	if spec == nil {
 		return c.findings, nil
@@ -588,43 +818,39 @@ func (c *checker) checkAppliedReferences(checked *cel.Ast, node *yaml.Node) {
 		return
 	}
 	sort.Strings(undeclared)
-	c.reportAt(node, nodeStart(node), CodeCELUnknownName,
+	c.reportAt(c.markerSpan(node, node.Value), CodeCELUnknownName,
 		fmt.Sprintf("applied.<id> references unknown ids %v; declared ids: %v", undeclared, sortKeys(c.appliedIDs)))
 }
 
 // addIssues emits a finding for the first issue reported by the CEL parser or
-// checker, resolved to its intra-expression location.
+// checker. The range covers the offending token (identifier/dotted path, or a
+// call and its arguments) resolved to absolute document coordinates; parse
+// errors and fallback cases span the whole ${...} marker instead.
 func (c *checker) addIssues(node *yaml.Node, code string, issues *cel.Issues, full, expr string) {
+	whole := c.markerSpan(node, full)
 	errs := issues.Errors()
 	if len(errs) == 0 {
-		c.reportAt(node, nodeStart(node), code,
+		c.reportAt(whole, code,
 			fmt.Sprintf("invalid CEL expression %q: %s", expr, issues.Err()))
 		return
 	}
 	e := errs[0]
-	c.reportAt(node, positionOf(node, full, e.Location), code,
+
+	rng := whole
+	if code != CodeCELParseError {
+		if innerOff := exprOffset(expr, e.Location); innerOff >= 0 {
+			startOff := innerOffset(node, expr) + innerOff
+			start := c.valueOffsetToPos(node, startOff)
+			if tokenEnd := celdTokenEnd(node.Value, startOff); tokenEnd > startOff {
+				c.reportAt(parser.Range{Start: start, End: c.valueOffsetToPos(node, tokenEnd)}, code,
+					fmt.Sprintf("invalid CEL expression %q: %s", expr, e.Message))
+				return
+			}
+			rng = parser.Range{Start: start, End: start}
+		}
+	}
+	c.reportAt(rng, code,
 		fmt.Sprintf("invalid CEL expression %q: %s", expr, e.Message))
-}
-
-// nodeStart returns the document position of the node's first character.
-func nodeStart(node *yaml.Node) parser.Position {
-	return parser.Position{Line: node.Line, Column: node.Column}
-}
-
-// positionOf maps a CEL error location (1-based line, 0-based column within
-// the expression text) back to absolute document coordinates. full is the
-// ${...} marker as it appears in node.Value, so the column offset is exact for
-// single-line expressions; continuation lines of a block scalar are relative
-// to their own line start.
-func positionOf(node *yaml.Node, full string, loc common.Location) parser.Position {
-	offset := strings.Index(node.Value, full)
-	if offset < 0 {
-		offset = 0
-	}
-	if loc.Line() > 1 {
-		return parser.Position{Line: node.Line + loc.Line() - 1, Column: loc.Column() + 1}
-	}
-	return parser.Position{Line: node.Line + loc.Line() - 1, Column: node.Column + offset + loc.Column()}
 }
 
 // classifyCELIssues maps the first checker message to a diagnostic code. The
@@ -647,9 +873,9 @@ func classifyCELIssues(issues *cel.Issues) string {
 	}
 }
 
-func (c *checker) reportAt(node *yaml.Node, pos parser.Position, code, message string) {
+func (c *checker) reportAt(r parser.Range, code, message string) {
 	c.findings = append(c.findings, Finding{
-		Range:   parser.Range{Start: pos, End: pos},
+		Range:   r,
 		Code:    code,
 		Message: message,
 	})
