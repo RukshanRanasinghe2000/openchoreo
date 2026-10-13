@@ -1,0 +1,151 @@
+{
+  "kind": "ClusterWorkflow",
+  "variables": [
+    {
+      "name": "parameters",
+      "celType": "object"
+    },
+    {
+      "name": "environmentConfigs",
+      "celType": "object"
+    },
+    {
+      "name": "metadata",
+      "celType": "WorkflowMetadata",
+      "declType": {
+        "Stringer": null,
+        "Fields": {
+          "labels": {
+            "Name": "labels",
+            "Type": {
+              "Stringer": null,
+              "Fields": null,
+              "KeyType": {
+                "Stringer": null,
+                "Fields": null,
+                "KeyType": null,
+                "ElemType": null,
+                "TypeParam": false,
+                "Metadata": null,
+                "MaxElements": 0,
+                "MinSerializedSize": 2
+              },
+              "ElemType": {
+                "Stringer": null,
+                "Fields": null,
+                "KeyType": null,
+                "ElemType": null,
+                "TypeParam": false,
+                "Metadata": null,
+                "MaxElements": 0,
+                "MinSerializedSize": 2
+              },
+              "TypeParam": false,
+              "Metadata": null,
+              "MaxElements": 1000,
+              "MinSerializedSize": 2
+            },
+            "Required": true
+          },
+          "namespace": {
+            "Name": "namespace",
+            "Type": {
+              "Stringer": null,
+              "Fields": null,
+              "KeyType": null,
+              "ElemType": null,
+              "TypeParam": false,
+              "Metadata": null,
+              "MaxElements": 0,
+              "MinSerializedSize": 2
+            },
+            "Required": true
+          },
+          "namespaceName": {
+            "Name": "namespaceName",
+            "Type": {
+              "Stringer": null,
+              "Fields": null,
+              "KeyType": null,
+              "ElemType": null,
+              "TypeParam": false,
+              "Metadata": null,
+              "MaxElements": 0,
+              "MinSerializedSize": 2
+            },
+            "Required": true
+          },
+          "workflowRunName": {
+            "Name": "workflowRunName",
+            "Type": {
+              "Stringer": null,
+              "Fields": null,
+              "KeyType": null,
+              "ElemType": null,
+              "TypeParam": false,
+              "Metadata": null,
+              "MaxElements": 0,
+              "MinSerializedSize": 2
+            },
+            "Required": true
+          }
+        },
+        "KeyType": null,
+        "ElemType": null,
+        "TypeParam": false,
+        "Metadata": null,
+        "MaxElements": 0,
+        "MinSerializedSize": 2
+      }
+    },
+    {
+      "name": "workflowplane",
+      "celType": "WorkflowPlaneData",
+      "declType": {
+        "Stringer": null,
+        "Fields": {
+          "secretStore": {
+            "Name": "secretStore",
+            "Type": {
+              "Stringer": null,
+              "Fields": null,
+              "KeyType": null,
+              "ElemType": null,
+              "TypeParam": false,
+              "Metadata": null,
+              "MaxElements": 0,
+              "MinSerializedSize": 2
+            },
+            "Required": true
+          }
+        },
+        "KeyType": null,
+        "ElemType": null,
+        "TypeParam": false,
+        "Metadata": null,
+        "MaxElements": 0,
+        "MinSerializedSize": 2
+      }
+    }
+  ],
+  "hasApplied": false,
+  "extensions": {
+    "base": [
+      "optionalTypes",
+      "strings",
+      "encoders",
+      "math",
+      "lists",
+      "sets",
+      "twoVarComprehensions"
+    ],
+    "customMacros": [
+      "oc_generate_name",
+      "oc_dns_label",
+      "oc_merge"
+    ],
+    "customFunctions": [
+      "oc_omit"
+    ]
+  }
+}
