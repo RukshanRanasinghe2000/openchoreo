@@ -29,7 +29,8 @@ WP_VALUES=""
 OP_VALUES=""
 OPENCHOREO_CHART_VERSION=""
 PARALLEL_PULLS=4
-HELM_REPO="oci://ghcr.io/openchoreo/helm-charts"
+HELM_REPO="${OPENCHOREO_HELM_REPO:-oci://cr.openchoreo.dev/openchoreo/helm-charts}"
+MODULES_HELM_REPO="${OPENCHOREO_MODULES_HELM_REPO:-oci://cr.openchoreo.dev/openchoreo/helm-charts}"
 USE_LOCAL_CHARTS=false
 CP_CHART=""
 DP_CHART=""
@@ -49,6 +50,7 @@ LOGS_OPENSEARCH_VERSION=""
 TRACES_OPENSEARCH_VERSION=""
 METRICS_PROMETHEUS_VERSION=""
 EVENTS_OTEL_COLLECTOR_VERSION=""
+FINOPS_OPENCOST_VERSION=""
 
 # Color codes for output
 GREEN='\033[0;32m'
@@ -98,7 +100,8 @@ Optional:
   --version VERSION           Helm chart version for OCI registry (default: empty, pulls latest)
                               Only used when --local-charts is NOT specified
   --parallel N                Number of parallel docker pulls (default: 4)
-  --helm-repo URL             OCI Helm repository URL (default: oci://ghcr.io/openchoreo/helm-charts)
+  --helm-repo URL             OCI Helm repository URL (default: ${HELM_REPO}, override with OPENCHOREO_HELM_REPO)
+                              Observability module charts: ${MODULES_HELM_REPO} (override with OPENCHOREO_MODULES_HELM_REPO)
   --local-charts              Use local chart paths instead of OCI registry
   --cp-chart PATH/URL         Custom Control Plane chart path or OCI URL
   --dp-chart PATH/URL         Custom Data Plane chart path or OCI URL
@@ -133,7 +136,8 @@ Prerequisite / Third-Party Dependencies:
   --traces-opensearch-version VER    Observability tracing-opensearch module chart version
   --metrics-prometheus-version VER   Observability metrics-prometheus module chart version
   --events-otel-version VER          Observability events-otel-collector module chart version
-                                      (all four used only when --observability-plane is set)
+  --finops-opencost-version VER      FinOps opencost module chart version
+                                      (all five used only when --observability-plane is set)
 
 Examples:
   # Local development with local charts
@@ -152,7 +156,7 @@ Examples:
 
   # Mix of OCI and custom chart paths
   $0 --cluster openchoreo \\
-    --control-plane --cp-chart oci://ghcr.io/openchoreo/helm-charts/openchoreo-control-plane \\
+    --control-plane --cp-chart oci://cr.openchoreo.dev/openchoreo/helm-charts/openchoreo-control-plane \\
     --data-plane --dp-chart /path/to/custom/data-plane
 
   # With extra images
@@ -300,6 +304,10 @@ while [[ $# -gt 0 ]]; do
             EVENTS_OTEL_COLLECTOR_VERSION="$2"
             shift 2
             ;;
+        --finops-opencost-version)
+            FINOPS_OPENCOST_VERSION="$2"
+            shift 2
+            ;;
         --help|-h)
             usage
             exit 0
@@ -355,6 +363,7 @@ if [[ "$INCLUDE_OBSERVABILITY_PLANE" == "true" ]]; then
     [[ -z "$TRACES_OPENSEARCH_VERSION" ]] && missing_versions+=("--traces-opensearch-version")
     [[ -z "$METRICS_PROMETHEUS_VERSION" ]] && missing_versions+=("--metrics-prometheus-version")
     [[ -z "$EVENTS_OTEL_COLLECTOR_VERSION" ]] && missing_versions+=("--events-otel-version")
+    [[ -z "$FINOPS_OPENCOST_VERSION" ]] && missing_versions+=("--finops-opencost-version")
 
     if [[ ${#missing_versions[@]} -gt 0 ]]; then
         log_error "--observability-plane requires: ${missing_versions[*]}"
@@ -572,15 +581,16 @@ collect_images() {
         fi
         all_images+=("${op_images[@]}")
 
-        # The OpenSearch/Prometheus/OTel-collector community modules are installed
-        # alongside the Observability Plane, so they're only relevant here.
+        # The OpenSearch/Prometheus/OTel-collector/OpenCost community modules are
+        # installed alongside the Observability Plane, so they're only relevant here.
         log_info "Collecting observability module images..." >&2
-        local modules_repo="oci://ghcr.io/openchoreo/helm-charts"
+        local modules_repo="${MODULES_HELM_REPO}"
         local module_charts=(
             "${modules_repo}/observability-logs-opensearch --version ${LOGS_OPENSEARCH_VERSION} --set openSearchSetup.openSearchSecretName=opensearch-admin-credentials --set adapter.openSearchSecretName=opensearch-admin-credentials --set fluent-bit.enabled=true --set fluentBitCustomizations.clusterInstance=${CLUSTER_NAME}|observability-logs-opensearch"
             "${modules_repo}/observability-tracing-opensearch --version ${TRACES_OPENSEARCH_VERSION} --set openSearch.enabled=false --set openSearchSetup.openSearchSecretName=opensearch-admin-credentials|observability-traces-opensearch"
             "${modules_repo}/observability-metrics-prometheus --version ${METRICS_PROMETHEUS_VERSION}|observability-metrics-prometheus"
             "${modules_repo}/observability-events-otel-collector --version ${EVENTS_OTEL_COLLECTOR_VERSION}|observability-events-kubernetes"
+            "${modules_repo}/finops-opencost --version ${FINOPS_OPENCOST_VERSION}|finops-opencost"
         )
         local module_images=()
         local module_entry module_chart_ref module_release

@@ -137,6 +137,23 @@ create_k3d_cluster() {
         return 1
     fi
 
+    # With a registry override, also mirror cr.openchoreo.dev to it so images the
+    # override does not reach (community modules, workflow templates) follow it
+    if [[ -n "${OPENCHOREO_IMAGE_REGISTRY:-}" && "$OPENCHOREO_IMAGE_REGISTRY" != */* ]]; then
+        local mirrored_config
+        mirrored_config="$(mktemp)"
+        awk -v reg="$OPENCHOREO_IMAGE_REGISTRY" '
+            { print }
+            /^    mirrors:$/ {
+                print "      \"cr.openchoreo.dev\":"
+                print "        endpoint:"
+                print "          - https://" reg
+            }
+        ' "$k3d_config" > "$mirrored_config"
+        k3d_config="$mirrored_config"
+        log_info "Mirroring cr.openchoreo.dev to $OPENCHOREO_IMAGE_REGISTRY"
+    fi
+
     # Detect if running in Colima and disable k3d's DNS fix if needed
     # The DNS fix replaces Docker's embedded DNS (127.0.0.11) with the gateway IP,
     # which causes DNS timeouts in Colima due to firewall/network isolation.
@@ -469,6 +486,11 @@ install_helm_chart() {
     # Only add version for OpenChoreo charts, not third-party charts
     if [[ -n "$OPENCHOREO_CHART_VERSION" && "$DEV_MODE" != "true" && "$is_third_party" != "true" ]]; then
         helm_args+=("--version" "$OPENCHOREO_CHART_VERSION")
+    fi
+
+    # Optional registry override for first-party images (e.g. ghcr.io)
+    if [[ -n "${OPENCHOREO_IMAGE_REGISTRY:-}" && "$is_third_party" != "true" ]]; then
+        helm_args+=("--set-string" "global.imageRegistry=$OPENCHOREO_IMAGE_REGISTRY")
     fi
 
     helm_args+=("${additional_args[@]}")
@@ -1108,7 +1130,7 @@ install_observability_plane() {
 
     # Install logs and metrics observability modules
     # See https://github.com/openchoreo/community-modules for more details
-    local modules_repo="oci://ghcr.io/openchoreo/helm-charts"
+    local modules_repo="$MODULES_HELM_REPO"
 
     log_info "Installing observability modules..."
 
@@ -1116,7 +1138,8 @@ install_observability_plane() {
         "--version" "$LOGS_OPENSEARCH_VERSION" \
         "--set" "openSearchSetup.openSearchSecretName=opensearch-admin-credentials" \
         "--set" "adapter.openSearchSecretName=opensearch-admin-credentials" \
-        "--set" "auditLogs.enabled=true"
+        "--set" "auditLogs.enabled=true" \
+        "--set" "fluentBitCustomizations.clusterInstance=$CLUSTER_NAME"
 
     install_helm_chart "observability-traces-opensearch" "$modules_repo/observability-tracing-opensearch" "$OBSERVABILITY_NS" "true" "true" "true" "600" \
         "--version" "$TRACES_OPENSEARCH_VERSION" \
@@ -1125,6 +1148,9 @@ install_observability_plane() {
 
     install_helm_chart "observability-metrics-prometheus" "$modules_repo/observability-metrics-prometheus" "$OBSERVABILITY_NS" "true" "true" "true" "600" \
         "--version" "$METRICS_PROMETHEUS_VERSION"
+
+    install_helm_chart "finops-opencost" "$modules_repo/finops-opencost" "$OBSERVABILITY_NS" "true" "true" "true" "600" \
+        "--version" "$FINOPS_OPENCOST_VERSION"
 
     # The prometheus-operator, not Helm, creates the metrics module's StatefulSets,
     # pods and PVCs from the custom resources the chart applies, so install_helm_chart's
@@ -1147,14 +1173,6 @@ install_observability_plane() {
             return 1
         fi
     done
-
-    # Enable fluent-bit after opensearch is installed and ready
-    log_info "Enabling fluent-bit for log collection..."
-    install_helm_chart "observability-logs-opensearch" "$modules_repo/observability-logs-opensearch" "$OBSERVABILITY_NS" "true" "true" "true" "600" \
-        "--version" "$LOGS_OPENSEARCH_VERSION" \
-        "--reuse-values" \
-        "--set" "fluent-bit.enabled=true" \
-        "--set" "fluentBitCustomizations.clusterInstance=$CLUSTER_NAME"
 
     # Enable Kubernetes events collection
     log_info "Enabling Kubernetes events collection..."
@@ -1562,6 +1580,7 @@ preload_images() {
             "--traces-opensearch-version" "$TRACES_OPENSEARCH_VERSION"
             "--metrics-prometheus-version" "$METRICS_PROMETHEUS_VERSION"
             "--events-otel-version" "$EVENTS_OTEL_COLLECTOR_VERSION"
+            "--finops-opencost-version" "$FINOPS_OPENCOST_VERSION"
         )
     fi
 

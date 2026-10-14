@@ -242,9 +242,9 @@ controllerManager:
     # @schema
     # type: string
     # description: Docker image repository
-    # default: ghcr.io/openchoreo/controller
+    # default: cr.openchoreo.dev/openchoreo/controller
     # @schema
-    repository: ghcr.io/openchoreo/controller
+    repository: cr.openchoreo.dev/openchoreo/controller
     # @schema
     # type: string
     # description: Image tag. If empty, uses Chart.AppVersion
@@ -256,7 +256,7 @@ controllerManager:
     # enum: [Always, IfNotPresent, Never]
     # default: Always
     # @schema
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
 
   # @schema
   # type: object
@@ -960,9 +960,9 @@ openchoreoApi:
     # @schema
     # type: string
     # description: Docker image repository
-    # default: ghcr.io/openchoreo/openchoreo-api
+    # default: cr.openchoreo.dev/openchoreo/openchoreo-api
     # @schema
-    repository: ghcr.io/openchoreo/openchoreo-api
+    repository: cr.openchoreo.dev/openchoreo/openchoreo-api
     # @schema
     # type: string
     # description: Image tag. If empty, uses Chart.AppVersion
@@ -2059,9 +2059,9 @@ openchoreoApi:
         # @schema
         # type: string
         # description: Remote-agent image repository
-        # default: ghcr.io/openchoreo/remote-agent
+        # default: cr.openchoreo.dev/openchoreo/remote-agent
         # @schema
-        repository: ghcr.io/openchoreo/remote-agent
+        repository: cr.openchoreo.dev/openchoreo/remote-agent
 
         # @schema
         # type: string
@@ -2816,9 +2816,9 @@ backstage:
     # @schema
     # type: string
     # description: Docker image repository
-    # default: ghcr.io/openchoreo/openchoreo-ui
+    # default: cr.openchoreo.dev/openchoreo/openchoreo-ui
     # @schema
-    repository: ghcr.io/openchoreo/openchoreo-ui
+    repository: cr.openchoreo.dev/openchoreo/openchoreo-ui
     # @schema
     # type: string
     # description: Image tag. If empty, uses Chart.AppVersion
@@ -2999,6 +2999,17 @@ backstage:
       # @schema
       # type: boolean
       # description: Show the Delivery Insights page in the portal navigation. Feature preview - off by default, and separate from the Observer flag that collects the data (observer.featurePreview.deliveryInsights.enabled on the observability plane). Both are needed for the page to show anything. Maps to OPENCHOREO_FEATURES_DELIVERY_INSIGHTS_ENABLED in the Backstage container.
+      # default: false
+      # @schema
+      enabled: false
+    # @schema
+    # type: object
+    # description: Cost Insights portal feature
+    # @schema
+    costInsights:
+      # @schema
+      # type: boolean
+      # description: Show cost insights. Off by default. Maps to OPENCHOREO_FEATURES_COST_INSIGHTS_ENABLED in the Backstage container.
       # default: false
       # @schema
       enabled: false
@@ -3723,9 +3734,9 @@ clusterGateway:
     # @schema
     # type: string
     # description: Docker image repository
-    # default: ghcr.io/openchoreo/cluster-gateway
+    # default: cr.openchoreo.dev/openchoreo/cluster-gateway
     # @schema
-    repository: ghcr.io/openchoreo/cluster-gateway
+    repository: cr.openchoreo.dev/openchoreo/cluster-gateway
     # @schema
     # type: string
     # description: Image tag. If empty, uses Chart.AppVersion
@@ -4329,7 +4340,7 @@ eventForwarder:
   name: event-forwarder
 
   image:
-    repository: ghcr.io/openchoreo/event-forwarder
+    repository: cr.openchoreo.dev/openchoreo/event-forwarder
     tag: ""
     pullPolicy: IfNotPresent
 
@@ -4454,7 +4465,7 @@ portalAssistant:
   name: portal-assistant
 
   image:
-    repository: ghcr.io/openchoreo/portal-assistant
+    repository: cr.openchoreo.dev/openchoreo/portal-assistant
     tag: ""
     pullPolicy: IfNotPresent
 

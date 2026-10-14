@@ -571,6 +571,21 @@
               "title": "auth",
               "type": "object"
             },
+            "costInsights": {
+              "additionalProperties": false,
+              "description": "Cost Insights portal feature",
+              "properties": {
+                "enabled": {
+                  "default": false,
+                  "description": "Show cost insights. Off by default. Maps to OPENCHOREO_FEATURES_COST_INSIGHTS_ENABLED in the Backstage container.",
+                  "title": "enabled",
+                  "type": "boolean"
+                }
+              },
+              "required": [],
+              "title": "costInsights",
+              "type": "object"
+            },
             "deliveryInsights": {
               "additionalProperties": false,
               "description": "Delivery Insights (DORA metrics) portal page",
@@ -673,7 +688,7 @@
               "title": "pullPolicy"
             },
             "repository": {
-              "default": "ghcr.io/openchoreo/openchoreo-ui",
+              "default": "cr.openchoreo.dev/openchoreo/openchoreo-ui",
               "description": "Docker image repository",
               "title": "repository",
               "type": "string"
@@ -1193,7 +1208,7 @@
               "title": "pullPolicy"
             },
             "repository": {
-              "default": "ghcr.io/openchoreo/cluster-gateway",
+              "default": "cr.openchoreo.dev/openchoreo/cluster-gateway",
               "description": "Docker image repository",
               "title": "repository",
               "type": "string"
@@ -2029,7 +2044,7 @@
               "title": "pullPolicy"
             },
             "repository": {
-              "default": "ghcr.io/openchoreo/controller",
+              "default": "cr.openchoreo.dev/openchoreo/controller",
               "description": "Docker image repository",
               "title": "repository",
               "type": "string"
@@ -2722,7 +2737,7 @@
               "type": "string"
             },
             "repository": {
-              "default": "ghcr.io/openchoreo/event-forwarder",
+              "default": "cr.openchoreo.dev/openchoreo/event-forwarder",
               "title": "repository",
               "type": "string"
             },
@@ -3505,7 +3520,7 @@
                       "title": "pullPolicy"
                     },
                     "repository": {
-                      "default": "ghcr.io/openchoreo/remote-agent",
+                      "default": "cr.openchoreo.dev/openchoreo/remote-agent",
                       "description": "Remote-agent image repository",
                       "title": "repository",
                       "type": "string"
@@ -4385,7 +4400,7 @@
               "title": "pullPolicy"
             },
             "repository": {
-              "default": "ghcr.io/openchoreo/openchoreo-api",
+              "default": "cr.openchoreo.dev/openchoreo/openchoreo-api",
               "description": "Docker image repository",
               "title": "repository",
               "type": "string"
@@ -4918,7 +4933,7 @@
               "type": "string"
             },
             "repository": {
-              "default": "ghcr.io/openchoreo/portal-assistant",
+              "default": "cr.openchoreo.dev/openchoreo/portal-assistant",
               "title": "repository",
               "type": "string"
             },

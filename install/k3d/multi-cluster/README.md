@@ -50,6 +50,7 @@ export LOGS_OPENSEARCH_VERSION=0.0.0-latest-dev
 export TRACES_OPENSEARCH_VERSION=0.0.0-latest-dev
 export METRICS_PROMETHEUS_VERSION=0.0.0-latest-dev
 export EVENTS_OTEL_COLLECTOR_VERSION=0.0.0-latest-dev
+export FINOPS_OPENCOST_VERSION=0.0.0-latest-dev
 ```
 
 ## 1. Control Plane
@@ -634,7 +635,7 @@ Install the OpenSearch logs module
 
 ```bash
 helm upgrade --install observability-logs-opensearch \
-  oci://ghcr.io/openchoreo/helm-charts/observability-logs-opensearch \
+  oci://cr.openchoreo.dev/openchoreo/helm-charts/observability-logs-opensearch \
   --kube-context k3d-openchoreo-op \
   --create-namespace \
   --namespace openchoreo-observability-plane \
@@ -650,7 +651,7 @@ Enable Fluent Bit in the data plane cluster:
 
 ```bash
 helm upgrade --install observability-logs-opensearch \
-  oci://ghcr.io/openchoreo/helm-charts/observability-logs-opensearch \
+  oci://cr.openchoreo.dev/openchoreo/helm-charts/observability-logs-opensearch \
   --kube-context k3d-openchoreo-dp \
   --create-namespace \
   --namespace openchoreo-observability-plane \
@@ -670,7 +671,7 @@ If the workflow plane is installed, enable Fluent Bit there too:
 
 ```bash
 helm upgrade --install observability-logs-opensearch \
-  oci://ghcr.io/openchoreo/helm-charts/observability-logs-opensearch \
+  oci://cr.openchoreo.dev/openchoreo/helm-charts/observability-logs-opensearch \
   --kube-context k3d-openchoreo-wp \
   --create-namespace \
   --namespace openchoreo-observability-plane \
@@ -690,7 +691,7 @@ Enable Kubernetes events collector in the data plane cluster:
 
 ```bash
 helm upgrade --install observability-events-otel-collector \
-  oci://ghcr.io/openchoreo/helm-charts/observability-events-otel-collector \
+  oci://cr.openchoreo.dev/openchoreo/helm-charts/observability-events-otel-collector \
   --kube-context k3d-openchoreo-dp \
   --create-namespace \
   --namespace openchoreo-observability-plane \
@@ -735,7 +736,7 @@ If the workflow plane is installed, enable events collector there too:
 
 ```bash
 helm upgrade --install observability-events-otel-collector \
-  oci://ghcr.io/openchoreo/helm-charts/observability-events-otel-collector \
+  oci://cr.openchoreo.dev/openchoreo/helm-charts/observability-events-otel-collector \
   --kube-context k3d-openchoreo-wp \
   --create-namespace \
   --namespace openchoreo-observability-plane \
@@ -782,7 +783,7 @@ Install the tracing receiver in the observability plane cluster. Since the logs 
 
 ```bash
 helm upgrade --install observability-traces-opensearch \
-  oci://ghcr.io/openchoreo/helm-charts/observability-tracing-opensearch \
+  oci://cr.openchoreo.dev/openchoreo/helm-charts/observability-tracing-opensearch \
   --kube-context k3d-openchoreo-op \
   --create-namespace \
   --namespace openchoreo-observability-plane \
@@ -797,7 +798,7 @@ Install the tracing exporter in the data plane cluster:
 
 ```bash
 helm upgrade --install observability-tracing-opensearch \
-  oci://ghcr.io/openchoreo/helm-charts/observability-tracing-opensearch \
+  oci://cr.openchoreo.dev/openchoreo/helm-charts/observability-tracing-opensearch \
   --kube-context k3d-openchoreo-dp \
   --create-namespace \
   --namespace openchoreo-observability-plane \
@@ -818,7 +819,7 @@ Install the metrics receiver in the observability plane cluster:
 
 ```bash
 helm upgrade --install observability-metrics-prometheus \
-  oci://ghcr.io/openchoreo/helm-charts/observability-metrics-prometheus \
+  oci://cr.openchoreo.dev/openchoreo/helm-charts/observability-metrics-prometheus \
   --kube-context k3d-openchoreo-op \
   --create-namespace \
   --namespace openchoreo-observability-plane \
@@ -831,7 +832,7 @@ Install the metrics exporter in the data plane cluster:
 
 ```bash
 helm upgrade --install observability-metrics-prometheus \
-  oci://ghcr.io/openchoreo/helm-charts/observability-metrics-prometheus \
+  oci://cr.openchoreo.dev/openchoreo/helm-charts/observability-metrics-prometheus \
   --kube-context k3d-openchoreo-dp \
   --create-namespace \
   --namespace openchoreo-observability-plane \
@@ -840,6 +841,19 @@ helm upgrade --install observability-metrics-prometheus \
   --set prometheusCustomizations.http.observabilityPlaneUrl=http://host.k3d.internal:11080/api/v1/write \
   --set kube-prometheus-stack.prometheus.enabled=false \
   --set kube-prometheus-stack.alertmanager.enabled=false
+```
+
+##### Cost (finops-opencost)
+
+Run the following command to install OpenCost and its adapter in the observability plane cluster 
+
+```bash
+helm upgrade --install finops-opencost \
+  oci://ghcr.io/openchoreo/helm-charts/finops-opencost \
+  --kube-context k3d-openchoreo-op \
+  --create-namespace \
+  --namespace openchoreo-observability-plane \
+  --version "$FINOPS_OPENCOST_VERSION"
 ```
 
 ### Register Observability Plane
@@ -979,6 +993,7 @@ install/k3d/preload-images.sh \
   --traces-opensearch-version "$TRACES_OPENSEARCH_VERSION" \
   --metrics-prometheus-version "$METRICS_PROMETHEUS_VERSION" \
   --events-otel-version "$EVENTS_OTEL_COLLECTOR_VERSION" \
+  --finops-opencost-version "$FINOPS_OPENCOST_VERSION" \
   --parallel 4
 ```
 

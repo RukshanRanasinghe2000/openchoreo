@@ -16,6 +16,7 @@ THUNDER_VERSION="1.0.1"
 
 # -- observability modules (0.0.0-latest-dev on main; pinned on release branches
 #    by hack/pin-observability-modules.sh) --
+FINOPS_OPENCOST_VERSION="0.0.0-latest-dev"
 LOGS_OPENSEARCH_VERSION="0.0.0-latest-dev"
 TRACES_OPENSEARCH_VERSION="0.0.0-latest-dev"
 METRICS_PROMETHEUS_VERSION="0.0.0-latest-dev"
@@ -23,7 +24,8 @@ EVENTS_OTEL_COLLECTOR_VERSION="0.0.0-latest-dev"
 
 # -- config --
 CLUSTER_NAME="${CLUSTER_NAME:-openchoreo}"
-HELM_REPO="oci://ghcr.io/openchoreo/helm-charts"
+HELM_REPO="${OPENCHOREO_HELM_REPO:-oci://cr.openchoreo.dev/openchoreo/helm-charts}"
+MODULES_HELM_REPO="${OPENCHOREO_MODULES_HELM_REPO:-oci://cr.openchoreo.dev/openchoreo/helm-charts}"
 CONTROL_PLANE_NS="openchoreo-control-plane"
 DATA_PLANE_NS="openchoreo-data-plane"
 WORKFLOW_PLANE_NS="openchoreo-workflow-plane"
@@ -50,6 +52,12 @@ Options:
                            (required when not running from a checkout)
   --cluster-name NAME     k3d cluster name (default: openchoreo)
   -h, --help              Show this help
+
+Environment:
+  OPENCHOREO_HELM_REPO          OpenChoreo chart repository or local chart directory
+                                (default: oci://cr.openchoreo.dev/openchoreo/helm-charts)
+  OPENCHOREO_MODULES_HELM_REPO  Observability module chart repository
+                                (default: oci://cr.openchoreo.dev/openchoreo/helm-charts)
 EOF
 }
 
@@ -449,19 +457,23 @@ EOF
 
     step "Installing observability modules"
     $HELM upgrade --install observability-logs-opensearch \
-        oci://ghcr.io/openchoreo/helm-charts/observability-logs-opensearch \
+        "$MODULES_HELM_REPO/observability-logs-opensearch" \
         --namespace "$OBSERVABILITY_NS" --version "$LOGS_OPENSEARCH_VERSION" \
         --set openSearchSetup.openSearchSecretName="opensearch-admin-credentials" \
         --set adapter.openSearchSecretName="opensearch-admin-credentials" \
-        --set auditLogs.enabled=true
+        --set auditLogs.enabled=true \
+        --set fluentBitCustomizations.clusterInstance="$CLUSTER_NAME"
     $HELM upgrade --install observability-traces-opensearch \
-        oci://ghcr.io/openchoreo/helm-charts/observability-tracing-opensearch \
+        "$MODULES_HELM_REPO/observability-tracing-opensearch" \
         --namespace "$OBSERVABILITY_NS" --version "$TRACES_OPENSEARCH_VERSION" \
         --set openSearch.enabled=false \
         --set openSearchSetup.openSearchSecretName="opensearch-admin-credentials"
     $HELM upgrade --install observability-metrics-prometheus \
-        oci://ghcr.io/openchoreo/helm-charts/observability-metrics-prometheus \
+        "$MODULES_HELM_REPO/observability-metrics-prometheus" \
         --namespace "$OBSERVABILITY_NS" --version "$METRICS_PROMETHEUS_VERSION"
+    $HELM upgrade --install finops-opencost \
+        oci://ghcr.io/openchoreo/helm-charts/finops-opencost \
+        --namespace "$OBSERVABILITY_NS" --version "$FINOPS_OPENCOST_VERSION"
 
     # The prometheus-operator, not Helm, creates the metrics module's StatefulSets,
     # pods and PVCs from the custom resources the chart applies — so helm returns
@@ -480,15 +492,9 @@ EOF
         $KUBECTL rollout status "statefulset/$sts" -n "$OBSERVABILITY_NS" --timeout=5m
     done
 
-    $HELM upgrade observability-logs-opensearch \
-        oci://ghcr.io/openchoreo/helm-charts/observability-logs-opensearch \
-        --namespace "$OBSERVABILITY_NS" --version "$LOGS_OPENSEARCH_VERSION" \
-        --reuse-values --set fluent-bit.enabled=true \
-        --set fluentBitCustomizations.clusterInstance="$CLUSTER_NAME"
-
     # Collect Kubernetes events into the k8s-events OpenSearch index.
     $HELM upgrade --install observability-events-otel-collector \
-        oci://ghcr.io/openchoreo/helm-charts/observability-events-otel-collector \
+        "$MODULES_HELM_REPO/observability-events-otel-collector" \
         --namespace "$OBSERVABILITY_NS" --version "$EVENTS_OTEL_COLLECTOR_VERSION" \
         -f - <<'EOF'
 collector:
@@ -556,7 +562,7 @@ warn_unpinned_modules() {
     case "$OPENCHOREO_CHART_VERSION" in
         ""|0.0.0-*) return 0 ;;
     esac
-    case "$LOGS_OPENSEARCH_VERSION $TRACES_OPENSEARCH_VERSION $METRICS_PROMETHEUS_VERSION $EVENTS_OTEL_COLLECTOR_VERSION" in
+    case "$LOGS_OPENSEARCH_VERSION $TRACES_OPENSEARCH_VERSION $METRICS_PROMETHEUS_VERSION $EVENTS_OTEL_COLLECTOR_VERSION $FINOPS_OPENCOST_VERSION" in
         *0.0.0-*) ;;
         *) return 0 ;;
     esac
