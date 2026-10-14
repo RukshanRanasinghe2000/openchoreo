@@ -15,12 +15,27 @@ var celEnvDir = ""
 func SetCelEnvDir(dir string) { celEnvDir = dir }
 func GetCelEnvDir() string    { return celEnvDir }
 
-type envDesc struct {
-	Kind       string `json:"kind"`
-	HasApplied bool   `json:"hasApplied"`
+type Var struct {
+	Name     string          `json:"name"`
+	CELType  string          `json:"celType,omitempty"`
+	DeclType json.RawMessage `json:"declType,omitempty"`
 }
 
-func loadEnvDesc(kind string) (*envDesc, bool) {
+type Ext struct {
+	Base            []string `json:"base,omitempty"`
+	CustomMacros    []string `json:"customMacros,omitempty"`
+	CustomFunctions []string `json:"customFunctions,omitempty"`
+	ContextMacros   []string `json:"contextMacros,omitempty"`
+}
+
+type EnvDesc struct {
+	Kind       string `json:"kind"`
+	Variables  []Var  `json:"variables"`
+	HasApplied bool   `json:"hasApplied"`
+	Extensions Ext    `json:"extensions"`
+}
+
+func loadEnvDesc(kind string) (*EnvDesc, bool) {
 	if celEnvDir == "" {
 		return nil, false
 	}
@@ -29,7 +44,7 @@ func loadEnvDesc(kind string) (*envDesc, bool) {
 	if err != nil {
 		return nil, false
 	}
-	var d envDesc
+	var d EnvDesc
 	if err := json.Unmarshal(b, &d); err != nil {
 		return nil, false
 	}

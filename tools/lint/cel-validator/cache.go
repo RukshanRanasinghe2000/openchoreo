@@ -131,10 +131,10 @@ func envFor(kind string, pair SchemaPair) (cachedEnv, error) {
 	switch kind {
 	case KindComponentType, KindClusterComponentType:
 		build = func() (cachedEnv, error) {
-			env, provider, err := NewComponentEnv(SchemaOptions{
-				ParametersSchema:         pair.Parameters,
-				EnvironmentConfigsSchema: pair.EnvironmentConfigs,
-			})
+			var env *cel.Env
+			var provider *apiservercel.DeclTypeProvider
+			var err error
+			env, provider, err = NewComponentEnv(SchemaOptions{ParametersSchema: pair.Parameters, EnvironmentConfigsSchema: pair.EnvironmentConfigs})
 			if err != nil {
 				return cachedEnv{}, err
 			}
@@ -142,10 +142,10 @@ func envFor(kind string, pair SchemaPair) (cachedEnv, error) {
 		}
 	case KindTrait, KindClusterTrait:
 		build = func() (cachedEnv, error) {
-			env, provider, err := NewTraitEnv(SchemaOptions{
-				ParametersSchema:         pair.Parameters,
-				EnvironmentConfigsSchema: pair.EnvironmentConfigs,
-			})
+			var env *cel.Env
+			var provider *apiservercel.DeclTypeProvider
+			var err error
+			env, provider, err = NewTraitEnv(SchemaOptions{ParametersSchema: pair.Parameters, EnvironmentConfigsSchema: pair.EnvironmentConfigs})
 			if err != nil {
 				return cachedEnv{}, err
 			}

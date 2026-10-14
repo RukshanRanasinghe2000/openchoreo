@@ -21,5 +21,5 @@ import "embed"
 // subdirectory of JSON schema files, both produced by the schema generator
 // (cmd/schema-gen) from the Go API types in api/v1alpha1.
 //
-//go:embed template-version.json template-v*/*.json
+//go:embed template-version.json template-v*/*.json template-v*/cel-envs/*.json cel-envs/*/*.json
 var FS embed.FS

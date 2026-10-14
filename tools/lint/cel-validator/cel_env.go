@@ -12,6 +12,7 @@
 package celvalidator
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 
@@ -194,6 +195,7 @@ func WithApplied(env *cel.Env) (*cel.Env, error) {
 // Schema-based fields (parameters, environmentConfigs) are derived from the provided schemas.
 // Reflection-based fields (metadata, workload, etc.) come from the contextFields slice.
 func buildCELEnv(contextFields []decltype.FieldInfo, opts SchemaOptions) (*cel.Env, *apiservercel.DeclTypeProvider, error) {
+
 	baseEnv, err := createBaseEnv()
 	if err != nil {
 		return nil, nil, err
@@ -301,4 +303,99 @@ func normalizeForCEL(s *apiextschema.Structural) *apiextschema.Structural {
 
 func hasCompositionValidation(v *apiextschema.ValueValidation) bool {
 	return v != nil && (len(v.OneOf) > 0 || len(v.AnyOf) > 0 || len(v.AllOf) > 0)
+}
+
+func buildCELEnvFromDesc(desc *EnvDesc, opts SchemaOptions) (*cel.Env, *apiservercel.DeclTypeProvider, error) {
+	var baseEnv *cel.Env
+	var err error
+	kind := desc.Kind
+	if kind == KindResourceType || kind == KindClusterResourceType {
+		baseEnv, err = createResourceBaseEnv()
+	} else if kind == KindWorkflow || kind == KindClusterWorkflow {
+		// workflow handled separately in envFor usually, but just in case
+		baseEnv, err = cel.NewEnv(template.BaseCELExtensions()...)
+	} else {
+		baseEnv, err = createBaseEnv()
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// collect decl types for non-schema variables from desc
+	declTypes := make([]*apiservercel.DeclType, 0, 32)
+	varOpts := make([]cel.EnvOption, 0, 32)
+
+	// schema-based
+	paramType := schemaToTypeOrEmpty(opts.ParametersSchema, "Parameters")
+	declTypes = append(declTypes, paramType)
+	varOpts = append(varOpts, cel.Variable(fieldParameters, paramType.CelType()))
+
+	environmentConfigsType := schemaToTypeOrEmpty(opts.EnvironmentConfigsSchema, "EnvironmentConfigs")
+	declTypes = append(declTypes, environmentConfigsType)
+	varOpts = append(varOpts, cel.Variable(fieldEnvironmentConfigs, environmentConfigsType.CelType()))
+
+	// from desc - skip schema-based; try to unmarshal DeclType, else fallback to reflection fields by kind
+	for _, v := range desc.Variables {
+		if v.Name == fieldParameters || v.Name == fieldEnvironmentConfigs {
+			continue
+		}
+		if len(v.DeclType) == 0 {
+			continue
+		}
+		dt := &apiservercel.DeclType{}
+		if err := json.Unmarshal(v.DeclType, dt); err == nil && dt.CelType() != cel.DynType { // heuristic: if result is dyn, maybe bad unmarshal
+			declTypes = append(declTypes, dt)
+			varOpts = append(varOpts, cel.Variable(v.Name, dt.CelType()))
+			continue
+		}
+		// fallback: try reflection fields
+		found := false
+		for _, f := range componentContextFields {
+			if f.Name == v.Name {
+				declTypes = append(declTypes, f.DeclType)
+				varOpts = append(varOpts, cel.Variable(f.Name, f.DeclType.CelType()))
+				found = true
+				break
+			}
+		}
+		if found {
+			continue
+		}
+		for _, f := range traitContextFields {
+			if f.Name == v.Name {
+				declTypes = append(declTypes, f.DeclType)
+				varOpts = append(varOpts, cel.Variable(f.Name, f.DeclType.CelType()))
+				found = true
+				break
+			}
+		}
+		if found {
+			continue
+		}
+		for _, f := range resourceContextFields {
+			if f.Name == v.Name {
+				declTypes = append(declTypes, f.DeclType)
+				varOpts = append(varOpts, cel.Variable(f.Name, f.DeclType.CelType()))
+				found = true
+				break
+			}
+		}
+		if !found {
+			// last resort: skip if unknown
+			continue
+		}
+	}
+
+	provider := apiservercel.NewDeclTypeProvider(declTypes...)
+	providerOpts, err := provider.EnvOptions(baseEnv.CELTypeProvider())
+	if err != nil {
+		return nil, nil, err
+	}
+	varOpts = append(varOpts, providerOpts...)
+
+	env, err := baseEnv.Extend(varOpts...)
+	if err != nil {
+		return nil, nil, err
+	}
+	return env, provider, nil
 }
