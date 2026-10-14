@@ -1,0 +1,3103 @@
+{
+  "kind": "ClusterResourceType",
+  "variables": [
+    {
+      "name": "parameters",
+      "celType": "object"
+    },
+    {
+      "name": "environmentConfigs",
+      "celType": "object"
+    },
+    {
+      "name": "metadata",
+      "celType": "MetadataContext",
+      "declType": {
+        "Stringer": null,
+        "Fields": {
+          "annotations": {
+            "Name": "annotations",
+            "Type": {
+              "Stringer": null,
+              "Fields": null,
+              "KeyType": {
+                "Stringer": null,
+                "Fields": null,
+                "KeyType": null,
+                "ElemType": null,
+                "TypeParam": false,
+                "Metadata": null,
+                "MaxElements": 0,
+                "MinSerializedSize": 2
+              },
+              "ElemType": {
+                "Stringer": null,
+                "Fields": null,
+                "KeyType": null,
+                "ElemType": null,
+                "TypeParam": false,
+                "Metadata": null,
+                "MaxElements": 0,
+                "MinSerializedSize": 2
+              },
+              "TypeParam": false,
+              "Metadata": null,
+              "MaxElements": 1000,
+              "MinSerializedSize": 2
+            },
+            "Required": true
+          },
+          "dataPlaneName": {
+            "Name": "dataPlaneName",
+            "Type": {
+              "Stringer": null,
+              "Fields": null,
+              "KeyType": null,
+              "ElemType": null,
+              "TypeParam": false,
+              "Metadata": null,
+              "MaxElements": 0,
+              "MinSerializedSize": 2
+            },
+            "Required": true
+          },
+          "dataPlaneUID": {
+            "Name": "dataPlaneUID",
+            "Type": {
+              "Stringer": null,
+              "Fields": null,
+              "KeyType": null,
+              "ElemType": null,
+              "TypeParam": false,
+              "Metadata": null,
+              "MaxElements": 0,
+              "MinSerializedSize": 2
+            },
+            "Required": true
+          },
+          "environmentName": {
+            "Name": "environmentName",
+            "Type": {
+              "Stringer": null,
+              "Fields": null,
+              "KeyType": null,
+              "ElemType": null,
+              "TypeParam": false,
+              "Metadata": null,
+              "MaxElements": 0,
+              "MinSerializedSize": 2
+            },
+            "Required": true
+          },
+          "environmentUID": {
+            "Name": "environmentUID",
+            "Type": {
+              "Stringer": null,
+              "Fields": null,
+              "KeyType": null,
+              "ElemType": null,
+              "TypeParam": false,
+              "Metadata": null,
+              "MaxElements": 0,
+              "MinSerializedSize": 2
+            },
+            "Required": true
+          },
+          "labels": {
+            "Name": "labels",
+            "Type": {
+              "Stringer": null,
+              "Fields": null,
+              "KeyType": {
+                "Stringer": null,
+                "Fields": null,
+                "KeyType": null,
+                "ElemType": null,
+                "TypeParam": false,
+                "Metadata": null,
+                "MaxElements": 0,
+                "MinSerializedSize": 2
+              },
+              "ElemType": {
+                "Stringer": null,
+                "Fields": null,
+                "KeyType": null,
+                "ElemType": null,
+                "TypeParam": false,
+                "Metadata": null,
+                "MaxElements": 0,
+                "MinSerializedSize": 2
+              },
+              "TypeParam": false,
+              "Metadata": null,
+              "MaxElements": 1000,
+              "MinSerializedSize": 2
+            },
+            "Required": true
+          },
+          "name": {
+            "Name": "name",
+            "Type": {
+              "Stringer": null,
+              "Fields": null,
+              "KeyType": null,
+              "ElemType": null,
+              "TypeParam": false,
+              "Metadata": null,
+              "MaxElements": 0,
+              "MinSerializedSize": 2
+            },
+            "Required": true
+          },
+          "namespace": {
+            "Name": "namespace",
+            "Type": {
+              "Stringer": null,
+              "Fields": null,
+              "KeyType": null,
+              "ElemType": null,
+              "TypeParam": false,
+              "Metadata": null,
+              "MaxElements": 0,
+              "MinSerializedSize": 2
+            },
+            "Required": true
+          },
+          "projectName": {
+            "Name": "projectName",
+            "Type": {
+              "Stringer": null,
+              "Fields": null,
+              "KeyType": null,
+              "ElemType": null,
+              "TypeParam": false,
+              "Metadata": null,
+              "MaxElements": 0,
+              "MinSerializedSize": 2
+            },
+            "Required": true
+          },
+          "projectUID": {
+            "Name": "projectUID",
+            "Type": {
+              "Stringer": null,
+              "Fields": null,
+              "KeyType": null,
+              "ElemType": null,
+              "TypeParam": false,
+              "Metadata": null,
+              "MaxElements": 0,
+              "MinSerializedSize": 2
+            },
+            "Required": true
+          },
+          "resourceName": {
+            "Name": "resourceName",
+            "Type": {
+              "Stringer": null,
+              "Fields": null,
+              "KeyType": null,
+              "ElemType": null,
+              "TypeParam": false,
+              "Metadata": null,
+              "MaxElements": 0,
+              "MinSerializedSize": 2
+            },
+            "Required": true
+          },
+          "resourceNamespace": {
+            "Name": "resourceNamespace",
+            "Type": {
+              "Stringer": null,
+              "Fields": null,
+              "KeyType": null,
+              "ElemType": null,
+              "TypeParam": false,
+              "Metadata": null,
+              "MaxElements": 0,
+              "MinSerializedSize": 2
+            },
+            "Required": true
+          },
+          "resourceUID": {
+            "Name": "resourceUID",
+            "Type": {
+              "Stringer": null,
+              "Fields": null,
+              "KeyType": null,
+              "ElemType": null,
+              "TypeParam": false,
+              "Metadata": null,
+              "MaxElements": 0,
+              "MinSerializedSize": 2
+            },
+            "Required": true
+          }
+        },
+        "KeyType": null,
+        "ElemType": null,
+        "TypeParam": false,
+        "Metadata": null,
+        "MaxElements": 0,
+        "MinSerializedSize": 2
+      }
+    },
+    {
+      "name": "dataplane",
+      "celType": "DataPlaneContext",
+      "declType": {
+        "Stringer": null,
+        "Fields": {
+          "gateway": {
+            "Name": "gateway",
+            "Type": {
+              "Stringer": null,
+              "Fields": {
+                "egress": {
+                  "Name": "egress",
+                  "Type": {
+                    "Stringer": null,
+                    "Fields": {
+                      "external": {
+                        "Name": "external",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": {
+                            "http": {
+                              "Name": "http",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": {
+                                  "host": {
+                                    "Name": "host",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "listenerName": {
+                                    "Name": "listenerName",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "port": {
+                                    "Name": "port",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 1
+                                    },
+                                    "Required": false
+                                  }
+                                },
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "https": {
+                              "Name": "https",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": {
+                                  "host": {
+                                    "Name": "host",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "listenerName": {
+                                    "Name": "listenerName",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "port": {
+                                    "Name": "port",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 1
+                                    },
+                                    "Required": false
+                                  }
+                                },
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "name": {
+                              "Name": "name",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "namespace": {
+                              "Name": "namespace",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "tls": {
+                              "Name": "tls",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": {
+                                  "host": {
+                                    "Name": "host",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "listenerName": {
+                                    "Name": "listenerName",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "port": {
+                                    "Name": "port",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 1
+                                    },
+                                    "Required": false
+                                  }
+                                },
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            }
+                          },
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      },
+                      "internal": {
+                        "Name": "internal",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": {
+                            "http": {
+                              "Name": "http",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": {
+                                  "host": {
+                                    "Name": "host",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "listenerName": {
+                                    "Name": "listenerName",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "port": {
+                                    "Name": "port",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 1
+                                    },
+                                    "Required": false
+                                  }
+                                },
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "https": {
+                              "Name": "https",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": {
+                                  "host": {
+                                    "Name": "host",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "listenerName": {
+                                    "Name": "listenerName",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "port": {
+                                    "Name": "port",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 1
+                                    },
+                                    "Required": false
+                                  }
+                                },
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "name": {
+                              "Name": "name",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "namespace": {
+                              "Name": "namespace",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "tls": {
+                              "Name": "tls",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": {
+                                  "host": {
+                                    "Name": "host",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "listenerName": {
+                                    "Name": "listenerName",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "port": {
+                                    "Name": "port",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 1
+                                    },
+                                    "Required": false
+                                  }
+                                },
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            }
+                          },
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      }
+                    },
+                    "KeyType": null,
+                    "ElemType": null,
+                    "TypeParam": false,
+                    "Metadata": null,
+                    "MaxElements": 0,
+                    "MinSerializedSize": 2
+                  },
+                  "Required": false
+                },
+                "ingress": {
+                  "Name": "ingress",
+                  "Type": {
+                    "Stringer": null,
+                    "Fields": {
+                      "external": {
+                        "Name": "external",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": {
+                            "http": {
+                              "Name": "http",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": {
+                                  "host": {
+                                    "Name": "host",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "listenerName": {
+                                    "Name": "listenerName",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "port": {
+                                    "Name": "port",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 1
+                                    },
+                                    "Required": false
+                                  }
+                                },
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "https": {
+                              "Name": "https",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": {
+                                  "host": {
+                                    "Name": "host",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "listenerName": {
+                                    "Name": "listenerName",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "port": {
+                                    "Name": "port",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 1
+                                    },
+                                    "Required": false
+                                  }
+                                },
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "name": {
+                              "Name": "name",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "namespace": {
+                              "Name": "namespace",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "tls": {
+                              "Name": "tls",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": {
+                                  "host": {
+                                    "Name": "host",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "listenerName": {
+                                    "Name": "listenerName",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "port": {
+                                    "Name": "port",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 1
+                                    },
+                                    "Required": false
+                                  }
+                                },
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            }
+                          },
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      },
+                      "internal": {
+                        "Name": "internal",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": {
+                            "http": {
+                              "Name": "http",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": {
+                                  "host": {
+                                    "Name": "host",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "listenerName": {
+                                    "Name": "listenerName",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "port": {
+                                    "Name": "port",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 1
+                                    },
+                                    "Required": false
+                                  }
+                                },
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "https": {
+                              "Name": "https",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": {
+                                  "host": {
+                                    "Name": "host",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "listenerName": {
+                                    "Name": "listenerName",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "port": {
+                                    "Name": "port",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 1
+                                    },
+                                    "Required": false
+                                  }
+                                },
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "name": {
+                              "Name": "name",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "namespace": {
+                              "Name": "namespace",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "tls": {
+                              "Name": "tls",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": {
+                                  "host": {
+                                    "Name": "host",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "listenerName": {
+                                    "Name": "listenerName",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "port": {
+                                    "Name": "port",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 1
+                                    },
+                                    "Required": false
+                                  }
+                                },
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            }
+                          },
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      }
+                    },
+                    "KeyType": null,
+                    "ElemType": null,
+                    "TypeParam": false,
+                    "Metadata": null,
+                    "MaxElements": 0,
+                    "MinSerializedSize": 2
+                  },
+                  "Required": false
+                }
+              },
+              "KeyType": null,
+              "ElemType": null,
+              "TypeParam": false,
+              "Metadata": null,
+              "MaxElements": 0,
+              "MinSerializedSize": 2
+            },
+            "Required": false
+          },
+          "observabilityPlaneRef": {
+            "Name": "observabilityPlaneRef",
+            "Type": {
+              "Stringer": null,
+              "Fields": {
+                "kind": {
+                  "Name": "kind",
+                  "Type": {
+                    "Stringer": null,
+                    "Fields": null,
+                    "KeyType": null,
+                    "ElemType": null,
+                    "TypeParam": false,
+                    "Metadata": null,
+                    "MaxElements": 0,
+                    "MinSerializedSize": 2
+                  },
+                  "Required": true
+                },
+                "name": {
+                  "Name": "name",
+                  "Type": {
+                    "Stringer": null,
+                    "Fields": null,
+                    "KeyType": null,
+                    "ElemType": null,
+                    "TypeParam": false,
+                    "Metadata": null,
+                    "MaxElements": 0,
+                    "MinSerializedSize": 2
+                  },
+                  "Required": true
+                }
+              },
+              "KeyType": null,
+              "ElemType": null,
+              "TypeParam": false,
+              "Metadata": null,
+              "MaxElements": 0,
+              "MinSerializedSize": 2
+            },
+            "Required": false
+          },
+          "secretStore": {
+            "Name": "secretStore",
+            "Type": {
+              "Stringer": null,
+              "Fields": null,
+              "KeyType": null,
+              "ElemType": null,
+              "TypeParam": false,
+              "Metadata": null,
+              "MaxElements": 0,
+              "MinSerializedSize": 2
+            },
+            "Required": false
+          }
+        },
+        "KeyType": null,
+        "ElemType": null,
+        "TypeParam": false,
+        "Metadata": null,
+        "MaxElements": 0,
+        "MinSerializedSize": 2
+      }
+    },
+    {
+      "name": "environment",
+      "celType": "EnvironmentContext",
+      "declType": {
+        "Stringer": null,
+        "Fields": {
+          "gateway": {
+            "Name": "gateway",
+            "Type": {
+              "Stringer": null,
+              "Fields": {
+                "egress": {
+                  "Name": "egress",
+                  "Type": {
+                    "Stringer": null,
+                    "Fields": {
+                      "external": {
+                        "Name": "external",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": {
+                            "http": {
+                              "Name": "http",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": {
+                                  "host": {
+                                    "Name": "host",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "listenerName": {
+                                    "Name": "listenerName",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "port": {
+                                    "Name": "port",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 1
+                                    },
+                                    "Required": false
+                                  }
+                                },
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "https": {
+                              "Name": "https",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": {
+                                  "host": {
+                                    "Name": "host",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "listenerName": {
+                                    "Name": "listenerName",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "port": {
+                                    "Name": "port",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 1
+                                    },
+                                    "Required": false
+                                  }
+                                },
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "name": {
+                              "Name": "name",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "namespace": {
+                              "Name": "namespace",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "tls": {
+                              "Name": "tls",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": {
+                                  "host": {
+                                    "Name": "host",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "listenerName": {
+                                    "Name": "listenerName",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "port": {
+                                    "Name": "port",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 1
+                                    },
+                                    "Required": false
+                                  }
+                                },
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            }
+                          },
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      },
+                      "internal": {
+                        "Name": "internal",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": {
+                            "http": {
+                              "Name": "http",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": {
+                                  "host": {
+                                    "Name": "host",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "listenerName": {
+                                    "Name": "listenerName",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "port": {
+                                    "Name": "port",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 1
+                                    },
+                                    "Required": false
+                                  }
+                                },
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "https": {
+                              "Name": "https",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": {
+                                  "host": {
+                                    "Name": "host",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "listenerName": {
+                                    "Name": "listenerName",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "port": {
+                                    "Name": "port",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 1
+                                    },
+                                    "Required": false
+                                  }
+                                },
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "name": {
+                              "Name": "name",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "namespace": {
+                              "Name": "namespace",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "tls": {
+                              "Name": "tls",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": {
+                                  "host": {
+                                    "Name": "host",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "listenerName": {
+                                    "Name": "listenerName",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "port": {
+                                    "Name": "port",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 1
+                                    },
+                                    "Required": false
+                                  }
+                                },
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            }
+                          },
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      }
+                    },
+                    "KeyType": null,
+                    "ElemType": null,
+                    "TypeParam": false,
+                    "Metadata": null,
+                    "MaxElements": 0,
+                    "MinSerializedSize": 2
+                  },
+                  "Required": false
+                },
+                "ingress": {
+                  "Name": "ingress",
+                  "Type": {
+                    "Stringer": null,
+                    "Fields": {
+                      "external": {
+                        "Name": "external",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": {
+                            "http": {
+                              "Name": "http",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": {
+                                  "host": {
+                                    "Name": "host",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "listenerName": {
+                                    "Name": "listenerName",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "port": {
+                                    "Name": "port",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 1
+                                    },
+                                    "Required": false
+                                  }
+                                },
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "https": {
+                              "Name": "https",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": {
+                                  "host": {
+                                    "Name": "host",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "listenerName": {
+                                    "Name": "listenerName",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "port": {
+                                    "Name": "port",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 1
+                                    },
+                                    "Required": false
+                                  }
+                                },
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "name": {
+                              "Name": "name",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "namespace": {
+                              "Name": "namespace",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "tls": {
+                              "Name": "tls",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": {
+                                  "host": {
+                                    "Name": "host",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "listenerName": {
+                                    "Name": "listenerName",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "port": {
+                                    "Name": "port",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 1
+                                    },
+                                    "Required": false
+                                  }
+                                },
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            }
+                          },
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      },
+                      "internal": {
+                        "Name": "internal",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": {
+                            "http": {
+                              "Name": "http",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": {
+                                  "host": {
+                                    "Name": "host",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "listenerName": {
+                                    "Name": "listenerName",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "port": {
+                                    "Name": "port",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 1
+                                    },
+                                    "Required": false
+                                  }
+                                },
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "https": {
+                              "Name": "https",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": {
+                                  "host": {
+                                    "Name": "host",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "listenerName": {
+                                    "Name": "listenerName",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "port": {
+                                    "Name": "port",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 1
+                                    },
+                                    "Required": false
+                                  }
+                                },
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "name": {
+                              "Name": "name",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "namespace": {
+                              "Name": "namespace",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "tls": {
+                              "Name": "tls",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": {
+                                  "host": {
+                                    "Name": "host",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "listenerName": {
+                                    "Name": "listenerName",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 2
+                                    },
+                                    "Required": false
+                                  },
+                                  "port": {
+                                    "Name": "port",
+                                    "Type": {
+                                      "Stringer": null,
+                                      "Fields": null,
+                                      "KeyType": null,
+                                      "ElemType": null,
+                                      "TypeParam": false,
+                                      "Metadata": null,
+                                      "MaxElements": 0,
+                                      "MinSerializedSize": 1
+                                    },
+                                    "Required": false
+                                  }
+                                },
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            }
+                          },
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      }
+                    },
+                    "KeyType": null,
+                    "ElemType": null,
+                    "TypeParam": false,
+                    "Metadata": null,
+                    "MaxElements": 0,
+                    "MinSerializedSize": 2
+                  },
+                  "Required": false
+                }
+              },
+              "KeyType": null,
+              "ElemType": null,
+              "TypeParam": false,
+              "Metadata": null,
+              "MaxElements": 0,
+              "MinSerializedSize": 2
+            },
+            "Required": false
+          }
+        },
+        "KeyType": null,
+        "ElemType": null,
+        "TypeParam": false,
+        "Metadata": null,
+        "MaxElements": 0,
+        "MinSerializedSize": 2
+      }
+    },
+    {
+      "name": "gateway",
+      "celType": "GatewayData",
+      "declType": {
+        "Stringer": null,
+        "Fields": {
+          "egress": {
+            "Name": "egress",
+            "Type": {
+              "Stringer": null,
+              "Fields": {
+                "external": {
+                  "Name": "external",
+                  "Type": {
+                    "Stringer": null,
+                    "Fields": {
+                      "http": {
+                        "Name": "http",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": {
+                            "host": {
+                              "Name": "host",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "listenerName": {
+                              "Name": "listenerName",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "port": {
+                              "Name": "port",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 1
+                              },
+                              "Required": false
+                            }
+                          },
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      },
+                      "https": {
+                        "Name": "https",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": {
+                            "host": {
+                              "Name": "host",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "listenerName": {
+                              "Name": "listenerName",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "port": {
+                              "Name": "port",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 1
+                              },
+                              "Required": false
+                            }
+                          },
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      },
+                      "name": {
+                        "Name": "name",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": null,
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      },
+                      "namespace": {
+                        "Name": "namespace",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": null,
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      },
+                      "tls": {
+                        "Name": "tls",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": {
+                            "host": {
+                              "Name": "host",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "listenerName": {
+                              "Name": "listenerName",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "port": {
+                              "Name": "port",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 1
+                              },
+                              "Required": false
+                            }
+                          },
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      }
+                    },
+                    "KeyType": null,
+                    "ElemType": null,
+                    "TypeParam": false,
+                    "Metadata": null,
+                    "MaxElements": 0,
+                    "MinSerializedSize": 2
+                  },
+                  "Required": false
+                },
+                "internal": {
+                  "Name": "internal",
+                  "Type": {
+                    "Stringer": null,
+                    "Fields": {
+                      "http": {
+                        "Name": "http",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": {
+                            "host": {
+                              "Name": "host",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "listenerName": {
+                              "Name": "listenerName",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "port": {
+                              "Name": "port",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 1
+                              },
+                              "Required": false
+                            }
+                          },
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      },
+                      "https": {
+                        "Name": "https",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": {
+                            "host": {
+                              "Name": "host",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "listenerName": {
+                              "Name": "listenerName",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "port": {
+                              "Name": "port",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 1
+                              },
+                              "Required": false
+                            }
+                          },
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      },
+                      "name": {
+                        "Name": "name",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": null,
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      },
+                      "namespace": {
+                        "Name": "namespace",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": null,
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      },
+                      "tls": {
+                        "Name": "tls",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": {
+                            "host": {
+                              "Name": "host",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "listenerName": {
+                              "Name": "listenerName",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "port": {
+                              "Name": "port",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 1
+                              },
+                              "Required": false
+                            }
+                          },
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      }
+                    },
+                    "KeyType": null,
+                    "ElemType": null,
+                    "TypeParam": false,
+                    "Metadata": null,
+                    "MaxElements": 0,
+                    "MinSerializedSize": 2
+                  },
+                  "Required": false
+                }
+              },
+              "KeyType": null,
+              "ElemType": null,
+              "TypeParam": false,
+              "Metadata": null,
+              "MaxElements": 0,
+              "MinSerializedSize": 2
+            },
+            "Required": false
+          },
+          "ingress": {
+            "Name": "ingress",
+            "Type": {
+              "Stringer": null,
+              "Fields": {
+                "external": {
+                  "Name": "external",
+                  "Type": {
+                    "Stringer": null,
+                    "Fields": {
+                      "http": {
+                        "Name": "http",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": {
+                            "host": {
+                              "Name": "host",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "listenerName": {
+                              "Name": "listenerName",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "port": {
+                              "Name": "port",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 1
+                              },
+                              "Required": false
+                            }
+                          },
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      },
+                      "https": {
+                        "Name": "https",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": {
+                            "host": {
+                              "Name": "host",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "listenerName": {
+                              "Name": "listenerName",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "port": {
+                              "Name": "port",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 1
+                              },
+                              "Required": false
+                            }
+                          },
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      },
+                      "name": {
+                        "Name": "name",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": null,
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      },
+                      "namespace": {
+                        "Name": "namespace",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": null,
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      },
+                      "tls": {
+                        "Name": "tls",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": {
+                            "host": {
+                              "Name": "host",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "listenerName": {
+                              "Name": "listenerName",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "port": {
+                              "Name": "port",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 1
+                              },
+                              "Required": false
+                            }
+                          },
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      }
+                    },
+                    "KeyType": null,
+                    "ElemType": null,
+                    "TypeParam": false,
+                    "Metadata": null,
+                    "MaxElements": 0,
+                    "MinSerializedSize": 2
+                  },
+                  "Required": false
+                },
+                "internal": {
+                  "Name": "internal",
+                  "Type": {
+                    "Stringer": null,
+                    "Fields": {
+                      "http": {
+                        "Name": "http",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": {
+                            "host": {
+                              "Name": "host",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "listenerName": {
+                              "Name": "listenerName",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "port": {
+                              "Name": "port",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 1
+                              },
+                              "Required": false
+                            }
+                          },
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      },
+                      "https": {
+                        "Name": "https",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": {
+                            "host": {
+                              "Name": "host",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "listenerName": {
+                              "Name": "listenerName",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "port": {
+                              "Name": "port",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 1
+                              },
+                              "Required": false
+                            }
+                          },
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      },
+                      "name": {
+                        "Name": "name",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": null,
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      },
+                      "namespace": {
+                        "Name": "namespace",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": null,
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      },
+                      "tls": {
+                        "Name": "tls",
+                        "Type": {
+                          "Stringer": null,
+                          "Fields": {
+                            "host": {
+                              "Name": "host",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "listenerName": {
+                              "Name": "listenerName",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 2
+                              },
+                              "Required": false
+                            },
+                            "port": {
+                              "Name": "port",
+                              "Type": {
+                                "Stringer": null,
+                                "Fields": null,
+                                "KeyType": null,
+                                "ElemType": null,
+                                "TypeParam": false,
+                                "Metadata": null,
+                                "MaxElements": 0,
+                                "MinSerializedSize": 1
+                              },
+                              "Required": false
+                            }
+                          },
+                          "KeyType": null,
+                          "ElemType": null,
+                          "TypeParam": false,
+                          "Metadata": null,
+                          "MaxElements": 0,
+                          "MinSerializedSize": 2
+                        },
+                        "Required": false
+                      }
+                    },
+                    "KeyType": null,
+                    "ElemType": null,
+                    "TypeParam": false,
+                    "Metadata": null,
+                    "MaxElements": 0,
+                    "MinSerializedSize": 2
+                  },
+                  "Required": false
+                }
+              },
+              "KeyType": null,
+              "ElemType": null,
+              "TypeParam": false,
+              "Metadata": null,
+              "MaxElements": 0,
+              "MinSerializedSize": 2
+            },
+            "Required": false
+          }
+        },
+        "KeyType": null,
+        "ElemType": null,
+        "TypeParam": false,
+        "Metadata": null,
+        "MaxElements": 0,
+        "MinSerializedSize": 2
+      }
+    },
+    {
+      "name": "applied",
+      "celType": "map(string, AppliedEntry)",
+      "declType": {
+        "Stringer": null,
+        "Fields": null,
+        "KeyType": {
+          "Stringer": null,
+          "Fields": null,
+          "KeyType": null,
+          "ElemType": null,
+          "TypeParam": false,
+          "Metadata": null,
+          "MaxElements": 0,
+          "MinSerializedSize": 2
+        },
+        "ElemType": {
+          "Stringer": null,
+          "Fields": {
+            "status": {
+              "Name": "status",
+              "Type": {
+                "Stringer": null,
+                "Fields": null,
+                "KeyType": null,
+                "ElemType": null,
+                "TypeParam": false,
+                "Metadata": null,
+                "MaxElements": 0,
+                "MinSerializedSize": 1
+              },
+              "Required": true
+            }
+          },
+          "KeyType": null,
+          "ElemType": null,
+          "TypeParam": false,
+          "Metadata": null,
+          "MaxElements": 0,
+          "MinSerializedSize": 2
+        },
+        "TypeParam": false,
+        "Metadata": null,
+        "MaxElements": 1000,
+        "MinSerializedSize": 2
+      }
+    }
+  ],
+  "hasApplied": true,
+  "extensions": {
+    "base": [
+      "optionalTypes",
+      "strings",
+      "encoders",
+      "math",
+      "lists",
+      "sets",
+      "twoVarComprehensions"
+    ],
+    "customMacros": [
+      "oc_generate_name",
+      "oc_dns_label",
+      "oc_merge"
+    ],
+    "customFunctions": [
+      "oc_omit"
+    ]
+  }
+}

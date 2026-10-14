@@ -1,0 +1,131 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.21.0
+  name: dataplanes.openchoreo.dev
+spec:
+  group: openchoreo.dev
+  names:
+    kind: DataPlane
+    listKind: DataPlaneList
+    plural: dataplanes
+    shortNames:
+    - dp
+    - dps
+    singular: dataplane
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: DataPlane is the Schema for the dataplanes API.
+        properties:
+          apiVersion:
+            description: APIVersion defines the versioned schema of this representation of an object.
+            type: string
+          kind:
+            description: Kind is a string value representing the REST resource this object represents.
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: DataPlaneSpec defines the desired state of a DataPlane.
+            properties:
+              clusterAgent:
+                description: ClusterAgent specifies the configuration for cluster agent-based communication.
+                properties:
+                  clientCA:
+                    description: ClientCA contains the CA certificate used to verify the agent's client certificate.
+                    properties:
+                      secretKeyRef:
+                        description: SecretKeyRef is a reference to a secret containing the value.
+                        properties:
+                          key:
+                            description: Key is the key within the secret.
+                            type: string
+                          name:
+                            description: Name of the secret.
+                            type: string
+                          namespace:
+                            description: Namespace of the secret.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      value:
+                        description: Value is the inline value.
+                        type: string
+                    type: object
+                required:
+                - clientCA
+                type: object
+              gateway:
+                description: Gateway specifies the configuration for the API gateway.
+                properties:
+                  egress:
+                    description: Egress defines the egress gateway configuration.
+                    properties:
+                      external:
+                        description: External defines the externally accessible gateway endpoint.
+                        properties:
+                          http:
+                            description: HTTP defines the HTTP listener configuration.
+                            properties:
+                              host:
+                                description: Host is the virtual host for this listener.
+                                type: string
+                              port:
+                                description: Port is the port number for this listener.
+                                format: int32
+                                type: integer
+                            required:
+                            - host
+                            - port
+                            type: object
+                          name:
+                            description: Name is the name of the Gateway resource.
+                            type: string
+                          namespace:
+                            description: Namespace is the namespace of the Gateway resource.
+                            type: string
+                        required:
+                        - name
+                        - namespace
+                        type: object
+                    type: object
+                type: object
+              secretStoreRef:
+                description: SecretStoreRef specifies the ESO ClusterSecretStore to use.
+                properties:
+                  name:
+                    description: Name of the ClusterSecretStore resource.
+                    type: string
+                required:
+                - name
+                type: object
+            required:
+            - clusterAgent
+            type: object
+          status:
+            description: DataPlaneStatus defines the observed state of DataPlane.
+            properties:
+              conditions:
+                items:
+                  properties:
+                    status:
+                      description: Status of the condition.
+                      type: string
+                    type:
+                      description: Type of condition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true

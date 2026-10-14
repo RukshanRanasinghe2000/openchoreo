@@ -1,0 +1,205 @@
+{
+  "type": "object",
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "required": true,
+      "default": "openchoreo.dev/v1alpha1"
+    },
+    "kind": {
+      "type": "string",
+      "required": true,
+      "default": "ClusterWorkflowPlane"
+    },
+    "metadata": {
+      "type": "object",
+      "required": false,
+      "properties": {
+        "annotations": {
+          "type": "object",
+          "required": false,
+          "preserveUnknownFields": true
+        },
+        "creationTimestamp": {
+          "type": "string",
+          "required": false
+        },
+        "name": {
+          "type": "string",
+          "required": false
+        },
+        "uid": {
+          "type": "string",
+          "required": false
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": false,
+      "properties": {
+        "clusterAgent": {
+          "type": "object",
+          "required": true,
+          "properties": {
+            "clientCA": {
+              "type": "object",
+              "required": true,
+              "properties": {
+                "secretKeyRef": {
+                  "type": "object",
+                  "required": false,
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "required": true
+                    },
+                    "name": {
+                      "type": "string",
+                      "required": true
+                    },
+                    "namespace": {
+                      "type": "string",
+                      "required": false
+                    }
+                  }
+                },
+                "value": {
+                  "type": "string",
+                  "required": false
+                }
+              }
+            }
+          }
+        },
+        "observabilityPlaneRef": {
+          "type": "object",
+          "required": false,
+          "properties": {
+            "kind": {
+              "type": "string",
+              "required": true,
+              "enum": [
+                "ClusterObservabilityPlane"
+              ]
+            },
+            "name": {
+              "type": "string",
+              "required": true,
+              "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+              "minLength": 1,
+              "maxLength": 63
+            }
+          }
+        },
+        "planeID": {
+          "type": "string",
+          "required": true,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "maxLength": 63
+        },
+        "secretStoreRef": {
+          "type": "object",
+          "required": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "required": true
+            }
+          }
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "required": false,
+      "properties": {
+        "agentConnection": {
+          "type": "object",
+          "required": false,
+          "properties": {
+            "connected": {
+              "type": "boolean",
+              "required": true
+            },
+            "connectedAgents": {
+              "type": "integer",
+              "required": true
+            },
+            "lastConnectedTime": {
+              "type": "string",
+              "required": false,
+              "format": "date-time"
+            },
+            "lastDisconnectedTime": {
+              "type": "string",
+              "required": false,
+              "format": "date-time"
+            },
+            "lastHeartbeatTime": {
+              "type": "string",
+              "required": false,
+              "format": "date-time"
+            },
+            "message": {
+              "type": "string",
+              "required": false
+            }
+          }
+        },
+        "conditions": {
+          "type": "array",
+          "required": false,
+          "items": {
+            "type": "object",
+            "properties": {
+              "lastTransitionTime": {
+                "type": "string",
+                "required": false,
+                "format": "date-time"
+              },
+              "message": {
+                "type": "string",
+                "required": false,
+                "maxLength": 32768
+              },
+              "observedGeneration": {
+                "type": "integer",
+                "required": false,
+                "format": "int64",
+                "minimum": 0
+              },
+              "reason": {
+                "type": "string",
+                "required": false,
+                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                "minLength": 1,
+                "maxLength": 1024
+              },
+              "status": {
+                "type": "string",
+                "required": false,
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "required": false,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                "maxLength": 316
+              }
+            }
+          }
+        },
+        "observedGeneration": {
+          "type": "integer",
+          "required": false,
+          "format": "int64"
+        }
+      }
+    }
+  }
+}
