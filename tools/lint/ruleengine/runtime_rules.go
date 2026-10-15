@@ -35,19 +35,19 @@ var integerFields = map[string]bool{
 	"port":     true,
 }
 
-// NumericRules performs logical value checks on numeric parameter fields:
+// RuntimeRules performs logical value checks on runtime parameter fields:
 // known fields such as replica counts and port numbers must be plain,
 // non-negative integers. The check only inspects literal parameters blocks
 // (the concrete values a user writes), never schema definitions or template
 // expressions, so it does not fire on a ComponentType's openAPIV3Schema or on
 // ${...} template references.
-type NumericRules struct{}
+type RuntimeRules struct{}
 
-func (r *NumericRules) Name() string { return "numeric-rules" }
+func (r *RuntimeRules) Name() string { return "runtime-rules" }
 
 // Evaluate inspects the document's spec for invalid values on known
 // non-negative integer fields.
-func (r *NumericRules) Evaluate(doc *parser.DocumentNode) Diagnostics {
+func (r *RuntimeRules) Evaluate(doc *parser.DocumentNode) Diagnostics {
 	if doc.Spec == nil {
 		return nil
 	}
@@ -60,7 +60,7 @@ func (r *NumericRules) Evaluate(doc *parser.DocumentNode) Diagnostics {
 // walk recurses through a yaml.Node tree. inParameters reports whether node
 // sits inside a literal parameters block, which is where concrete,
 // user-supplied values live as opposed to schema definitions or templates.
-func (r *NumericRules) walk(node *yaml.Node, inParameters bool, diags *Diagnostics) {
+func (r *RuntimeRules) walk(node *yaml.Node, inParameters bool, diags *Diagnostics) {
 	if node == nil {
 		return
 	}

@@ -649,11 +649,11 @@ spec:
 	}
 }
 
-// --- Numeric Rules ---
+// --- Runtime Rules ---
 
-// TestNumeric_NegativeReplicas verifies that a negative replica count under
+// TestRuntime_NegativeReplicas verifies that a negative replica count under
 // spec.parameters is reported.
-func TestNumeric_NegativeReplicas(t *testing.T) {
+func TestRuntime_NegativeReplicas(t *testing.T) {
 	yaml := `apiVersion: openchoreo.dev/v1alpha1
 kind: Component
 metadata:
@@ -669,9 +669,9 @@ spec:
 	}
 }
 
-// TestNumeric_NegativePort verifies that a negative port number under
+// TestRuntime_NegativePort verifies that a negative port number under
 // spec.parameters is reported.
-func TestNumeric_NegativePort(t *testing.T) {
+func TestRuntime_NegativePort(t *testing.T) {
 	yaml := `apiVersion: openchoreo.dev/v1alpha1
 kind: Component
 metadata:
@@ -687,9 +687,9 @@ spec:
 	}
 }
 
-// TestNumeric_PositiveValues verifies that valid non-negative replicas and
+// TestRuntime_PositiveValues verifies that valid non-negative replicas and
 // port values produce no numeric errors.
-func TestNumeric_PositiveValues(t *testing.T) {
+func TestRuntime_PositiveValues(t *testing.T) {
 	yaml := `apiVersion: openchoreo.dev/v1alpha1
 kind: Component
 metadata:
@@ -705,8 +705,8 @@ spec:
 	}
 }
 
-// TestNumeric_ZeroAllowed verifies that the boundary value zero is accepted.
-func TestNumeric_ZeroAllowed(t *testing.T) {
+// TestRuntime_ZeroAllowed verifies that the boundary value zero is accepted.
+func TestRuntime_ZeroAllowed(t *testing.T) {
 	yaml := `apiVersion: openchoreo.dev/v1alpha1
 kind: Component
 metadata:
@@ -721,10 +721,10 @@ spec:
 	}
 }
 
-// TestNumeric_NestedParameters verifies that negative values are detected in
+// TestRuntime_NestedParameters verifies that negative values are detected in
 // nested parameter blocks (for example trait parameters), not only at the top
 // level of spec.parameters.
-func TestNumeric_NestedParameters(t *testing.T) {
+func TestRuntime_NestedParameters(t *testing.T) {
 	yaml := `apiVersion: openchoreo.dev/v1alpha1
 kind: Component
 metadata:
@@ -741,9 +741,9 @@ spec:
 	}
 }
 
-// TestNumeric_TemplatedValueIgnored verifies that a templated expression is
+// TestRuntime_TemplatedValueIgnored verifies that a templated expression is
 // never treated as a negative number.
-func TestNumeric_TemplatedValueIgnored(t *testing.T) {
+func TestRuntime_TemplatedValueIgnored(t *testing.T) {
 	yaml := `apiVersion: openchoreo.dev/v1alpha1
 kind: Component
 metadata:
@@ -758,9 +758,9 @@ spec:
 	}
 }
 
-// TestNumeric_ReasonMentionsField verifies the message names the offending
+// TestRuntime_ReasonMentionsField verifies the message names the offending
 // field so the diagnostic is actionable.
-func TestNumeric_ReasonMentionsField(t *testing.T) {
+func TestRuntime_ReasonMentionsField(t *testing.T) {
 	yaml := `apiVersion: openchoreo.dev/v1alpha1
 kind: Component
 metadata:
@@ -781,9 +781,9 @@ spec:
 	t.Errorf("expected a negative-value diagnostic, got %v", diags)
 }
 
-// TestNumeric_FloatRejected verifies that a fractional value is rejected even
+// TestRuntime_FloatRejected verifies that a fractional value is rejected even
 // though it is numeric.
-func TestNumeric_FloatRejected(t *testing.T) {
+func TestRuntime_FloatRejected(t *testing.T) {
 	yaml := `apiVersion: openchoreo.dev/v1alpha1
 kind: Component
 metadata:
@@ -798,9 +798,9 @@ spec:
 	}
 }
 
-// TestNumeric_StringRejected verifies that a quoted number is rejected: the
+// TestRuntime_StringRejected verifies that a quoted number is rejected: the
 // field must be an integer, not a string.
-func TestNumeric_StringRejected(t *testing.T) {
+func TestRuntime_StringRejected(t *testing.T) {
 	yaml := `apiVersion: openchoreo.dev/v1alpha1
 kind: Component
 metadata:
@@ -815,8 +815,8 @@ spec:
 	}
 }
 
-// TestNumeric_BoolRejected verifies that a boolean value is rejected.
-func TestNumeric_BoolRejected(t *testing.T) {
+// TestRuntime_BoolRejected verifies that a boolean value is rejected.
+func TestRuntime_BoolRejected(t *testing.T) {
 	yaml := `apiVersion: openchoreo.dev/v1alpha1
 kind: Component
 metadata:
@@ -831,8 +831,8 @@ spec:
 	}
 }
 
-// TestNumeric_ListRejected verifies that a sequence value is rejected.
-func TestNumeric_ListRejected(t *testing.T) {
+// TestRuntime_ListRejected verifies that a sequence value is rejected.
+func TestRuntime_ListRejected(t *testing.T) {
 	yaml := `apiVersion: openchoreo.dev/v1alpha1
 kind: Component
 metadata:
@@ -849,8 +849,8 @@ spec:
 	}
 }
 
-// TestNumeric_NullRejected verifies that an empty (null) value is rejected.
-func TestNumeric_NullRejected(t *testing.T) {
+// TestRuntime_NullRejected verifies that an empty (null) value is rejected.
+func TestRuntime_NullRejected(t *testing.T) {
 	yaml := `apiVersion: openchoreo.dev/v1alpha1
 kind: Component
 metadata:
@@ -865,10 +865,10 @@ spec:
 	}
 }
 
-// TestNumeric_ComponentTypeSchemaIgnored verifies that a ComponentType's
+// TestRuntime_ComponentTypeSchemaIgnored verifies that a ComponentType's
 // openAPIV3Schema definition of replicas (a mapping with type/default) is not
 // mistaken for a literal value.
-func TestNumeric_ComponentTypeSchemaIgnored(t *testing.T) {
+func TestRuntime_ComponentTypeSchemaIgnored(t *testing.T) {
 	yaml := `apiVersion: openchoreo.dev/v1alpha1
 kind: ComponentType
 metadata:
@@ -893,9 +893,9 @@ spec:
 	}
 }
 
-// TestNumeric_ParameterSchemaIgnored verifies that a ComponentType's
+// TestRuntime_ParameterSchemaIgnored verifies that a ComponentType's
 // spec.parameters openAPIV3Schema definition is skipped.
-func TestNumeric_ParameterSchemaIgnored(t *testing.T) {
+func TestRuntime_ParameterSchemaIgnored(t *testing.T) {
 	yaml := `apiVersion: openchoreo.dev/v1alpha1
 kind: ComponentType
 metadata:
