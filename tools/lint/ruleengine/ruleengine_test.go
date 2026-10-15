@@ -649,6 +649,271 @@ spec:
 	}
 }
 
+// --- Numeric Rules ---
+
+// TestNumeric_NegativeReplicas verifies that a negative replica count under
+// spec.parameters is reported.
+func TestNumeric_NegativeReplicas(t *testing.T) {
+	yaml := `apiVersion: openchoreo.dev/v1alpha1
+kind: Component
+metadata:
+  name: nats
+spec:
+  parameters:
+    replicas: -1
+    port: 4222
+`
+	diags := eval(t, yaml)
+	if !hasCode(diags, "negative-value") {
+		t.Errorf("expected negative-value error for replicas: -1, got %v", diags)
+	}
+}
+
+// TestNumeric_NegativePort verifies that a negative port number under
+// spec.parameters is reported.
+func TestNumeric_NegativePort(t *testing.T) {
+	yaml := `apiVersion: openchoreo.dev/v1alpha1
+kind: Component
+metadata:
+  name: nats
+spec:
+  parameters:
+    replicas: 1
+    port: -80
+`
+	diags := eval(t, yaml)
+	if !hasCode(diags, "negative-value") {
+		t.Errorf("expected negative-value error for port: -80, got %v", diags)
+	}
+}
+
+// TestNumeric_PositiveValues verifies that valid non-negative replicas and
+// port values produce no numeric errors.
+func TestNumeric_PositiveValues(t *testing.T) {
+	yaml := `apiVersion: openchoreo.dev/v1alpha1
+kind: Component
+metadata:
+  name: nats
+spec:
+  parameters:
+    replicas: 1
+    port: 4222
+`
+	diags := eval(t, yaml)
+	if hasCode(diags, "negative-value") {
+		t.Errorf("unexpected negative-value error for positive values, got %v", diags)
+	}
+}
+
+// TestNumeric_ZeroAllowed verifies that the boundary value zero is accepted.
+func TestNumeric_ZeroAllowed(t *testing.T) {
+	yaml := `apiVersion: openchoreo.dev/v1alpha1
+kind: Component
+metadata:
+  name: nats
+spec:
+  parameters:
+    replicas: 0
+`
+	diags := eval(t, yaml)
+	if hasCode(diags, "negative-value") {
+		t.Errorf("unexpected negative-value error for replicas: 0, got %v", diags)
+	}
+}
+
+// TestNumeric_NestedParameters verifies that negative values are detected in
+// nested parameter blocks (for example trait parameters), not only at the top
+// level of spec.parameters.
+func TestNumeric_NestedParameters(t *testing.T) {
+	yaml := `apiVersion: openchoreo.dev/v1alpha1
+kind: Component
+metadata:
+  name: nats
+spec:
+  traits:
+    - name: autoscaler
+      parameters:
+        replicas: -3
+`
+	diags := eval(t, yaml)
+	if !hasCode(diags, "negative-value") {
+		t.Errorf("expected negative-value error for nested replicas: -3, got %v", diags)
+	}
+}
+
+// TestNumeric_TemplatedValueIgnored verifies that a templated expression is
+// never treated as a negative number.
+func TestNumeric_TemplatedValueIgnored(t *testing.T) {
+	yaml := `apiVersion: openchoreo.dev/v1alpha1
+kind: Component
+metadata:
+  name: nats
+spec:
+  parameters:
+    replicas: ${environmentConfigs.replicas}
+`
+	diags := eval(t, yaml)
+	if hasCode(diags, "negative-value") {
+		t.Errorf("unexpected negative-value error for templated value, got %v", diags)
+	}
+}
+
+// TestNumeric_ReasonMentionsField verifies the message names the offending
+// field so the diagnostic is actionable.
+func TestNumeric_ReasonMentionsField(t *testing.T) {
+	yaml := `apiVersion: openchoreo.dev/v1alpha1
+kind: Component
+metadata:
+  name: nats
+spec:
+  parameters:
+    port: -1
+`
+	diags := eval(t, yaml)
+	for _, d := range diags {
+		if d.Code == "negative-value" {
+			if !strings.Contains(d.Message, "port") {
+				t.Errorf("expected message to mention the field name, got %q", d.Message)
+			}
+			return
+		}
+	}
+	t.Errorf("expected a negative-value diagnostic, got %v", diags)
+}
+
+// TestNumeric_FloatRejected verifies that a fractional value is rejected even
+// though it is numeric.
+func TestNumeric_FloatRejected(t *testing.T) {
+	yaml := `apiVersion: openchoreo.dev/v1alpha1
+kind: Component
+metadata:
+  name: nats
+spec:
+  parameters:
+    replicas: 1.5
+`
+	diags := eval(t, yaml)
+	if !hasCode(diags, "invalid-integer") {
+		t.Errorf("expected invalid-integer error for replicas: 1.5, got %v", diags)
+	}
+}
+
+// TestNumeric_StringRejected verifies that a quoted number is rejected: the
+// field must be an integer, not a string.
+func TestNumeric_StringRejected(t *testing.T) {
+	yaml := `apiVersion: openchoreo.dev/v1alpha1
+kind: Component
+metadata:
+  name: nats
+spec:
+  parameters:
+    port: "8080"
+`
+	diags := eval(t, yaml)
+	if !hasCode(diags, "invalid-integer") {
+		t.Errorf("expected invalid-integer error for port: \"8080\", got %v", diags)
+	}
+}
+
+// TestNumeric_BoolRejected verifies that a boolean value is rejected.
+func TestNumeric_BoolRejected(t *testing.T) {
+	yaml := `apiVersion: openchoreo.dev/v1alpha1
+kind: Component
+metadata:
+  name: nats
+spec:
+  parameters:
+    replicas: true
+`
+	diags := eval(t, yaml)
+	if !hasCode(diags, "invalid-integer") {
+		t.Errorf("expected invalid-integer error for replicas: true, got %v", diags)
+	}
+}
+
+// TestNumeric_ListRejected verifies that a sequence value is rejected.
+func TestNumeric_ListRejected(t *testing.T) {
+	yaml := `apiVersion: openchoreo.dev/v1alpha1
+kind: Component
+metadata:
+  name: nats
+spec:
+  parameters:
+    replicas:
+      - 1
+      - 2
+`
+	diags := eval(t, yaml)
+	if !hasCode(diags, "invalid-integer") {
+		t.Errorf("expected invalid-integer error for a list, got %v", diags)
+	}
+}
+
+// TestNumeric_NullRejected verifies that an empty (null) value is rejected.
+func TestNumeric_NullRejected(t *testing.T) {
+	yaml := `apiVersion: openchoreo.dev/v1alpha1
+kind: Component
+metadata:
+  name: nats
+spec:
+  parameters:
+    port:
+`
+	diags := eval(t, yaml)
+	if !hasCode(diags, "invalid-integer") {
+		t.Errorf("expected invalid-integer error for null port, got %v", diags)
+	}
+}
+
+// TestNumeric_ComponentTypeSchemaIgnored verifies that a ComponentType's
+// openAPIV3Schema definition of replicas (a mapping with type/default) is not
+// mistaken for a literal value.
+func TestNumeric_ComponentTypeSchemaIgnored(t *testing.T) {
+	yaml := `apiVersion: openchoreo.dev/v1alpha1
+kind: ComponentType
+metadata:
+  name: service
+spec:
+  environmentConfigs:
+    openAPIV3Schema:
+      type: object
+      properties:
+        replicas:
+          type: integer
+          default: 1
+  resources:
+    - id: deployment
+      template:
+        spec:
+          replicas: ${environmentConfigs.replicas}
+`
+	diags := eval(t, yaml)
+	if hasCode(diags, "invalid-integer") || hasCode(diags, "negative-value") {
+		t.Errorf("unexpected numeric error for ComponentType schema/template, got %v", diags)
+	}
+}
+
+// TestNumeric_ParameterSchemaIgnored verifies that a ComponentType's
+// spec.parameters openAPIV3Schema definition is skipped.
+func TestNumeric_ParameterSchemaIgnored(t *testing.T) {
+	yaml := `apiVersion: openchoreo.dev/v1alpha1
+kind: ComponentType
+metadata:
+  name: service
+spec:
+  parameters:
+    openAPIV3Schema:
+      type: object
+      properties:
+        replicas:
+          type: integer
+`
+	diags := eval(t, yaml)
+	if hasCode(diags, "invalid-integer") || hasCode(diags, "negative-value") {
+		t.Errorf("unexpected numeric error for parameters schema, got %v", diags)
+	}
+}
+
 // TestKindRules_SelectorReturnsCorrectCount verifies that RulesForKind
 // returns the schema rule for every known kind, plus the CEL rule for the
 // CEL-bearing kinds.

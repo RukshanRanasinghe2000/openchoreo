@@ -26,6 +26,7 @@ func NewEngine() *Engine {
 	e.rules = append(e.rules, &ReferenceRules{})
 	e.rules = append(e.rules, &MetadataRules{})
 	e.rules = append(e.rules, &EmptyLinesRules{})
+	e.rules = append(e.rules, &NumericRules{})
 	return e
 }
 
