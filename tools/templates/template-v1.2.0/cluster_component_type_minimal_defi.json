@@ -1,0 +1,315 @@
+{
+  "type": "object",
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "required": true,
+      "default": "openchoreo.dev/v1alpha1"
+    },
+    "kind": {
+      "type": "string",
+      "required": true,
+      "default": "ClusterComponentType"
+    },
+    "metadata": {
+      "type": "object",
+      "required": false,
+      "properties": {
+        "annotations": {
+          "type": "object",
+          "required": false,
+          "preserveUnknownFields": true
+        },
+        "creationTimestamp": {
+          "type": "string",
+          "required": false
+        },
+        "name": {
+          "type": "string",
+          "required": false
+        },
+        "uid": {
+          "type": "string",
+          "required": false
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": false,
+      "properties": {
+        "allowedTraits": {
+          "type": "array",
+          "required": false,
+          "items": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "required": true,
+                "enum": [
+                  "ClusterTrait"
+                ]
+              },
+              "name": {
+                "type": "string",
+                "required": true,
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "allowedWorkflows": {
+          "type": "array",
+          "required": false,
+          "items": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "required": true,
+                "enum": [
+                  "ClusterWorkflow"
+                ]
+              },
+              "name": {
+                "type": "string",
+                "required": true,
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "environmentConfigs": {
+          "type": "object",
+          "required": false,
+          "properties": {
+            "openAPIV3Schema": {
+              "type": "object",
+              "required": false,
+              "preserveUnknownFields": true
+            }
+          }
+        },
+        "parameters": {
+          "type": "object",
+          "required": false,
+          "properties": {
+            "openAPIV3Schema": {
+              "type": "object",
+              "required": false,
+              "preserveUnknownFields": true
+            }
+          }
+        },
+        "postRenderValidations": {
+          "type": "array",
+          "required": false,
+          "items": {
+            "type": "object",
+            "properties": {
+              "forEach": {
+                "type": "string",
+                "required": false,
+                "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+              },
+              "message": {
+                "type": "string",
+                "required": true,
+                "minLength": 1
+              },
+              "rule": {
+                "type": "string",
+                "required": true,
+                "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+              },
+              "target": {
+                "type": "object",
+                "required": true,
+                "properties": {
+                  "group": {
+                    "type": "string",
+                    "required": true
+                  },
+                  "kind": {
+                    "type": "string",
+                    "required": true,
+                    "minLength": 1
+                  },
+                  "mustMatch": {
+                    "type": "boolean",
+                    "required": false,
+                    "default": true
+                  },
+                  "version": {
+                    "type": "string",
+                    "required": true,
+                    "minLength": 1
+                  },
+                  "where": {
+                    "type": "string",
+                    "required": false,
+                    "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+                  }
+                }
+              },
+              "targetPlane": {
+                "type": "string",
+                "required": false,
+                "default": "dataplane",
+                "enum": [
+                  "dataplane",
+                  "observabilityplane"
+                ]
+              },
+              "var": {
+                "type": "string",
+                "required": false,
+                "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+              },
+              "when": {
+                "type": "string",
+                "required": false,
+                "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+              }
+            }
+          }
+        },
+        "preRenderValidations": {
+          "type": "array",
+          "required": false,
+          "items": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string",
+                "required": true,
+                "minLength": 1
+              },
+              "rule": {
+                "type": "string",
+                "required": true,
+                "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+              }
+            }
+          }
+        },
+        "resources": {
+          "type": "array",
+          "required": true,
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "forEach": {
+                "type": "string",
+                "required": false,
+                "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+              },
+              "id": {
+                "type": "string",
+                "required": true,
+                "minLength": 1
+              },
+              "includeWhen": {
+                "type": "string",
+                "required": false,
+                "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+              },
+              "targetPlane": {
+                "type": "string",
+                "required": false,
+                "default": "dataplane",
+                "enum": [
+                  "dataplane",
+                  "observabilityplane"
+                ]
+              },
+              "template": {
+                "type": "object",
+                "required": true,
+                "preserveUnknownFields": true
+              },
+              "var": {
+                "type": "string",
+                "required": false,
+                "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+              }
+            }
+          }
+        },
+        "traits": {
+          "type": "array",
+          "required": false,
+          "items": {
+            "type": "object",
+            "properties": {
+              "environmentConfigs": {
+                "type": "object",
+                "required": false,
+                "preserveUnknownFields": true
+              },
+              "instanceName": {
+                "type": "string",
+                "required": true,
+                "minLength": 1
+              },
+              "kind": {
+                "type": "string",
+                "required": false,
+                "default": "ClusterTrait",
+                "enum": [
+                  "ClusterTrait"
+                ]
+              },
+              "name": {
+                "type": "string",
+                "required": true,
+                "minLength": 1
+              },
+              "parameters": {
+                "type": "object",
+                "required": false,
+                "preserveUnknownFields": true
+              }
+            }
+          }
+        },
+        "validations": {
+          "type": "array",
+          "required": false,
+          "items": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string",
+                "required": true,
+                "minLength": 1
+              },
+              "rule": {
+                "type": "string",
+                "required": true,
+                "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+              }
+            }
+          }
+        },
+        "workloadType": {
+          "type": "string",
+          "required": true,
+          "enum": [
+            "deployment",
+            "statefulset",
+            "cronjob",
+            "job",
+            "proxy"
+          ]
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "required": false
+    }
+  }
+}

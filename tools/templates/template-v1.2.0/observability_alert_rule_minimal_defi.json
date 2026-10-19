@@ -1,0 +1,250 @@
+{
+  "type": "object",
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "required": true,
+      "default": "openchoreo.dev/v1alpha1"
+    },
+    "kind": {
+      "type": "string",
+      "required": true,
+      "default": "ObservabilityAlertRule"
+    },
+    "metadata": {
+      "type": "object",
+      "required": false,
+      "properties": {
+        "annotations": {
+          "type": "object",
+          "required": false,
+          "preserveUnknownFields": true
+        },
+        "creationTimestamp": {
+          "type": "string",
+          "required": false
+        },
+        "labels": {
+          "type": "object",
+          "required": false,
+          "preserveUnknownFields": true
+        },
+        "name": {
+          "type": "string",
+          "required": false
+        },
+        "namespace": {
+          "type": "string",
+          "required": false
+        },
+        "uid": {
+          "type": "string",
+          "required": false
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": false,
+      "properties": {
+        "actions": {
+          "type": "object",
+          "required": true,
+          "properties": {
+            "incident": {
+              "type": "object",
+              "required": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "required": false,
+                  "default": false
+                },
+                "triggerAiCostAnalysis": {
+                  "type": "boolean",
+                  "required": false,
+                  "default": false
+                },
+                "triggerAiRca": {
+                  "type": "boolean",
+                  "required": false,
+                  "default": false
+                }
+              }
+            },
+            "notifications": {
+              "type": "object",
+              "required": true,
+              "properties": {
+                "channels": {
+                  "type": "array",
+                  "required": true,
+                  "minItems": 1,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "condition": {
+          "type": "object",
+          "required": true,
+          "properties": {
+            "interval": {
+              "type": "string",
+              "required": true
+            },
+            "operator": {
+              "type": "string",
+              "required": true,
+              "enum": [
+                "gt",
+                "lt",
+                "gte",
+                "lte",
+                "eq"
+              ]
+            },
+            "threshold": {
+              "type": "integer",
+              "required": true,
+              "format": "int64"
+            },
+            "window": {
+              "type": "string",
+              "required": true
+            }
+          }
+        },
+        "description": {
+          "type": "string",
+          "required": false
+        },
+        "enabled": {
+          "type": "boolean",
+          "required": false
+        },
+        "name": {
+          "type": "string",
+          "required": true
+        },
+        "severity": {
+          "type": "string",
+          "required": false,
+          "enum": [
+            "critical",
+            "info",
+            "warning"
+          ]
+        },
+        "source": {
+          "type": "object",
+          "required": true,
+          "properties": {
+            "metric": {
+              "type": "string",
+              "required": false
+            },
+            "query": {
+              "type": "string",
+              "required": false
+            },
+            "type": {
+              "type": "string",
+              "required": true,
+              "enum": [
+                "log",
+                "metric",
+                "budget"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "required": false,
+      "properties": {
+        "backendMonitorId": {
+          "type": "string",
+          "required": false
+        },
+        "conditions": {
+          "type": "array",
+          "required": false,
+          "items": {
+            "type": "object",
+            "properties": {
+              "lastTransitionTime": {
+                "type": "string",
+                "required": false,
+                "format": "date-time"
+              },
+              "message": {
+                "type": "string",
+                "required": false,
+                "maxLength": 32768
+              },
+              "observedGeneration": {
+                "type": "integer",
+                "required": false,
+                "format": "int64",
+                "minimum": 0
+              },
+              "reason": {
+                "type": "string",
+                "required": false,
+                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                "minLength": 1,
+                "maxLength": 1024
+              },
+              "status": {
+                "type": "string",
+                "required": false,
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "required": false,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                "maxLength": 316
+              }
+            }
+          }
+        },
+        "lastReconcileTime": {
+          "type": "string",
+          "required": false,
+          "format": "date-time"
+        },
+        "lastSyncTime": {
+          "type": "string",
+          "required": false,
+          "format": "date-time"
+        },
+        "observedGeneration": {
+          "type": "integer",
+          "required": false,
+          "format": "int64"
+        },
+        "phase": {
+          "type": "string",
+          "required": false,
+          "enum": [
+            "Error",
+            "Pending",
+            "Ready"
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,10 @@
+apiVersion: openchoreo.dev/v1alpha1
+kind: Component
+metadata:
+  name: demo
+spec:
+  owner:
+    projectName: default
+  componentType:
+    kind: ComponentType
+    name: deployment/web-app

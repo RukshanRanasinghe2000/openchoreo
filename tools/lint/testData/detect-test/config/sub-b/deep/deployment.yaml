@@ -1,0 +1,36 @@
+apiVersion: openchoreo.dev/v1alpha1
+kind: DeploymentPipeline
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"openchoreo.dev/v1alpha1","kind":"DeploymentPipeline","metadata":{"annotations":{"openchoreo.dev/description":"Standard deployment pipeline with dev, staging, and prod environments","openchoreo.dev/display-name":"Default Pipeline"},"labels":{"openchoreo.dev/name":"default"},"name":"default","namespace":"default"},"spec":{"promotionPaths":[{"sourceEnvironmentRef":{"name":"development"},"targetEnvironmentRefs":[{"name":"staging"}]},{"sourceEnvironmentRef":{"name":"staging"},"targetEnvironmentRefs":[{"name":"production"}]}]}}
+    openchoreo.dev/description: Standard deployment pipeline with dev, staging, and prod environments
+    openchoreo.dev/display-name: Default Pipeline
+  creationTimestamp: 2026-07-23T10:09:04Z
+  labels:
+    openchoreo.dev/name: default
+  name: default
+  namespace: default
+  uid: b8e9b88c-a839-4181-a7bb-3c5a69f90994
+spec:
+  promotionPaths:
+    - sourceEnvironmentRef:
+        kind: Environment
+        name: development
+      targetEnvironmentRefs:
+        - kind: Environment
+          name: staging
+    - sourceEnvironmentRef:
+        kind: Environment
+        name: staging
+      targetEnvironmentRefs:
+        - kind: Environment
+          name: production
+status:
+  conditions:
+    - lastTransitionTime: 2026-07-23T10:09:04Z
+      message: DeploymentPipeline is available
+      observedGeneration: 1
+      reason: DeploymentPipelineAvailable
+      status: "True"
+      type: Available

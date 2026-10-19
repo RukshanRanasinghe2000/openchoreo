@@ -1,0 +1,168 @@
+{
+  "type": "object",
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "required": true,
+      "default": "openchoreo.dev/v1alpha1"
+    },
+    "kind": {
+      "type": "string",
+      "required": true,
+      "default": "ResourceType"
+    },
+    "metadata": {
+      "type": "object",
+      "required": false,
+      "properties": {
+        "annotations": {
+          "type": "object",
+          "required": false,
+          "preserveUnknownFields": true
+        },
+        "creationTimestamp": {
+          "type": "string",
+          "required": false
+        },
+        "labels": {
+          "type": "object",
+          "required": false,
+          "preserveUnknownFields": true
+        },
+        "name": {
+          "type": "string",
+          "required": false
+        },
+        "namespace": {
+          "type": "string",
+          "required": false
+        },
+        "uid": {
+          "type": "string",
+          "required": false
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": false,
+      "properties": {
+        "environmentConfigs": {
+          "type": "object",
+          "required": false,
+          "properties": {
+            "openAPIV3Schema": {
+              "type": "object",
+              "required": false,
+              "preserveUnknownFields": true
+            }
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "required": false,
+          "items": {
+            "type": "object",
+            "properties": {
+              "configMapKeyRef": {
+                "type": "object",
+                "required": false,
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "required": true,
+                    "minLength": 1
+                  },
+                  "name": {
+                    "type": "string",
+                    "required": true,
+                    "minLength": 1
+                  }
+                }
+              },
+              "name": {
+                "type": "string",
+                "required": true,
+                "minLength": 1
+              },
+              "secretKeyRef": {
+                "type": "object",
+                "required": false,
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "required": true,
+                    "minLength": 1
+                  },
+                  "name": {
+                    "type": "string",
+                    "required": true,
+                    "minLength": 1
+                  }
+                }
+              },
+              "value": {
+                "type": "string",
+                "required": false
+              }
+            }
+          }
+        },
+        "parameters": {
+          "type": "object",
+          "required": false,
+          "properties": {
+            "openAPIV3Schema": {
+              "type": "object",
+              "required": false,
+              "preserveUnknownFields": true
+            }
+          }
+        },
+        "resources": {
+          "type": "array",
+          "required": true,
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "required": true,
+                "minLength": 1
+              },
+              "includeWhen": {
+                "type": "string",
+                "required": false,
+                "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+              },
+              "readyWhen": {
+                "type": "string",
+                "required": false,
+                "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+              },
+              "template": {
+                "type": "object",
+                "required": true,
+                "preserveUnknownFields": true
+              }
+            }
+          }
+        },
+        "retainPolicy": {
+          "type": "string",
+          "required": false,
+          "default": "Delete",
+          "enum": [
+            "Delete",
+            "Retain"
+          ]
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "required": false
+    }
+  }
+}

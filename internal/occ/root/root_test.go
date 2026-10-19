@@ -65,6 +65,9 @@ func TestBuildRootCmd_Subcommands(t *testing.T) {
 		"observabilityalertsnotificationchannel",
 		"auditlogs",
 		"remote",
+		// The linter is a subtree of occ rather than a binary of its own, and it
+		// runs fully offline, so it needs no context bootstrap.
+		"lint",
 	}
 
 	commands := cmd.Commands()

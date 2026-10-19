@@ -1,0 +1,950 @@
+{
+  "type": "object",
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "required": true,
+      "default": "openchoreo.dev/v1alpha1"
+    },
+    "kind": {
+      "type": "string",
+      "required": true,
+      "default": "ComponentRelease"
+    },
+    "metadata": {
+      "type": "object",
+      "required": false,
+      "properties": {
+        "annotations": {
+          "type": "object",
+          "required": false,
+          "preserveUnknownFields": true
+        },
+        "creationTimestamp": {
+          "type": "string",
+          "required": false
+        },
+        "labels": {
+          "type": "object",
+          "required": false,
+          "preserveUnknownFields": true
+        },
+        "name": {
+          "type": "string",
+          "required": false
+        },
+        "namespace": {
+          "type": "string",
+          "required": false
+        },
+        "uid": {
+          "type": "string",
+          "required": false
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": false,
+      "properties": {
+        "componentProfile": {
+          "type": "object",
+          "required": false,
+          "properties": {
+            "parameters": {
+              "type": "object",
+              "required": false,
+              "preserveUnknownFields": true
+            },
+            "traits": {
+              "type": "array",
+              "required": false,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "instanceName": {
+                    "type": "string",
+                    "required": true,
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "required": true,
+                    "enum": [
+                      "Trait",
+                      "ClusterTrait"
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "required": true,
+                    "minLength": 1
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "required": false,
+                    "preserveUnknownFields": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "componentType": {
+          "type": "object",
+          "required": true,
+          "properties": {
+            "kind": {
+              "type": "string",
+              "required": true,
+              "enum": [
+                "ComponentType",
+                "ClusterComponentType"
+              ]
+            },
+            "name": {
+              "type": "string",
+              "required": true,
+              "minLength": 1
+            },
+            "spec": {
+              "type": "object",
+              "required": true,
+              "properties": {
+                "allowedTraits": {
+                  "type": "array",
+                  "required": false,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "required": false,
+                        "default": "Trait",
+                        "enum": [
+                          "Trait",
+                          "ClusterTrait"
+                        ]
+                      },
+                      "name": {
+                        "type": "string",
+                        "required": true,
+                        "minLength": 1
+                      }
+                    }
+                  }
+                },
+                "allowedWorkflows": {
+                  "type": "array",
+                  "required": false,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "required": false,
+                        "default": "ClusterWorkflow",
+                        "enum": [
+                          "Workflow",
+                          "ClusterWorkflow"
+                        ]
+                      },
+                      "name": {
+                        "type": "string",
+                        "required": true,
+                        "minLength": 1
+                      }
+                    }
+                  }
+                },
+                "environmentConfigs": {
+                  "type": "object",
+                  "required": false,
+                  "properties": {
+                    "openAPIV3Schema": {
+                      "type": "object",
+                      "required": false,
+                      "preserveUnknownFields": true
+                    }
+                  }
+                },
+                "parameters": {
+                  "type": "object",
+                  "required": false,
+                  "properties": {
+                    "openAPIV3Schema": {
+                      "type": "object",
+                      "required": false,
+                      "preserveUnknownFields": true
+                    }
+                  }
+                },
+                "postRenderValidations": {
+                  "type": "array",
+                  "required": false,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "forEach": {
+                        "type": "string",
+                        "required": false,
+                        "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+                      },
+                      "message": {
+                        "type": "string",
+                        "required": true,
+                        "minLength": 1
+                      },
+                      "rule": {
+                        "type": "string",
+                        "required": true,
+                        "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+                      },
+                      "target": {
+                        "type": "object",
+                        "required": true,
+                        "properties": {
+                          "group": {
+                            "type": "string",
+                            "required": true
+                          },
+                          "kind": {
+                            "type": "string",
+                            "required": true,
+                            "minLength": 1
+                          },
+                          "mustMatch": {
+                            "type": "boolean",
+                            "required": false,
+                            "default": true
+                          },
+                          "version": {
+                            "type": "string",
+                            "required": true,
+                            "minLength": 1
+                          },
+                          "where": {
+                            "type": "string",
+                            "required": false,
+                            "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+                          }
+                        }
+                      },
+                      "targetPlane": {
+                        "type": "string",
+                        "required": false,
+                        "default": "dataplane",
+                        "enum": [
+                          "dataplane",
+                          "observabilityplane"
+                        ]
+                      },
+                      "var": {
+                        "type": "string",
+                        "required": false,
+                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+                      },
+                      "when": {
+                        "type": "string",
+                        "required": false,
+                        "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+                      }
+                    }
+                  }
+                },
+                "preRenderValidations": {
+                  "type": "array",
+                  "required": false,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "message": {
+                        "type": "string",
+                        "required": true,
+                        "minLength": 1
+                      },
+                      "rule": {
+                        "type": "string",
+                        "required": true,
+                        "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+                      }
+                    }
+                  }
+                },
+                "resources": {
+                  "type": "array",
+                  "required": true,
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "forEach": {
+                        "type": "string",
+                        "required": false,
+                        "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+                      },
+                      "id": {
+                        "type": "string",
+                        "required": true,
+                        "minLength": 1
+                      },
+                      "includeWhen": {
+                        "type": "string",
+                        "required": false,
+                        "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+                      },
+                      "targetPlane": {
+                        "type": "string",
+                        "required": false,
+                        "default": "dataplane",
+                        "enum": [
+                          "dataplane",
+                          "observabilityplane"
+                        ]
+                      },
+                      "template": {
+                        "type": "object",
+                        "required": true,
+                        "preserveUnknownFields": true
+                      },
+                      "var": {
+                        "type": "string",
+                        "required": false,
+                        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+                      }
+                    }
+                  }
+                },
+                "traits": {
+                  "type": "array",
+                  "required": false,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "environmentConfigs": {
+                        "type": "object",
+                        "required": false,
+                        "preserveUnknownFields": true
+                      },
+                      "instanceName": {
+                        "type": "string",
+                        "required": true,
+                        "minLength": 1
+                      },
+                      "kind": {
+                        "type": "string",
+                        "required": false,
+                        "default": "Trait",
+                        "enum": [
+                          "Trait",
+                          "ClusterTrait"
+                        ]
+                      },
+                      "name": {
+                        "type": "string",
+                        "required": true,
+                        "minLength": 1
+                      },
+                      "parameters": {
+                        "type": "object",
+                        "required": false,
+                        "preserveUnknownFields": true
+                      }
+                    }
+                  }
+                },
+                "validations": {
+                  "type": "array",
+                  "required": false,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "message": {
+                        "type": "string",
+                        "required": true,
+                        "minLength": 1
+                      },
+                      "rule": {
+                        "type": "string",
+                        "required": true,
+                        "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+                      }
+                    }
+                  }
+                },
+                "workloadType": {
+                  "type": "string",
+                  "required": true,
+                  "enum": [
+                    "deployment",
+                    "statefulset",
+                    "cronjob",
+                    "job",
+                    "proxy"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "owner": {
+          "type": "object",
+          "required": true,
+          "properties": {
+            "componentName": {
+              "type": "string",
+              "required": true,
+              "minLength": 1
+            },
+            "projectName": {
+              "type": "string",
+              "required": true,
+              "minLength": 1
+            }
+          }
+        },
+        "traits": {
+          "type": "array",
+          "required": false,
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "required": true,
+                "enum": [
+                  "Trait",
+                  "ClusterTrait"
+                ]
+              },
+              "name": {
+                "type": "string",
+                "required": true,
+                "minLength": 1
+              },
+              "spec": {
+                "type": "object",
+                "required": true,
+                "properties": {
+                  "creates": {
+                    "type": "array",
+                    "required": false,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "forEach": {
+                          "type": "string",
+                          "required": false,
+                          "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+                        },
+                        "includeWhen": {
+                          "type": "string",
+                          "required": false,
+                          "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+                        },
+                        "targetPlane": {
+                          "type": "string",
+                          "required": false,
+                          "default": "dataplane",
+                          "enum": [
+                            "dataplane",
+                            "observabilityplane"
+                          ]
+                        },
+                        "template": {
+                          "type": "object",
+                          "required": true,
+                          "preserveUnknownFields": true
+                        },
+                        "var": {
+                          "type": "string",
+                          "required": false,
+                          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+                        }
+                      }
+                    }
+                  },
+                  "environmentConfigs": {
+                    "type": "object",
+                    "required": false,
+                    "properties": {
+                      "openAPIV3Schema": {
+                        "type": "object",
+                        "required": false,
+                        "preserveUnknownFields": true
+                      }
+                    }
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "required": false,
+                    "properties": {
+                      "openAPIV3Schema": {
+                        "type": "object",
+                        "required": false,
+                        "preserveUnknownFields": true
+                      }
+                    }
+                  },
+                  "patches": {
+                    "type": "array",
+                    "required": false,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "forEach": {
+                          "type": "string",
+                          "required": false,
+                          "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+                        },
+                        "operations": {
+                          "type": "array",
+                          "required": true,
+                          "minItems": 1,
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "op": {
+                                "type": "string",
+                                "required": true,
+                                "enum": [
+                                  "add",
+                                  "replace",
+                                  "remove"
+                                ]
+                              },
+                              "path": {
+                                "type": "string",
+                                "required": true
+                              },
+                              "value": {
+                                "type": "object",
+                                "required": false,
+                                "preserveUnknownFields": true
+                              }
+                            }
+                          }
+                        },
+                        "target": {
+                          "type": "object",
+                          "required": true,
+                          "properties": {
+                            "group": {
+                              "type": "string",
+                              "required": true
+                            },
+                            "kind": {
+                              "type": "string",
+                              "required": true,
+                              "minLength": 1
+                            },
+                            "version": {
+                              "type": "string",
+                              "required": true,
+                              "minLength": 1
+                            },
+                            "where": {
+                              "type": "string",
+                              "required": false,
+                              "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+                            }
+                          }
+                        },
+                        "targetPlane": {
+                          "type": "string",
+                          "required": false,
+                          "default": "dataplane",
+                          "enum": [
+                            "dataplane",
+                            "observabilityplane"
+                          ]
+                        },
+                        "var": {
+                          "type": "string",
+                          "required": false,
+                          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+                        }
+                      }
+                    }
+                  },
+                  "postRenderValidations": {
+                    "type": "array",
+                    "required": false,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "forEach": {
+                          "type": "string",
+                          "required": false,
+                          "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+                        },
+                        "message": {
+                          "type": "string",
+                          "required": true,
+                          "minLength": 1
+                        },
+                        "rule": {
+                          "type": "string",
+                          "required": true,
+                          "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+                        },
+                        "target": {
+                          "type": "object",
+                          "required": true,
+                          "properties": {
+                            "group": {
+                              "type": "string",
+                              "required": true
+                            },
+                            "kind": {
+                              "type": "string",
+                              "required": true,
+                              "minLength": 1
+                            },
+                            "mustMatch": {
+                              "type": "boolean",
+                              "required": false,
+                              "default": true
+                            },
+                            "version": {
+                              "type": "string",
+                              "required": true,
+                              "minLength": 1
+                            },
+                            "where": {
+                              "type": "string",
+                              "required": false,
+                              "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+                            }
+                          }
+                        },
+                        "targetPlane": {
+                          "type": "string",
+                          "required": false,
+                          "default": "dataplane",
+                          "enum": [
+                            "dataplane",
+                            "observabilityplane"
+                          ]
+                        },
+                        "var": {
+                          "type": "string",
+                          "required": false,
+                          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+                        },
+                        "when": {
+                          "type": "string",
+                          "required": false,
+                          "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+                        }
+                      }
+                    }
+                  },
+                  "preRenderValidations": {
+                    "type": "array",
+                    "required": false,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "required": true,
+                          "minLength": 1
+                        },
+                        "rule": {
+                          "type": "string",
+                          "required": true,
+                          "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+                        }
+                      }
+                    }
+                  },
+                  "removes": {
+                    "type": "array",
+                    "required": false,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "forEach": {
+                          "type": "string",
+                          "required": false,
+                          "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+                        },
+                        "target": {
+                          "type": "object",
+                          "required": true,
+                          "properties": {
+                            "group": {
+                              "type": "string",
+                              "required": true
+                            },
+                            "kind": {
+                              "type": "string",
+                              "required": true,
+                              "minLength": 1
+                            },
+                            "version": {
+                              "type": "string",
+                              "required": true,
+                              "minLength": 1
+                            },
+                            "where": {
+                              "type": "string",
+                              "required": false,
+                              "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+                            }
+                          }
+                        },
+                        "targetPlane": {
+                          "type": "string",
+                          "required": false,
+                          "default": "dataplane",
+                          "enum": [
+                            "dataplane",
+                            "observabilityplane"
+                          ]
+                        },
+                        "var": {
+                          "type": "string",
+                          "required": false,
+                          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+                        }
+                      }
+                    }
+                  },
+                  "validations": {
+                    "type": "array",
+                    "required": false,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "required": true,
+                          "minLength": 1
+                        },
+                        "rule": {
+                          "type": "string",
+                          "required": true,
+                          "pattern": "^\\$\\{[\\s\\S]+\\}\\s*$"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "workload": {
+          "type": "object",
+          "required": true,
+          "properties": {
+            "container": {
+              "type": "object",
+              "required": true,
+              "properties": {
+                "args": {
+                  "type": "array",
+                  "required": false,
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "command": {
+                  "type": "array",
+                  "required": false,
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "env": {
+                  "type": "array",
+                  "required": false,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "key": {
+                        "type": "string",
+                        "required": true
+                      },
+                      "value": {
+                        "type": "string",
+                        "required": false
+                      },
+                      "valueFrom": {
+                        "type": "object",
+                        "required": false,
+                        "properties": {
+                          "secretKeyRef": {
+                            "type": "object",
+                            "required": false,
+                            "properties": {
+                              "key": {
+                                "type": "string",
+                                "required": true,
+                                "minLength": 1
+                              },
+                              "name": {
+                                "type": "string",
+                                "required": true,
+                                "minLength": 1
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "files": {
+                  "type": "array",
+                  "required": false,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "key": {
+                        "type": "string",
+                        "required": true
+                      },
+                      "mountPath": {
+                        "type": "string",
+                        "required": true
+                      },
+                      "value": {
+                        "type": "string",
+                        "required": false
+                      },
+                      "valueFrom": {
+                        "type": "object",
+                        "required": false,
+                        "properties": {
+                          "secretKeyRef": {
+                            "type": "object",
+                            "required": false,
+                            "properties": {
+                              "key": {
+                                "type": "string",
+                                "required": true,
+                                "minLength": 1
+                              },
+                              "name": {
+                                "type": "string",
+                                "required": true,
+                                "minLength": 1
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "image": {
+                  "type": "string",
+                  "required": true,
+                  "minLength": 1
+                }
+              }
+            },
+            "dependencies": {
+              "type": "object",
+              "required": false,
+              "properties": {
+                "endpoints": {
+                  "type": "array",
+                  "required": false,
+                  "maxItems": 50,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "component": {
+                        "type": "string",
+                        "required": true,
+                        "minLength": 1
+                      },
+                      "envBindings": {
+                        "type": "object",
+                        "required": true,
+                        "properties": {
+                          "address": {
+                            "type": "string",
+                            "required": false
+                          },
+                          "basePath": {
+                            "type": "string",
+                            "required": false
+                          },
+                          "host": {
+                            "type": "string",
+                            "required": false
+                          },
+                          "port": {
+                            "type": "string",
+                            "required": false
+                          }
+                        }
+                      },
+                      "name": {
+                        "type": "string",
+                        "required": true,
+                        "minLength": 1
+                      },
+                      "project": {
+                        "type": "string",
+                        "required": false
+                      },
+                      "visibility": {
+                        "type": "string",
+                        "required": true,
+                        "enum": [
+                          "project",
+                          "namespace"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "resources": {
+                  "type": "array",
+                  "required": false,
+                  "maxItems": 50,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "envBindings": {
+                        "type": "object",
+                        "required": false,
+                        "preserveUnknownFields": true
+                      },
+                      "fileBindings": {
+                        "type": "object",
+                        "required": false,
+                        "preserveUnknownFields": true
+                      },
+                      "ref": {
+                        "type": "string",
+                        "required": true,
+                        "minLength": 1
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "endpoints": {
+              "type": "object",
+              "required": false,
+              "preserveUnknownFields": true
+            }
+          }
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "required": false
+    }
+  }
+}

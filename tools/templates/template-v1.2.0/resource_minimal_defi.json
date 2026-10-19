@@ -1,0 +1,164 @@
+{
+  "type": "object",
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "required": true,
+      "default": "openchoreo.dev/v1alpha1"
+    },
+    "kind": {
+      "type": "string",
+      "required": true,
+      "default": "Resource"
+    },
+    "metadata": {
+      "type": "object",
+      "required": false,
+      "properties": {
+        "annotations": {
+          "type": "object",
+          "required": false,
+          "preserveUnknownFields": true
+        },
+        "creationTimestamp": {
+          "type": "string",
+          "required": false
+        },
+        "labels": {
+          "type": "object",
+          "required": false,
+          "preserveUnknownFields": true
+        },
+        "name": {
+          "type": "string",
+          "required": false
+        },
+        "namespace": {
+          "type": "string",
+          "required": false
+        },
+        "uid": {
+          "type": "string",
+          "required": false
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": false,
+      "properties": {
+        "owner": {
+          "type": "object",
+          "required": true,
+          "properties": {
+            "projectName": {
+              "type": "string",
+              "required": true,
+              "minLength": 1
+            }
+          }
+        },
+        "parameters": {
+          "type": "object",
+          "required": false,
+          "preserveUnknownFields": true
+        },
+        "type": {
+          "type": "object",
+          "required": true,
+          "properties": {
+            "kind": {
+              "type": "string",
+              "required": false,
+              "default": "ResourceType",
+              "enum": [
+                "ResourceType",
+                "ClusterResourceType"
+              ]
+            },
+            "name": {
+              "type": "string",
+              "required": true,
+              "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "required": false,
+      "properties": {
+        "conditions": {
+          "type": "array",
+          "required": false,
+          "items": {
+            "type": "object",
+            "properties": {
+              "lastTransitionTime": {
+                "type": "string",
+                "required": false,
+                "format": "date-time"
+              },
+              "message": {
+                "type": "string",
+                "required": false,
+                "maxLength": 32768
+              },
+              "observedGeneration": {
+                "type": "integer",
+                "required": false,
+                "format": "int64",
+                "minimum": 0
+              },
+              "reason": {
+                "type": "string",
+                "required": false,
+                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                "minLength": 1,
+                "maxLength": 1024
+              },
+              "status": {
+                "type": "string",
+                "required": false,
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "required": false,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                "maxLength": 316
+              }
+            }
+          }
+        },
+        "latestRelease": {
+          "type": "object",
+          "required": false,
+          "properties": {
+            "hash": {
+              "type": "string",
+              "required": true,
+              "minLength": 1
+            },
+            "name": {
+              "type": "string",
+              "required": true,
+              "minLength": 1
+            }
+          }
+        },
+        "observedGeneration": {
+          "type": "integer",
+          "required": false,
+          "format": "int64"
+        }
+      }
+    }
+  }
+}
