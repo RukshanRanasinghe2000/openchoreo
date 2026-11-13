@@ -56,7 +56,23 @@ func Handle(text string, cursorLine, cursorCol int) (any, error) {
 
 // HandleWithIndex is Handle plus an optional workspace index used to suggest
 // resource names for `kind`/`name` reference pairs.
-func HandleWithIndex(text string, cursorLine, cursorCol int, idx ResourceIndexer) (any, error) {
+func HandleWithIndex(text string, cursorLine, cursorCol int, idx ResourceIndexer, sourceURI ...string) (any, error) {
+	uri := ""
+	if len(sourceURI) > 0 {
+		uri = sourceURI[0]
+	}
+	if items, ok := bindingReleaseItems(text, cursorLine, cursorCol, uri, idx); ok {
+		return protocol.CompletionList{Items: items}, nil
+	}
+	if items, ok := workflowPolicyItems(text, cursorLine, cursorCol, uri, idx); ok {
+		return protocol.CompletionList{Items: items}, nil
+	}
+	if items, ok := dynamicItems(text, cursorLine, cursorCol, idx, uri); ok {
+		return protocol.CompletionList{Items: items}, nil
+	}
+	if items, handled := rootKindChoices(text, cursorLine, cursorCol); handled {
+		return protocol.CompletionList{IsIncomplete: true, Items: items}, nil
+	}
 	docs, err := parser.ParseYAML([]byte(text))
 	if err != nil || len(docs) == 0 {
 		return completionFromText(text, cursorLine, cursorCol, idx)
@@ -339,7 +355,7 @@ func suggest(ctx completionContext, root *schema.FieldSchema, idx ResourceIndexe
 			return nil
 		}
 		// `kind:` values are the valid resource kind names.
-		if ctx.field == "kind" {
+		if ctx.field == "kind" && ctx.path == "kind" {
 			return kindNameCompletions(ctx.text, ctx.line, ctx.col)
 		}
 		// A `name:` value under an object with a sibling `kind:` is a resource

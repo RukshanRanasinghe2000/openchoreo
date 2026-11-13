@@ -82,8 +82,17 @@ func (s *Server) DidChangeConfiguration(
 		s.logger.Info("template version changed", "version", applied)
 	}
 	s.invalidateValidationCache()
-	for _, doc := range s.snapshotOpenDocuments() {
+	stalePostRender := s.clearPostRenderAll()
+	openDocs := s.snapshotOpenDocuments()
+	open := make(map[string]struct{}, len(openDocs))
+	for _, doc := range openDocs {
+		open[doc.URI] = struct{}{}
 		s.publishDiagnosticsAsync(doc.URI, doc.Version, s.diagnosticsForCached(doc.URI, doc.Text))
+	}
+	for _, uri := range stalePostRender {
+		if _, ok := open[uri]; !ok {
+			s.publishDiagnosticsAsync(uri, 0, nil)
+		}
 	}
 	return nil
 }
@@ -98,6 +107,7 @@ func (s *Server) Initialize(
 	openClose := true
 	change := protocol.TextDocumentSyncKindIncremental
 	save := false
+	codeLensResolve := false
 
 	// Index workspace in the background so initialize responds promptly, and
 	// report $/progress when the client declares WorkDoneProgress support.
@@ -108,8 +118,11 @@ func (s *Server) Initialize(
 	}
 
 	roots := resolveWorkspaceRoots(params)
+	s.workspaceRootsMu.Lock()
 	s.workspaceRoots = roots
+	s.workspaceRootsMu.Unlock()
 	if len(roots) > 0 {
+		s.initialIndexStarted = true
 		s.beginIndexing(roots)
 	}
 
@@ -157,6 +170,7 @@ func (s *Server) Initialize(
 		},
 
 		Capabilities: protocol.ServerCapabilities{
+			Workspace: &protocol.ServerCapabilitiesWorkspace{WorkspaceFolders: &protocol.WorkspaceFoldersServerCapabilities{Supported: &openClose, ChangeNotifications: &protocol.BoolOrString{Value: true}}},
 			TextDocumentSync: protocol.TextDocumentSyncOptions{
 				OpenClose: &openClose,
 				Change:    &change,
@@ -169,6 +183,12 @@ func (s *Server) Initialize(
 			DefinitionProvider: true,
 			CodeActionProvider: &protocol.CodeActionOptions{
 				CodeActionKinds: []protocol.CodeActionKind{protocol.CodeActionKindQuickFix},
+			},
+			CodeLensProvider: &protocol.CodeLensOptions{
+				ResolveProvider: &codeLensResolve,
+			},
+			ExecuteCommandProvider: &protocol.ExecuteCommandOptions{
+				Commands: []string{postRenderCommand, "openchoreo.requiredFieldsPreview"},
 			},
 		},
 	}, nil
@@ -195,6 +215,9 @@ func (s *Server) DidOpen(
 	// The opened document's resources now exist under its declared names;
 	// other open documents may reference them.
 	s.scheduleOtherDocRevalidation(uri)
+	if path := fileURIToPath(uri); path != "" {
+		go s.triggerPreRenderSchemaValidationForPath(path)
+	}
 
 	s.publishDiagnostics(
 		context,
@@ -224,6 +247,10 @@ func (s *Server) DidChange(
 			"indexer update failed for "+uri+": "+err.Error())
 	}
 
+	// Any edit to a file used by the last post-render run makes the whole
+	// result stale. Clear it immediately rather than waiting for a rerun.
+	s.invalidatePostRenderForEdit(uri)
+
 	// The edited document's resource names may have changed; references to
 	// them in other open documents need rechecking too, not just this one.
 	s.scheduleOtherDocRevalidation(uri)
@@ -239,20 +266,33 @@ func (s *Server) DidClose(
 ) error {
 
 	uri := string(params.TextDocument.URI)
+	closeChanged := false
+	if current := s.GetDocument(uri); current != nil {
+		saved, err := os.ReadFile(fileURIToPath(uri))
+		closeChanged = err != nil || string(saved) != current.Text
+	}
 	s.CloseDocument(uri)
 	s.cancelDiagnostics(uri)
 	s.deleteValidationEntry(uri)
+	if closeChanged {
+		s.invalidatePostRenderForClose(uri)
+	}
 
 	// A document closed after its file was renamed or deleted must not keep
 	// its old name in the index. Files that still exist on disk are untouched.
 	if _, err := os.Stat(fileURIToPath(uri)); err != nil {
 		s.indexer.RemoveFile(uri)
+	} else {
+		s.updateIndexedFile(fileURIToPath(uri))
 	}
 
 	// Closing may have removed resource names other open documents reference.
 	s.scheduleOtherDocRevalidation(uri)
 
 	s.publishDiagnostics(context, uri, 0, nil)
+	if path := fileURIToPath(uri); path != "" {
+		go s.triggerPreRenderSchemaValidationForPath(path)
+	}
 
 	return nil
 }
@@ -270,4 +310,15 @@ func fileURIToPath(uri string) string {
 		return path
 	}
 	return uri
+}
+
+func (s *Server) DidSave(
+	context *glsp.Context,
+	params *protocol.DidSaveTextDocumentParams,
+) error {
+	uri := string(params.TextDocument.URI)
+	if path := fileURIToPath(uri); path != "" {
+		go s.triggerPreRenderSchemaValidationForPath(path)
+	}
+	return nil
 }

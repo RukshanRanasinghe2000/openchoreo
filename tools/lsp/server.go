@@ -6,7 +6,6 @@ package lsp
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"os"
 	"sync"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/openchoreo/openchoreo/tools/lint/indexer"
+	"github.com/openchoreo/openchoreo/tools/lint/targetschema"
 	"github.com/openchoreo/openchoreo/tools/lsp/code-action"
 	"github.com/openchoreo/openchoreo/tools/lsp/code-completion"
 	"github.com/openchoreo/openchoreo/tools/lsp/code-definition"
@@ -24,23 +24,41 @@ import (
 	"github.com/tliron/glsp/server"
 )
 
+type outboundNotification struct {
+	conn   *jsonrpc2.Conn
+	method string
+	params any
+}
+
 type Server struct {
-	server    *server.Server
-	documents map[string]*Document
-	docMu     sync.RWMutex
-	indexer   *indexer.Indexer
+	schemaMu              sync.Mutex
+	schemaScopes          map[string]schemaScopeEntry
+	schemaDependencyPaths map[string]struct{}
+	server                *server.Server
+	documents             map[string]*Document
+	docMu                 sync.RWMutex
+	indexer               *indexer.Indexer
 	// workspaceRoots are the normalized, non-overlapping working directories
 	// this server indexes and watches (from initialize workspaceFolders or,
 	// for legacy single-folder clients, rootUri).
-	workspaceRoots []string
-	logger         *slog.Logger
+	workspaceRootsMu  sync.RWMutex
+	workspaceChangeMu sync.Mutex
+	workspaceRoots    []string
+	preRenderRunMu    sync.Mutex
+	logger            *slog.Logger
 
 	connMu sync.RWMutex
 	conn   *jsonrpc2.Conn
 
+	// Outgoing notifications are queued to a single writer so handlers never
+	// block on an unbuffered client connection and diagnostics stay ordered.
+	outboxOnce sync.Once
+	outbox     chan outboundNotification
+
 	// Workspace scanning runs once per session in a background goroutine so
 	// initialize returns promptly on large workspaces.
-	indexOnce sync.Once
+	indexOnce           sync.Once
+	initialIndexStarted bool
 	// indexDone is closed once the initial workspace scan finishes, whether it
 	// succeeded or failed. Callers (e.g. tests) block on it to observe the scan.
 	indexDone chan struct{}
@@ -82,6 +100,23 @@ type Server struct {
 	cache       map[string]*validationEntry
 	cacheHits   uint64
 	cacheMisses uint64
+
+	// Post-render diagnostics are kept separately from structural diagnostics
+	// so a late structural publish cannot erase them. postRenderFiles records
+	// every file used by the last run, letting edits/closes invalidate the
+	// whole result even when a file had no finding of its own.
+	postRenderMu            sync.Mutex
+	postRenderByURI         map[string][]protocol.Diagnostic
+	postRenderFiles         map[string]struct{}
+	postRenderContentHashes map[string][32]byte
+	postRenderScope         string
+	postRenderRunning       bool
+	postRenderEpoch         uint64
+
+	preRenderSchemaMu    sync.Mutex
+	preRenderSchemaByURI map[string][]protocol.Diagnostic
+	workspaceStaticByURI map[string][]protocol.Diagnostic
+	preRenderSchemaFiles map[string]struct{}
 }
 
 // New creates a new OpenChoreo language server.
@@ -89,12 +124,17 @@ func NewServer() *Server {
 	handler := protocol.Handler{}
 
 	s := &Server{
-		server:    server.NewServer(&handler, "OpenChoreo Language Server", false),
-		documents: make(map[string]*Document),
-		indexer:   indexer.NewIndexer(),
-		indexDone: make(chan struct{}),
-		cache:     make(map[string]*validationEntry),
-		logger:    slog.New(slog.NewTextHandler(os.Stderr, nil)),
+		server:               server.NewServer(&handler, "OpenChoreo Language Server", false),
+		documents:            make(map[string]*Document),
+		indexer:              indexer.NewIndexer(),
+		indexDone:            make(chan struct{}),
+		cache:                make(map[string]*validationEntry),
+		postRenderByURI:      make(map[string][]protocol.Diagnostic),
+		postRenderFiles:      make(map[string]struct{}),
+		preRenderSchemaByURI: make(map[string][]protocol.Diagnostic),
+		preRenderSchemaFiles: make(map[string]struct{}),
+		outbox:               make(chan outboundNotification, 256),
+		logger:               slog.New(slog.NewTextHandler(os.Stderr, nil)),
 	}
 	handler.Initialize = WithRequestRecovery(s, "initialize", s.Initialize)
 	handler.Initialized = WithHandlerRecovery(s, "initialized", s.Initialized)
@@ -107,11 +147,14 @@ func NewServer() *Server {
 	})
 	handler.TextDocumentDidOpen = WithHandlerRecovery(s, "didOpen", s.DidOpen)
 	handler.TextDocumentDidChange = WithHandlerRecovery(s, "didChange", s.DidChange)
+	handler.WorkspaceDidChangeWorkspaceFolders = s.DidChangeWorkspaceFolders
 	handler.TextDocumentDidClose = WithHandlerRecovery(s, "didClose", s.DidClose)
 	handler.TextDocumentCompletion = WithRequestRecovery(s, "completion", s.Completion)
 	handler.TextDocumentHover = WithRequestRecovery(s, "hover", s.Hover)
 	handler.TextDocumentDefinition = WithRequestRecovery(s, "definition", s.Definition)
 	handler.TextDocumentCodeAction = WithRequestRecovery(s, "codeAction", s.CodeAction)
+	handler.TextDocumentCodeLens = WithRequestRecovery(s, "codeLens", s.CodeLens)
+	handler.WorkspaceExecuteCommand = WithRequestRecovery(s, "executeCommand", s.ExecuteCommand)
 
 	return s
 }
@@ -158,8 +201,11 @@ func (s *Server) Start() error {
 // serve over other transports.
 func (s *Server) SetConnection(conn *jsonrpc2.Conn) {
 	s.connMu.Lock()
-	defer s.connMu.Unlock()
 	s.conn = conn
+	s.connMu.Unlock()
+	if conn != nil {
+		s.outboxOnce.Do(func() { go s.pumpOutbox() })
+	}
 }
 
 // Connection returns the currently attached connection, or nil before Start.
@@ -173,14 +219,18 @@ func (s *Server) Connection() *jsonrpc2.Conn {
 // safe to call after a request handler has returned, unlike glsp.Context.Notify.
 func (s *Server) SendAsync(method string, params any) {
 	conn := s.Connection()
-	if conn == nil {
+	if conn == nil || s.outbox == nil {
 		return
 	}
-	fmt.Fprintf(os.Stderr, "DBG SendAsync enter %s\n", method)
-	if err := conn.Notify(context.Background(), method, params); err != nil && s.logger != nil {
-		s.logger.Error("async notification failed", "method", method, "error", err.Error())
+	s.outbox <- outboundNotification{conn: conn, method: method, params: params}
+}
+
+func (s *Server) pumpOutbox() {
+	for item := range s.outbox {
+		if err := item.conn.Notify(context.Background(), item.method, item.params); err != nil && s.logger != nil {
+			s.logger.Error("async notification failed", "method", item.method, "error", err.Error())
+		}
 	}
-	fmt.Fprintf(os.Stderr, "DBG SendAsync exit %s\n", method)
 }
 
 // CallRequest sends a request to the client and waits for its reply, since
@@ -220,7 +270,7 @@ func (s *Server) Completion(
 	if s.indexer == nil {
 		return codecompletion.Handle(doc.Text, cursorLine, cursorCol)
 	}
-	return codecompletion.HandleWithIndex(doc.Text, cursorLine, cursorCol, s.indexer)
+	return codecompletion.HandleWithIndex(doc.Text, cursorLine, cursorCol, s.indexer, uri)
 }
 
 // CodeAction handles textDocument/codeAction requests, delegating to the
@@ -238,7 +288,7 @@ func (s *Server) CodeAction(context *glsp.Context, params *protocol.CodeActionPa
 		fileNames = s.indexer.FileNames()
 	}
 
-	actions := codeaction.Handle(uri, doc.Text, params.Context.Diagnostics, params.Range, s.diagnosticsForCached(uri, doc.Text), resourceNames, fileNames)
+	actions := codeaction.Handle(uri, doc.Text, params.Context.Diagnostics, params.Range, s.diagnosticsForCached(uri, doc.Text), resourceNames, fileNames, codeaction.ReferenceScope{Index: s.indexer, URI: uri})
 	return actions, nil
 }
 
@@ -274,5 +324,6 @@ func (s *Server) Hover(
 	cursorLine := int(params.Position.Line) + 1
 	cursorCol := int(params.Position.Character) + 1
 
-	return hover.Handle(doc.Text, cursorLine, cursorCol), nil
+	scope := s.targetSchemaScope(uri, map[string][]byte{fileURIToPath(uri): []byte(doc.Text)})
+	return hover.Handle(doc.Text, cursorLine, cursorCol, targetschema.WithResolver(nil, scope)), nil
 }
