@@ -4,12 +4,14 @@
 package handlers
 
 import (
+	"errors"
 	"log/slog"
 	"mime"
 	"net/http"
 
 	"github.com/openchoreo/openchoreo/internal/observer/api/gen"
 	"github.com/openchoreo/openchoreo/internal/observer/httputil"
+	"github.com/openchoreo/openchoreo/internal/observer/service"
 )
 
 // The generated servers default every error they raise before (or around) a
@@ -32,6 +34,29 @@ func errorPayload(title gen.ErrorResponseTitle, errorCode, message string) gen.E
 		ErrorCode: &errorCode,
 		Message:   &message,
 	}
+}
+
+const (
+	scopeNotFoundCode    = "SCOPE_NOT_FOUND"
+	scopeNotFoundMessage = "one or more resources in the search scope were not found"
+)
+
+// scopeNotFoundResponse reports a query whose search scope names a resource that doesn't exist,
+// such as an unknown component or release line, as a client error.
+func scopeNotFoundResponse(err error) (apiResponse, bool) {
+	if !errors.Is(err, service.ErrScopeNotFound) && !errors.Is(err, service.ErrResourceNotFound) {
+		return apiResponse{}, false
+	}
+	return errorResponse(http.StatusBadRequest, gen.BadRequest, scopeNotFoundCode, scopeNotFoundText(err)), true
+}
+
+// scopeNotFoundText names the missing resource when the resolver reported it.
+func scopeNotFoundText(err error) string {
+	var notFound *service.NotFoundError
+	if errors.As(err, &notFound) {
+		return notFound.Error()
+	}
+	return scopeNotFoundMessage
 }
 
 // writeGeneratedError renders a gen.ErrorResponse for an error raised by the
@@ -114,15 +139,20 @@ func StrictResponseErrorHandler(logger *slog.Logger) func(http.ResponseWriter, *
 // uniformly to every body-bearing public operation, all of which declare
 // `content: application/json` in the spec.
 //
+// The raw trace query route is the exception: its body is the tracing
+// backend's native request, which may be text, so rawTracesQueryGuard checks
+// it instead.
+//
 // An absent Content-Type is allowed. The rejection is a 400 rather than the
-// arguably more correct 415 because the spec declares no 415 response and
-// gen.ErrorResponseTitle has no value for one.
+// arguably more correct 415 because the operations it covers declare no 415
+// response; only the raw trace query route does.
 func RequireJSONContentType(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			raw := r.Header.Get("Content-Type")
-			// No body, or no declared type: nothing to reject.
-			if raw == "" || r.ContentLength == 0 {
+			// No body, or no declared type: nothing to reject. Raw trace queries
+			// are checked by rawTracesQueryGuard.
+			if raw == "" || r.ContentLength == 0 || isRawTracesQuery(r) {
 				next.ServeHTTP(w, r)
 				return
 			}

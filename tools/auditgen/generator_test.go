@@ -113,12 +113,12 @@ func TestBuildDefinitions_AgainstLiveSpec(t *testing.T) {
 		t.Fatalf("BuildDefinitions failed: %v", err)
 	}
 
-	const wantTotal = 112
+	const wantTotal = 133
 	if len(defs) != wantTotal {
 		t.Errorf("len(defs) = %d, want %d", len(defs), wantTotal)
 	}
 
-	var mgmt, authz int
+	var mgmt, authz, access int
 	verbCount := map[string]int{}
 	for _, d := range defs {
 		switch d.Category {
@@ -126,6 +126,8 @@ func TestBuildDefinitions_AgainstLiveSpec(t *testing.T) {
 			mgmt++
 		case "CategoryAuthorization":
 			authz++
+		case "CategoryAccess":
+			access++
 		default:
 			t.Errorf("operation %q has unrecognized category %q", d.ID, d.Category)
 		}
@@ -137,12 +139,14 @@ func TestBuildDefinitions_AgainstLiveSpec(t *testing.T) {
 		}
 	}
 
-	if mgmt != 100 || authz != 12 {
-		t.Errorf("category split = %d management / %d authorization, want 100/12", mgmt, authz)
+	// access: the reads in apiAccessReadOverrides.
+	if mgmt != 117 || authz != 12 || access != 4 {
+		t.Errorf("category split = %d management / %d authorization / %d access, want 117/12/4",
+			mgmt, authz, access)
 	}
-	if verbCount["create"] != 38 || verbCount["update"] != 34 || verbCount["delete"] != 38 ||
+	if verbCount["create"] != 44 || verbCount["update"] != 39 || verbCount["delete"] != 44 ||
 		verbCount["trigger"] != 1 || verbCount["generate"] != 1 {
-		t.Errorf("verb split = %+v, want create:38 update:34 delete:38 trigger:1 generate:1", verbCount)
+		t.Errorf("verb split = %+v, want create:44 update:39 delete:44 trigger:1 generate:1", verbCount)
 	}
 
 	for _, excluded := range []string{"Evaluates", "HandleAutoBuild"} {

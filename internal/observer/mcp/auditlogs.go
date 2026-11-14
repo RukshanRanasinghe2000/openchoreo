@@ -37,8 +37,11 @@ type AuditLogsQueryArgs struct {
 	ResourceEnvironments []string `json:"resource_environment"`
 	ResourceProjects     []string `json:"resource_project"`
 	ResourceComponents   []string `json:"resource_component"`
+	ResourceReleaseLines []string `json:"resource_release_line"`
 	ResourceResources    []string `json:"resource_resource"`
 	ResourceNames        []string `json:"resource_name"`
+
+	ReturnedItemNames []string `json:"returned_item_name"`
 
 	Actions      []string `json:"action"`
 	Categories   []string `json:"category"`
@@ -77,8 +80,12 @@ func (h *MCPHandler) QueryAuditLogs(ctx context.Context, args AuditLogsQueryArgs
 			Environments: args.ResourceEnvironments,
 			Projects:     args.ResourceProjects,
 			Components:   args.ResourceComponents,
+			ReleaseLines: args.ResourceReleaseLines,
 			Resources:    args.ResourceResources,
 			Names:        args.ResourceNames,
+		},
+		Returned: types.AuditLogsReturnedFilter{
+			Items: types.AuditLogsReturnedItemsFilter{Names: args.ReturnedItemNames},
 		},
 		Actions:          args.Actions,
 		Categories:       args.Categories,
@@ -122,4 +129,14 @@ func recordAuthzResult(ctx context.Context, err error) {
 	if errors.Is(err, observerAuthz.ErrAuthzForbidden) {
 		audit.SetResult(ctx, audit.ResultDenied)
 	}
+}
+
+// auditedResult is the return path of a tool bound to an audited read, so a
+// denial is recorded as one.
+func auditedResult[T any](ctx context.Context, result *T, err error) (any, error) {
+	if err != nil {
+		recordAuthzResult(ctx, err)
+		return nil, err
+	}
+	return result, nil
 }

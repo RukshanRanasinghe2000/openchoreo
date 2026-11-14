@@ -101,6 +101,10 @@ type Interface interface {
 	CreateComponentRelease(ctx context.Context, namespaceName string, cr gen.ComponentRelease) (*gen.ComponentRelease, error)
 	DeleteComponentRelease(ctx context.Context, namespaceName, componentReleaseName string) error
 	GenerateRelease(ctx context.Context, namespaceName, componentName string, req gen.GenerateReleaseRequest) (*gen.ComponentRelease, error)
+	CreateComponentWorkflowRun(ctx context.Context, namespaceName, componentName string, req gen.CreateComponentWorkflowRunRequest) (*gen.WorkflowRun, error)
+	ListComponentReleaseLines(ctx context.Context, namespaceName, componentName string, params *gen.ListComponentReleaseLinesParams) (*gen.ReleaseLineList, error)
+	GetComponentReleaseLine(ctx context.Context, namespaceName, componentName, releaseLineName string) (*gen.ReleaseLine, error)
+	DeleteComponentReleaseLine(ctx context.Context, namespaceName, componentName, releaseLineName string) error
 
 	ListReleaseBindings(ctx context.Context, namespaceName string, params *gen.ListReleaseBindingsParams) (*gen.ReleaseBindingList, error)
 	GetReleaseBinding(ctx context.Context, namespaceName, releaseBindingName string) (*gen.ReleaseBinding, error)
@@ -164,6 +168,36 @@ type Interface interface {
 	CreateResourceReleaseBinding(ctx context.Context, namespaceName string, rrb gen.ResourceReleaseBinding) (*gen.ResourceReleaseBinding, error)
 	UpdateResourceReleaseBinding(ctx context.Context, namespaceName, bindingName string, rrb gen.ResourceReleaseBinding) (*gen.ResourceReleaseBinding, error)
 	DeleteResourceReleaseBinding(ctx context.Context, namespaceName, bindingName string) error
+
+	ListEndpointTypes(ctx context.Context, namespaceName string, params *gen.ListEndpointTypesParams) (*gen.EndpointTypeList, error)
+	GetEndpointType(ctx context.Context, namespaceName, etName string) (*gen.EndpointType, error)
+	CreateEndpointType(ctx context.Context, namespaceName string, et gen.EndpointType) (*gen.EndpointType, error)
+	UpdateEndpointType(ctx context.Context, namespaceName, etName string, et gen.EndpointType) (*gen.EndpointType, error)
+	DeleteEndpointType(ctx context.Context, namespaceName, etName string) error
+	GetEndpointTypeSchema(ctx context.Context, namespaceName, etName string) (*json.RawMessage, error)
+
+	ListClusterEndpointTypes(ctx context.Context, params *gen.ListClusterEndpointTypesParams) (*gen.ClusterEndpointTypeList, error)
+	GetClusterEndpointType(ctx context.Context, cetName string) (*gen.ClusterEndpointType, error)
+	CreateClusterEndpointType(ctx context.Context, cet gen.ClusterEndpointType) (*gen.ClusterEndpointType, error)
+	UpdateClusterEndpointType(ctx context.Context, cetName string, cet gen.ClusterEndpointType) (*gen.ClusterEndpointType, error)
+	DeleteClusterEndpointType(ctx context.Context, cetName string) error
+	GetClusterEndpointTypeSchema(ctx context.Context, cetName string) (*json.RawMessage, error)
+
+	ListEndpoints(ctx context.Context, namespaceName string, params *gen.ListEndpointsParams) (*gen.EndpointList, error)
+	GetEndpoint(ctx context.Context, namespaceName, endpointName string) (*gen.Endpoint, error)
+	CreateEndpoint(ctx context.Context, namespaceName string, e gen.Endpoint) (*gen.Endpoint, error)
+	UpdateEndpoint(ctx context.Context, namespaceName, endpointName string, e gen.Endpoint) (*gen.Endpoint, error)
+	DeleteEndpoint(ctx context.Context, namespaceName, endpointName string) error
+
+	ListEndpointReleases(ctx context.Context, namespaceName string, params *gen.ListEndpointReleasesParams) (*gen.EndpointReleaseList, error)
+	GetEndpointRelease(ctx context.Context, namespaceName, endpointReleaseName string) (*gen.EndpointRelease, error)
+	DeleteEndpointRelease(ctx context.Context, namespaceName, endpointReleaseName string) error
+
+	ListEndpointReleaseBindings(ctx context.Context, namespaceName string, params *gen.ListEndpointReleaseBindingsParams) (*gen.EndpointReleaseBindingList, error)
+	GetEndpointReleaseBinding(ctx context.Context, namespaceName, bindingName string) (*gen.EndpointReleaseBinding, error)
+	CreateEndpointReleaseBinding(ctx context.Context, namespaceName string, erb gen.EndpointReleaseBinding) (*gen.EndpointReleaseBinding, error)
+	UpdateEndpointReleaseBinding(ctx context.Context, namespaceName, bindingName string, erb gen.EndpointReleaseBinding) (*gen.EndpointReleaseBinding, error)
+	DeleteEndpointReleaseBinding(ctx context.Context, namespaceName, bindingName string) error
 
 	ListDeploymentPipelines(ctx context.Context, namespaceName string, params *gen.ListDeploymentPipelinesParams) (*gen.DeploymentPipelineList, error)
 	GetDeploymentPipeline(ctx context.Context, namespaceName, deploymentPipelineName string) (*gen.DeploymentPipeline, error)

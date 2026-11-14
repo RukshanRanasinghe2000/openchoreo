@@ -173,8 +173,8 @@ func componentWithImageYAML(name, componentType, image string, port int, args []
 			WorkloadTemplateSpec: openchoreov1alpha1.WorkloadTemplateSpec{
 				Endpoints: map[string]openchoreov1alpha1.WorkloadEndpoint{
 					"http": {
-						Type: openchoreov1alpha1.EndpointType("HTTP"),
-						Port: int32(port),
+						Protocol: openchoreov1alpha1.EndpointProtocol("HTTP"),
+						Port:     int32(port),
 						// project keeps the in-cluster ClusterIP probe alive;
 						// external renders an HTTPRoute on the data plane's
 						// external kgateway listener so the same workload is
@@ -234,8 +234,13 @@ func scheduledTaskComponentYAML(name, image string) string {
 	return mustYAMLDocs(comp, workload)
 }
 
-// scheduleOverridePatch forces a 1-minute schedule on the ReleaseBinding.
-const scheduleOverridePatch = `{"spec":{"componentTypeEnvironmentConfigs":{"schedule":"* * * * *"}}}`
+// imagePullSecretName is set on the scheduled-task ReleaseBinding to check that it reaches the
+// component's ServiceAccount. The Secret doesn't need to exist, since the image is public.
+const imagePullSecretName = "wt-regcred"
+
+// scheduleOverridePatch forces a 1-minute schedule and an image pull secret on the ReleaseBinding.
+const scheduleOverridePatch = `{"spec":{"componentTypeEnvironmentConfigs":{"schedule":"* * * * *",` +
+	`"imagePullSecrets":["` + imagePullSecretName + `"]}}}`
 
 // testerPodYAML returns a busybox pod that sleeps forever, used as the source
 // of in-cluster wget probes against project-visibility workloads. Deployed in

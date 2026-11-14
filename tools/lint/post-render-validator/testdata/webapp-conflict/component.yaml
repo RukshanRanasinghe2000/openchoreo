@@ -1,0 +1,17 @@
+apiVersion: openchoreo.dev/v1alpha1
+kind: Component
+metadata:
+  name: demo
+  namespace: default
+spec:
+  componentType:
+    name: web-service
+    kind: ComponentType
+  parameters:
+    replicas: 1
+    port: 8080
+  traits:
+    - name: autoscaling
+      instanceName: scale
+    - name: storage
+      instanceName: data

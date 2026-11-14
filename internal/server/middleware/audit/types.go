@@ -5,6 +5,7 @@ package audit
 
 import (
 	"encoding/json"
+	"sync"
 	"time"
 )
 
@@ -29,10 +30,9 @@ const (
 	// authzrolebindings).
 	CategoryAuthorization Category = "authorization"
 	// CategoryAccess covers reads that disclose enough to be worth recording in
-	// their own right — reading the audit trail itself, today. Most reads are
-	// not audited at all (see each service's RESTExemptions); this category is
-	// for the ones where knowing who looked is part of the point, so an
-	// investigator can filter disclosure apart from change.
+	// their own right: secret values, logs, span attributes and the audit trail
+	// itself. Most reads are not audited at all (see each service's
+	// RESTExemptions).
 	CategoryAccess Category = "access"
 )
 
@@ -73,6 +73,7 @@ type Hierarchy struct {
 	Project     string
 	Component   string
 	Resource    string
+	ReleaseLine string
 }
 
 // Result represents the outcome of an action
@@ -100,7 +101,36 @@ const (
 // SchemaVersion is stamped on every published event as "schema_version".
 // major.minor: major on a field removal or a changed value representation,
 // minor on an addition.
-const SchemaVersion = "1.0"
+//
+// One version for every category: a reader should not need an event's
+// category before knowing how to parse it.
+const SchemaVersion = "1.1"
+
+// MaxParameterLength caps each string recorded in request.parameters, in
+// runes. A longer value is cut with no truncation flag.
+const MaxParameterLength = 256
+
+// MaxReturnedItems caps returned.items, matching the largest page an
+// OpenChoreo list read serves.
+const MaxReturnedItems = 100
+
+// Returned records what an operation handed back, never the content itself.
+// Count is published even when zero, and exceeds len(Items) when the list was
+// cut.
+type Returned struct {
+	Count int            `json:"count"`
+	Items []ReturnedItem `json:"items,omitempty"`
+}
+
+// ReturnedItem identifies one object an operation returned. A single-object
+// read records one too, so "who read X" is one filter whether X came from a
+// get or a list.
+type ReturnedItem struct {
+	Type      string `json:"type"`
+	Namespace string `json:"namespace,omitempty"`
+	Name      string `json:"name"`
+	UID       string `json:"uid,omitempty"`
+}
 
 // HTTPInfo records the request line of an event that arrived over HTTP.
 // Absent for an MCP tools/call, which has no request line of its own.
@@ -140,9 +170,11 @@ type Event struct {
 	SourceIP     string // Client IP address
 	// UserAgent is client-supplied and unverifiable, like SourceIP. It is the
 	// only field that separates a portal session from occ, CI or an agent.
-	UserAgent string
-	Producer  string // Emitting service (e.g., "openchoreo-api")
-	Metadata  map[string]any
+	UserAgent         string
+	Producer          string         // Emitting service (e.g., "openchoreo-api")
+	RequestParameters map[string]any // Published as request.parameters
+	Returned          *Returned      // Set only on success, see buildEvent
+	Metadata          map[string]any
 }
 
 // eventJSON is the single definition of the published audit record. Field
@@ -164,7 +196,16 @@ type eventJSON struct {
 	OperationID   string         `json:"operation_id,omitempty"`
 	HTTP          *HTTPInfo      `json:"http,omitempty"`
 	Resource      *resourceJSON  `json:"resource,omitempty"`
+	Request       *requestJSON   `json:"request,omitempty"`
+	Returned      *Returned      `json:"returned,omitempty"`
 	Metadata      map[string]any `json:"metadata,omitempty"`
+}
+
+// requestJSON nests the parameters one level down so a store that flattens
+// keys with underscores can't turn a parameter named "id" into the top-level
+// "request_id".
+type requestJSON struct {
+	Parameters map[string]any `json:"parameters,omitempty"`
 }
 
 // resourceJSON is Resource with Type merged back in, plus Hierarchy's
@@ -177,6 +218,7 @@ type resourceJSON struct {
 	Project     string         `json:"project,omitempty"`
 	Component   string         `json:"component,omitempty"`
 	Resource    string         `json:"resource,omitempty"`
+	ReleaseLine string         `json:"release_line,omitempty"`
 	UID         string         `json:"uid,omitempty"`
 	Name        string         `json:"name,omitempty"`
 	Metadata    map[string]any `json:"metadata,omitempty"`
@@ -205,8 +247,17 @@ func (e Event) MarshalJSON() ([]byte, error) {
 		OperationID:   e.OperationID,
 		HTTP:          e.HTTP,
 		Resource:      e.resolvedResource(),
+		Request:       e.resolvedRequest(),
+		Returned:      e.Returned,
 		Metadata:      e.Metadata,
 	})
+}
+
+func (e Event) resolvedRequest() *requestJSON {
+	if len(e.RequestParameters) == 0 {
+		return nil
+	}
+	return &requestJSON{Parameters: e.RequestParameters}
 }
 
 // resolvedResource folds ResourceType and Hierarchy into the published
@@ -227,6 +278,7 @@ func (e Event) resolvedResource() *resourceJSON {
 		Environment: e.Hierarchy.Environment,
 		Project:     e.Hierarchy.Project,
 		Component:   e.Hierarchy.Component,
+		ReleaseLine: e.Hierarchy.ReleaseLine,
 		Resource:    e.Hierarchy.Resource,
 	}
 	if e.Resource != nil {
@@ -242,10 +294,7 @@ func (e Event) resolvedResource() *resourceJSON {
 
 // AuditData is a mutable container for audit information set by handlers.
 //
-// Metadata has no writer today, so it is always nil and never appears in a
-// published event. It is still plumbed through end-to-end (EmitFromContext →
-// Envelope → Event → Logger renders it as a "metadata" group), so a future
-// setter can be wired in without touching the pipeline.
+// Metadata's only writer is SetMCPClient, so it is nil on every REST event.
 //
 // Result overrides the status-code-derived Result the REST middleware would
 // otherwise compute (see determineResult in middleware.go). nil everywhere
@@ -258,12 +307,20 @@ func (e Event) resolvedResource() *resourceJSON {
 //
 // Request is the exception to "mutable": the adapter fills it once at entry
 // and nothing else writes it.
+//
+// Every setter takes mu, because one MCP tool call can run several
+// authz-wrapped reads in parallel on the same context. The emitter reads
+// without it, since it runs after the handler has returned.
 type AuditData struct {
-	Resource  *Resource
-	Metadata  map[string]any
-	Hierarchy Hierarchy
-	Result    *Result
-	Request   RequestInfo
+	mu sync.Mutex
+
+	Resource   *Resource
+	Metadata   map[string]any
+	Hierarchy  Hierarchy
+	Result     *Result
+	Request    RequestInfo
+	Parameters map[string]any
+	Returned   *Returned
 }
 
 // contextKey is a type for context keys to avoid collisions

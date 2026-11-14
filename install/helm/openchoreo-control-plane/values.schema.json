@@ -616,6 +616,21 @@
               "title": "observability",
               "type": "object"
             },
+            "scorecards": {
+              "additionalProperties": false,
+              "description": "Scorecards portal feature",
+              "properties": {
+                "enabled": {
+                  "default": true,
+                  "description": "Show Scorecards (Tech Insights checks) in the portal. Maps to OPENCHOREO_FEATURES_SCORECARDS_ENABLED in the Backstage container. Checks authored in the portal are stored in the Backstage database, which is SQLite on an emptyDir by default, so they are lost when the pod restarts. Set backstage.database.type to postgresql or enable backstage.database.sqlite.persistence to keep them.",
+                  "title": "enabled",
+                  "type": "boolean"
+                }
+              },
+              "required": [],
+              "title": "scorecards",
+              "type": "object"
+            },
             "workflows": {
               "additionalProperties": false,
               "description": "Build plane / Workflows functionality configuration",
@@ -1096,6 +1111,45 @@
           },
           "required": [],
           "title": "serviceAccount",
+          "type": "object"
+        },
+        "startupProbe": {
+          "additionalProperties": false,
+          "description": "Startup probe for the Backstage container. Backstage can take minutes to load its plugins on a slow or busy machine; until this probe succeeds, the liveness and readiness probes are not run, so a slow start is not killed as a hung container. It gives Backstage up to periodSeconds x failureThreshold to start.",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "description": "Enable the startup probe",
+              "title": "enabled",
+              "type": "boolean"
+            },
+            "failureThreshold": {
+              "default": 30,
+              "description": "Consecutive failures before the container is restarted. With the defaults, Backstage has up to 5 minutes to start.",
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "failureThreshold",
+              "type": "integer"
+            },
+            "periodSeconds": {
+              "default": 10,
+              "description": "How often the startup probe is run, in seconds",
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "periodSeconds",
+              "type": "integer"
+            },
+            "timeoutSeconds": {
+              "default": 10,
+              "description": "Timeout of each startup probe check, in seconds",
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "timeoutSeconds",
+              "type": "integer"
+            }
+          },
+          "required": [],
+          "title": "startupProbe",
           "type": "object"
         },
         "tls": {
@@ -2124,6 +2178,29 @@
               "pattern": "^(0|(([0-9]+([.][0-9]+)?|[.][0-9]+)(ns|us|µs|μs|ms|s|m|h))+)$",
               "title": "renderTimeout",
               "type": "string"
+            },
+            "renderedRelease": {
+              "additionalProperties": false,
+              "description": "RenderedRelease controller settings",
+              "properties": {
+                "progressingInterval": {
+                  "default": "10s",
+                  "description": "How long a RenderedRelease with transitioning resources (Progressing, Unknown or Degraded) waits before the controller checks it again (Go duration, e.g. \"10s\"), unless the release sets spec.progressingInterval. 20% jitter is added. Must be greater than 0. Empty uses the controller's built-in default (10s).",
+                  "pattern": "^((([0-9]+([.][0-9]+)?|[.][0-9]+)(ns|us|µs|μs|ms|s|m|h))+)?$",
+                  "title": "progressingInterval",
+                  "type": "string"
+                },
+                "stableInterval": {
+                  "default": "1m",
+                  "description": "How long a RenderedRelease whose resources are all stable waits before the controller checks it again (Go duration, e.g. \"1m\"), unless the release sets spec.interval. 20% jitter is added. Every stable release costs one reconcile per interval, so the controller needs about releases x reconcile time / interval workers; with hundreds of releases on a remote data plane raise it (e.g. \"5m\"). Longer intervals also delay noticing drift and health changes on stable releases, including ResourceReleaseBinding readyWhen on custom resources. Must be greater than 0. Empty uses the controller's built-in default (1m).",
+                  "pattern": "^((([0-9]+([.][0-9]+)?|[.][0-9]+)(ns|us|µs|μs|ms|s|m|h))+)?$",
+                  "title": "stableInterval",
+                  "type": "string"
+                }
+              },
+              "required": [],
+              "title": "renderedRelease",
+              "type": "object"
             }
           },
           "required": [],
@@ -2910,8 +2987,23 @@
     },
     "features": {
       "additionalProperties": false,
-      "description": "Feature flags shared across the control plane (API server and Backstage).",
+      "description": "Feature flags shared across the control plane (controller, API server and Backstage).",
       "properties": {
+        "referencedConfigRollout": {
+          "additionalProperties": false,
+          "description": "Referenced-config rollout. Controls which changes to a component restart its pods.",
+          "properties": {
+            "enabled": {
+              "default": false,
+              "description": "Limit the configuration changes that restart a component's pods to the ConfigMaps, Secrets and ExternalSecrets their pod template references, instead of any change to the component's rendered resources, such as a Service, HTTPRoute or HorizontalPodAutoscaler. Also enables the openchoreo.dev/restart-on-change annotation, which lets ComponentType and Trait authors include or exclude a resource. Changes to the pod template itself, such as a new image, still roll out the pods. Turning it on does not restart pods by itself.",
+              "title": "enabled",
+              "type": "boolean"
+            }
+          },
+          "required": [],
+          "title": "referencedConfigRollout",
+          "type": "object"
+        },
         "secretManagement": {
           "additionalProperties": false,
           "description": "Secret management feature. Controls the Secret management API on the API server and the corresponding UI in Backstage.",
@@ -2927,6 +3019,21 @@
               "description": "First segment of every key written to the external secret store, as in \u003cprefix\u003e/\u003cnamespace\u003e/\u003ctype\u003e/\u003cname\u003e. Set to an empty string to drop the segment. It must not equal the KV mount name that the ClusterSecretStore points at, otherwise external-secrets writes the value and its ownership metadata to two different paths and leaves a duplicate data-less entry per secret. This is an install-time setting, since changing it after secrets exist does not move existing entries.",
               "title": "remoteKeyPrefix",
               "type": "string"
+            },
+            "remoteKeySeparator": {
+              "default": "/",
+              "description": "Separator that joins the segments of every key written to the external secret store, including the segments of a nested remoteKeyPrefix. \"/\" gives path-style keys \u003cprefix\u003e/\u003cnamespace\u003e/\u003ctype\u003e/\u003cname\u003e for OpenBao, Vault and AWS Secrets Manager. \"-\" is the only separator Azure Key Vault allows and works with every store. \"_\" works with GCP Secret Manager, AWS Secrets Manager, OpenBao and Vault, and \".\", \"+\", \"=\" and \"@\" work with AWS Secrets Manager, OpenBao and Vault. With \"-\" or \".\", two different secrets can map to the same key, since those characters can also appear in namespace and secret names. This is an install-time setting, since changing it after secrets exist does not move existing entries.",
+              "enum": [
+                "/",
+                "-",
+                "_",
+                ".",
+                "+",
+                "=",
+                "@"
+              ],
+              "required": [],
+              "title": "remoteKeySeparator"
             }
           },
           "required": [],
@@ -3402,7 +3509,19 @@
                   "type": "object"
                 },
                 "policies": {
-                  "default": [],
+                  "default": [
+                    {
+                      "match": {
+                        "operations": [
+                          "GetReleaseBindingK8sResourceLogs",
+                          "GetWorkflowRunLogs"
+                        ]
+                      },
+                      "set": {
+                        "publish": false
+                      }
+                    }
+                  ],
                   "description": "Ordered, first-match-wins policy overrides. Each entry has a `match` selector and a `set` block of overrides. See the audit logging docs for the selector-admissibility rules enforced at startup.\n",
                   "items": {
                     "additionalProperties": true,
@@ -3472,9 +3591,10 @@
                     "deployment",
                     "build",
                     "pe",
-                    "resource"
+                    "resource",
+                    "endpoint"
                   ],
-                  "description": "List of enabled MCP toolsets. Each toolset exposes a group of related operations. Allowed toolsets: namespace, project, component, deployment, build, pe, resource",
+                  "description": "List of enabled MCP toolsets. Each toolset exposes a group of related operations. Allowed toolsets: namespace, project, component, deployment, build, pe, resource, endpoint",
                   "items": {
                     "type": "string"
                   },
@@ -4954,6 +5074,16 @@
         "llm": {
           "additionalProperties": false,
           "properties": {
+            "auth": {
+              "default": "api_key",
+              "description": "How the Portal Assistant authenticates to the LLM endpoint. api_key sends PORTAL_ASSISTANT_LLM_API_KEY from secretName. azure sends a Microsoft Entra ID token from DefaultAzureCredential instead, for an Azure OpenAI or Azure AI Foundry endpoint set in baseUrl (e.g., https://\u003cresource\u003e.openai.azure.com/openai/v1/), and secretName is optional. On AKS, use workload identity - the azure.workload.identity/client-id annotation in serviceAccount.annotations and the azure.workload.identity/use label in podLabels. Set modelName to the deployment name, and name the deployment after its model (e.g., gpt-5-mini). The Portal Assistant needs a model name LangChain recognizes, so other deployment names fail, even when prefixed as openai:\u003cdeployment\u003e.",
+              "enum": [
+                "api_key",
+                "azure"
+              ],
+              "required": [],
+              "title": "auth"
+            },
             "baseUrl": {
               "default": "",
               "description": "Optional OpenAI-compatible base URL. Set to route LLM calls through the\nai-gateway-agentgateway module (e.g. http://agentgateway-proxy.openchoreo-data-plane)\ninstead of the provider directly; the provider key is then managed at the\ngateway and the secret's PORTAL_ASSISTANT_LLM_API_KEY may be a placeholder.",
@@ -4967,7 +5097,14 @@
             },
             "secretName": {
               "default": "",
+              "description": "Secret holding PORTAL_ASSISTANT_LLM_API_KEY. Not needed when auth is azure.",
               "title": "secretName",
+              "type": "string"
+            },
+            "tokenScope": {
+              "default": "",
+              "description": "Microsoft Entra ID scope of the LLM token when auth is azure. Empty uses https://cognitiveservices.azure.com/.default, the scope of Azure OpenAI and Azure AI Foundry.",
+              "title": "tokenScope",
               "type": "string"
             }
           },
@@ -4992,6 +5129,16 @@
           "description": "Node selector for pod scheduling",
           "required": [],
           "title": "nodeSelector",
+          "type": "object"
+        },
+        "podLabels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "description": "Labels to add to Portal Assistant pods, for example azure.workload.identity/use to opt the pod into Azure Workload Identity token projection",
+          "required": [],
+          "title": "podLabels",
           "type": "object"
         },
         "replicas": {
@@ -5076,6 +5223,25 @@
             "port"
           ],
           "title": "service",
+          "type": "object"
+        },
+        "serviceAccount": {
+          "additionalProperties": false,
+          "description": "Service account configuration for the Portal Assistant",
+          "properties": {
+            "annotations": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "default": {},
+              "description": "Annotations to add to the Portal Assistant service account, for example azure.workload.identity/client-id or eks.amazonaws.com/role-arn",
+              "required": [],
+              "title": "annotations",
+              "type": "object"
+            }
+          },
+          "required": [],
+          "title": "serviceAccount",
           "type": "object"
         },
         "tolerations": {

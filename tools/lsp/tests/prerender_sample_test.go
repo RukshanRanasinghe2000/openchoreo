@@ -22,7 +22,7 @@ func TestPreRenderSamplePublishesDynamicFindings(t *testing.T) {
 }
 
 func testPreRenderSamplePublication(t *testing.T, componentOpen bool) {
-	source := filepath.Join("..", "..", "lint", "testData", "sample-projects", "pre-render-schema-validation")
+	source := filepath.Join("testdata", "pre-render-schema-validation")
 	dir := t.TempDir()
 	var definition, component string
 	for _, name := range []string{"componenttype.yaml", "component.yaml", "autoscaling-trait.yaml", "storage-trait.yaml"} {

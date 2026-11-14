@@ -16,7 +16,10 @@ const (
 // here, so a new endpoint cannot go unaudited by nobody noticing. Reads are
 // listed rather than inferred from the method because the method is not a
 // reliable proxy either way — Evaluates is a POST that reads, and GetSecret is
-// a GET that might be worth auditing.
+// a GET that is audited.
+//
+// The secret and live log reads are not here either; they are defined under
+// CategoryAccess (see tools/auditgen's apiAccessReadOverrides).
 //
 // GenerateRelease is NOT here: it persists a new ComponentRelease via
 // k8sClient.Create (see ComponentService.GenerateRelease), so it has a real
@@ -30,6 +33,8 @@ var RESTExemptions = map[string]string{
 	"GetClusterComponentType":                     reasonRead,
 	"GetClusterComponentTypeSchema":               reasonRead,
 	"GetClusterDataPlane":                         reasonRead,
+	"GetClusterEndpointType":                      reasonRead,
+	"GetClusterEndpointTypeSchema":                reasonRead,
 	"GetClusterObservabilityPlane":                reasonRead,
 	"GetClusterProjectType":                       reasonRead,
 	"GetClusterProjectTypeSchema":                 reasonRead,
@@ -49,6 +54,11 @@ var RESTExemptions = map[string]string{
 	"GetComponentTypeSchema":                      reasonRead,
 	"GetDataPlane":                                reasonRead,
 	"GetDeploymentPipeline":                       reasonRead,
+	"GetEndpoint":                                 reasonRead,
+	"GetEndpointRelease":                          reasonRead,
+	"GetEndpointReleaseBinding":                   reasonRead,
+	"GetEndpointType":                             reasonRead,
+	"GetEndpointTypeSchema":                       reasonRead,
 	"GetEnvironment":                              reasonRead,
 	"GetHealth":                                   reasonRead,
 	"GetMetadata":                                 reasonRead,
@@ -67,14 +77,12 @@ var RESTExemptions = map[string]string{
 	"GetReady":                                    reasonRead,
 	"GetReleaseBinding":                           reasonRead,
 	"GetReleaseBindingK8sResourceEvents":          reasonRead,
-	"GetReleaseBindingK8sResourceLogs":            reasonRead,
 	"GetReleaseBindingK8sResourceTree":            reasonRead,
 	"GetResource":                                 reasonRead,
 	"GetResourceRelease":                          reasonRead,
 	"GetResourceReleaseBinding":                   reasonRead,
 	"GetResourceType":                             reasonRead,
 	"GetResourceTypeSchema":                       reasonRead,
-	"GetSecret":                                   reasonRead,
 	"GetSecretReference":                          reasonRead,
 	"GetSubjectProfile":                           reasonRead,
 	"GetTrait":                                    reasonRead,
@@ -84,13 +92,13 @@ var RESTExemptions = map[string]string{
 	"GetWorkflowPlane":                            reasonRead,
 	"GetWorkflowRun":                              reasonRead,
 	"GetWorkflowRunEvents":                        reasonRead,
-	"GetWorkflowRunLogs":                          reasonRead,
 	"GetWorkflowRunStatus":                        reasonRead,
 	"GetWorkflowSchema":                           reasonRead,
 	"GetWorkload":                                 reasonRead,
 	"ListActions":                                 reasonRead,
 	"ListClusterComponentTypes":                   reasonRead,
 	"ListClusterDataPlanes":                       reasonRead,
+	"ListClusterEndpointTypes":                    reasonRead,
 	"ListClusterObservabilityPlanes":              reasonRead,
 	"ListClusterProjectTypes":                     reasonRead,
 	"ListClusterResourceTypes":                    reasonRead,
@@ -99,11 +107,17 @@ var RESTExemptions = map[string]string{
 	"ListClusterTraits":                           reasonRead,
 	"ListClusterWorkflowPlanes":                   reasonRead,
 	"ListClusterWorkflows":                        reasonRead,
+	"ListComponentReleaseLines":                   reasonRead,
+	"GetComponentReleaseLine":                     reasonRead,
 	"ListComponentReleases":                       reasonRead,
 	"ListComponentTypes":                          reasonRead,
 	"ListComponents":                              reasonRead,
 	"ListDataPlanes":                              reasonRead,
 	"ListDeploymentPipelines":                     reasonRead,
+	"ListEndpointReleaseBindings":                 reasonRead,
+	"ListEndpointReleases":                        reasonRead,
+	"ListEndpointTypes":                           reasonRead,
+	"ListEndpoints":                               reasonRead,
 	"ListEnvironments":                            reasonRead,
 	"ListGitSecrets":                              reasonRead,
 	"ListNamespaceRoleBindings":                   reasonRead,
@@ -121,7 +135,6 @@ var RESTExemptions = map[string]string{
 	"ListResourceTypes":                           reasonRead,
 	"ListResources":                               reasonRead,
 	"ListSecretReferences":                        reasonRead,
-	"ListSecrets":                                 reasonRead,
 	"ListSubjectTypes":                            reasonRead,
 	"ListTraits":                                  reasonRead,
 	"ListWorkflowPlanes":                          reasonRead,
@@ -148,5 +161,7 @@ var MCPToolExemptions = map[string]string{
 	"get_resource_type_creation_schema": "Declares resourcetype:create for permission-gating only; " +
 		"returns a static JSON schema and calls no service method.",
 	"get_project_type_creation_schema": "Declares projecttype:create for permission-gating only; " +
+		"returns a static JSON schema and calls no service method.",
+	"get_endpoint_type_creation_schema": "Declares endpointtype:create for permission-gating only; " +
 		"returns a static JSON schema and calls no service method.",
 }

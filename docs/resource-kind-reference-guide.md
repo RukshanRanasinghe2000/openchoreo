@@ -230,12 +230,16 @@ Resources are organized under Kubernetes namespaces which serve as organizationa
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `type` | EndpointType | Yes | HTTP, gRPC, GraphQL, Websocket, TCP, UDP |
+| `protocol` | EndpointProtocol | Yes* | HTTP, gRPC, GraphQL, Websocket, TCP, UDP |
+| `type` | EndpointProtocol | Yes* | **Deprecated**: use `protocol`. Kept equal to `protocol` by the admission webhook |
 | `port` | int32 | Yes | Exposed port |
 | `targetPort` | int32 | No | Container listening port (defaults to port) |
-| `visibility` | []EndpointVisibility | No | project, namespace, internal, external |
+| `visibility` | []EndpointVisibility | No | **Deprecated**: expose the endpoint through an `Endpoint` instead. project, namespace, internal, external; still honored by ComponentType templates that read it |
 | `basePath` | string | No | URL base path |
 | `schema` | EndpointSchema | No | API schema (type + content) |
+
+\* One of `protocol` or the deprecated `type` must be set; the Workload admission webhook copies
+each to the other, rejects them when they differ, and warns on any use of a deprecated field.
 
 **Relationships:**
 - Owner: Component (via `spec.owner.componentName`)
@@ -331,8 +335,8 @@ All spec fields are **immutable** after creation (enforced via `XValidation:rule
 | `environmentName` | string | Yes | Target environment |
 | `resources[]` | Resource[] | No | Rendered K8s resources (id + raw object) |
 | `targetPlane` | string | No | `dataplane` (default) or `observabilityplane` |
-| `interval` | Duration | No | Stable-state watch interval (default 5m) |
-| `progressingInterval` | Duration | No | Transitioning watch interval (default 10s) |
+| `interval` | Duration | No | Stable-state watch interval (default: controller flag `--renderedrelease-stable-interval`, 1m) |
+| `progressingInterval` | Duration | No | Transitioning watch interval (default: controller flag `--renderedrelease-progressing-interval`, 10s) |
 
 **Status:**
 
@@ -479,8 +483,33 @@ All spec fields are **immutable** after creation (enforced via `XValidation:rule
 | `traits[]` | ComponentTypeTrait[] | No | Pre-configured embedded traits with parameter/environmentConfig bindings |
 | `allowedTraits[]` | TraitRef[] | No | Additional traits developers can attach |
 | `allowedWorkflows[]` | WorkflowRef[] | No | Permitted build workflows |
+| `allowedEndpoints[]` | AllowedEndpointType[] | No | Which (Cluster)EndpointType may expose a workload endpoint, by protocol. Empty: no Endpoints are created for components of this type |
 | `validations[]` | ValidationRule[] | No | CEL validation rules |
 | `resources[]` | ResourceTemplate[] | Yes (min 1) | K8s resource templates with CEL expressions |
+
+**AllowedEndpointType Fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | No | Alias a workload endpoint can name when several entries match its protocol |
+| `protocols[]` | string[] | Yes | Workload endpoint protocols (HTTP, gRPC, GraphQL, Websocket, TCP, UDP) |
+| `ref` | EndpointTypeRef | Yes | The EndpointType or ClusterEndpointType to use |
+| `default` | bool | No | Automatic choice for its protocols. At most one default per protocol, enforced by the webhook |
+
+Clients that create a Component (portal, occ, GitOps tooling) create one `Endpoint` per workload
+endpoint the developer exposes, from the chosen or default entry, with `spec.owner.componentName`
+set to the component. The Endpoint controller makes that Component the Endpoint's owner, so
+deleting the component deletes its Endpoints. `componentName` is accepted only while every backend
+routes to that component; an Endpoint routing to several components is owned by its Project, and
+the OpenChoreo API drops `componentName` when an update adds such a backend. An `Endpoint` created
+for one of the component's release lines routes to it with `component.releaseLine` and also sets
+`spec.owner.releaseLineName`, so deleting the line deletes its Endpoints; it is accepted only while
+every backend routes to that line, and the API drops it when an update adds a backend on another
+line or the main line, leaving the Component as owner. The developer picks the
+visibility on the `Endpoint`; the EndpointType renders what each requested visibility needs (for
+example `includeWhen: '${"internal" in visibility && ...}'`) and rejects any it does not support
+through its `validations`. A PE opting a type in should drop the type's own route resources for
+the matched endpoints, otherwise both the type's route and the Endpoint's route render.
 
 **ResourceTemplate Fields:**
 
@@ -497,7 +526,7 @@ All spec fields are **immutable** after creation (enforced via `XValidation:rule
 - `ocSchema` — OpenChoreo shorthand format (e.g., `replicas: "integer | default=1"`)
 - `openAPIV3Schema` — Standard OpenAPI v3 JSON Schema
 
-**Cluster-scoped variant** (`ClusterComponentType`) only references `ClusterTrait` and `ClusterWorkflow`.
+**Cluster-scoped variant** (`ClusterComponentType`) only references `ClusterTrait`, `ClusterWorkflow` and `ClusterEndpointType`.
 
 [Back to Top](#overview)
 
@@ -657,6 +686,10 @@ All spec fields are **immutable** after creation (enforced via `XValidation:rule
 | `promotionPaths[].sourceEnvironmentRef` | EnvironmentRef | Yes | Source environment |
 | `promotionPaths[].targetEnvironmentRefs[]` | TargetEnvironmentRef[] | Yes | Destination environments |
 
+The API requires a ReleaseBinding in a promotion target to reference a ComponentRelease already referenced by a binding for the same project and component in one of its source environments. Create and update requests that do not satisfy this rule return HTTP 400 with a message naming the required source environments. MCP release binding tools use the same validation. An already-rendered release can keep running after its source moves on, and `Undeploy` and pending auto-deploy bindings remain allowed. Environments the pipeline does not list as a target are not restricted.
+
+Promotion paths are enforced only by the API. Direct Kubernetes writes, including `kubectl` and GitOps, bypass this check so operators can deploy hotfixes without following the promotion path.
+
 **Relationships:**
 - Referenced by: Project
 - References: Environment
@@ -778,6 +811,7 @@ gateway:
 | `observerURL` | string | Yes | Base URL of the Observer API |
 | `rcaAgentURL` | string | No | RCA Agent API URL |
 | `finOpsAgentURL` | string | No | FinOps Agent API URL |
+| `secretStoreRef` | SecretStoreRef | No | ESO ClusterSecretStore reference; needed for notification channels that reference SecretReferences |
 
 **Status:** Same as DataPlane (conditions + agentConnection).
 
@@ -800,6 +834,7 @@ gateway:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
+| `targetPlane` | TargetPlaneRef | No | Plane whose external secret store holds the value: `WorkflowPlane`, `ClusterWorkflowPlane`, `DataPlane`, `ClusterDataPlane`, `ObservabilityPlane` or `ClusterObservabilityPlane` |
 | `template` | SecretTemplate | Yes | Secret type and metadata (annotations, labels) |
 | `data[]` | SecretDataSource[] | Yes (min 1) | Mapping of secret keys to external store references |
 | `refreshInterval` | Duration | No | Refresh interval (default: 1h) |
@@ -910,9 +945,24 @@ gateway:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
+| `environment` | string | Yes | Environment the channel belongs to (immutable) |
+| `isEnvDefault` | bool | No | Whether this is the environment's default channel |
 | `type` | NotificationChannelType | Yes | `email` or `webhook` |
-| `email` | EmailConfig | Conditional | Email configuration (from, to, SMTP, template) — required when type=email |
-| `webhook` | WebhookConfig | Conditional | Webhook configuration (URL, headers, template) — required when type=webhook |
+| `emailConfig` | EmailConfig | Conditional | Email configuration (from, fromName, to, SMTP, template) — required when type=email |
+| `webhookConfig` | WebhookConfig | Conditional | Webhook configuration (URL, headers, template) — required when type=webhook |
+
+`emailConfig.from` must be a bare address because it is also the SMTP envelope sender. To show a sender display name, set `emailConfig.fromName`; alert emails then carry `From: "<fromName>" <from>`.
+
+SMTP `auth.username` / `auth.password` and webhook header `valueFrom` take a `secretKeyRef` (`name`, `key`). The `name` refers to a SecretReference in the channel's namespace and the `key` to one of its `data[].secretKey` entries, as in a Workload. The controller applies an ExternalSecret to the environment's observability plane that syncs the values from that plane's secret store, so the observability plane needs a `secretStoreRef`. A SecretReference's remote keys must be the key the secret API writes for it (`<remoteKeyPrefix>/<namespace>/<type>/<name>`, from the channel's namespace and the SecretReference's type and name). If the observability plane's secret store can't read a value, the ExternalSecret fails to sync and `SecretsReady` reports why.
+
+If no SecretReference has the referenced name, a Kubernetes Secret with that name is copied to the observability plane instead. This fallback is deprecated. All references of a channel must resolve the same way.
+
+**Status:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `observedGeneration` | int64 | Generation observed by the controller |
+| `conditions` | []Condition | `Ready` (applied to the observability plane) and `SecretsReady` (secret values available there; reason `DeprecatedKubernetesSecret` when copied from Kubernetes Secrets) |
 
 [Back to Top](#overview)
 

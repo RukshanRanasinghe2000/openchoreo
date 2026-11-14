@@ -1,0 +1,77 @@
+apiVersion: openchoreo.dev/v1alpha1
+kind: ProjectRelease
+metadata: {name: project}
+spec:
+  projectType:
+    spec:
+      parameters:
+        openAPIV3Schema:
+          type: object
+          properties:
+            count: {type: integer}
+  parameters:
+    count: wrong
+---
+apiVersion: openchoreo.dev/v1alpha1
+kind: ResourceRelease
+metadata: {name: resource}
+spec:
+  resourceType:
+    spec:
+      parameters:
+        openAPIV3Schema:
+          type: object
+          properties:
+            replicas: {type: integer}
+  parameters:
+    replicas: wrong
+---
+apiVersion: openchoreo.dev/v1alpha1
+kind: ComponentRelease
+metadata: {name: frozen}
+spec:
+  componentType:
+    spec:
+      parameters:
+        openAPIV3Schema:
+          type: object
+          properties:
+            count: {type: integer, default: 1}
+      environmentConfigs:
+        openAPIV3Schema:
+          type: object
+          properties:
+            count: {type: integer}
+      preRenderValidations:
+        - rule: '${parameters.count > 3}'
+          message: count too small
+  componentProfile:
+    parameters:
+      count: 1
+---
+apiVersion: openchoreo.dev/v1alpha1
+kind: ReleaseBinding
+metadata: {name: binding}
+spec:
+  releaseName: frozen
+  componentTypeEnvironmentConfigs:
+    count: wrong
+---
+apiVersion: openchoreo.dev/v1alpha1
+kind: ComponentRelease
+metadata: {name: trait-frozen}
+spec:
+  componentProfile:
+    traits:
+      - kind: Trait
+        name: scaling
+        instanceName: scale
+  traits:
+    - kind: Trait
+      name: scaling
+      spec:
+        parameters:
+          openAPIV3Schema:
+            type: object
+            properties:
+              replicas: {type: integer, default: 1}

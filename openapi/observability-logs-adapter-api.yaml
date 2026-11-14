@@ -73,6 +73,9 @@ paths:
       responses:
         "200":
           description: Logs queried successfully
+          headers:
+            OpenChoreo-Release-Line-Applied:
+              $ref: "#/components/headers/ReleaseLineApplied"
           content:
             application/json:
               schema:
@@ -487,6 +490,9 @@ paths:
       responses:
         "200":
           description: Events queried successfully
+          headers:
+            OpenChoreo-Release-Line-Applied:
+              $ref: "#/components/headers/ReleaseLineApplied"
           content:
             application/json:
               schema:
@@ -576,6 +582,9 @@ paths:
       responses:
         "201":
           description: Alert rule created successfully
+          headers:
+            OpenChoreo-Release-Line-Applied:
+              $ref: "#/components/headers/ReleaseLineApplied"
           content:
             application/json:
               schema:
@@ -687,6 +696,9 @@ paths:
       responses:
         "200":
           description: Alert rule updated successfully
+          headers:
+            OpenChoreo-Release-Line-Applied:
+              $ref: "#/components/headers/ReleaseLineApplied"
           content:
             application/json:
               schema:
@@ -742,6 +754,16 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
 
 components:
+  headers:
+    ReleaseLineApplied:
+      description: >
+        "true" when the adapter applied the release line part of a component scope,
+        releaseLineUid or allReleaseLines. Adapters with release line support set it for every
+        component scope. An adapter without it ignores both fields and matches
+        openchoreo.dev/component-uid, which only the main line's pods carry, so any other
+        value or no header means the result covers the component's main line only.
+      schema:
+        type: string
   schemas:
     # Request schemas for logs
     ComponentSearchScope:
@@ -753,8 +775,26 @@ components:
           type: string
         componentUid:
           type: string
+          description: >
+            The UID of the component. On its own it covers the component's main line:
+            openchoreo.dev/component-uid without an openchoreo.dev/release-line-uid label.
         environmentUid:
           type: string
+        releaseLineUid:
+          type: string
+          description: >
+            The UID of one of the component's release lines to restrict the result to. Adapters
+            that support it filter on the openchoreo.dev/release-line-uid label alone, since
+            release line pods don't carry the openchoreo.dev/component-uid label, and set
+            the OpenChoreo-Release-Line-Applied response header to "true".
+        allReleaseLines:
+          type: boolean
+          description: >
+            Covers every line of the component, its main line and its release lines:
+            openchoreo.dev/component-uid, or openchoreo.dev/release-line-component-uid, which
+            release line pods carry instead. Has no effect without componentUid, and
+            releaseLineUid takes precedence. Adapters that support it set the
+            OpenChoreo-Release-Line-Applied response header to "true".
       required: [namespace]
 
     WorkflowSearchScope:
@@ -848,6 +888,17 @@ components:
             environmentUid:
               type: string
               description: The OpenChoreo environment UID that generated the log
+              format: uuid
+            releaseLineName:
+              type: string
+              description: >-
+                The component's release line that generated the log, from the pod's
+                openchoreo.dev/release-line label. Absent for its main line.
+            releaseLineUid:
+              type: string
+              description: >-
+                The UID of the component's release line that generated the log, from the
+                pod's openchoreo.dev/release-line-uid label. Absent for its main line.
               format: uuid
             containerName:
               type: string
@@ -1175,6 +1226,8 @@ components:
           $ref: "#/components/schemas/AuditLogsActorFilter"
         resource:
           $ref: "#/components/schemas/AuditLogsResourceFilter"
+        returned:
+          $ref: "#/components/schemas/AuditLogsReturnedFilter"
         action:
           type: array
           uniqueItems: true
@@ -1296,6 +1349,7 @@ components:
             - resource.environment
             - resource.project
             - resource.component
+            - resource.release_line
             - resource.resource
             - resource.name
             - action
@@ -1456,6 +1510,12 @@ components:
           maxItems: 20
           items:
             type: string
+        release_line:
+          type: array
+          uniqueItems: true
+          maxItems: 20
+          items:
+            type: string
         resource:
           type: array
           uniqueItems: true
@@ -1467,6 +1527,28 @@ components:
           uniqueItems: true
           maxItems: 20
           description: Resource names, as the handler recorded them
+          items:
+            type: string
+
+    AuditLogsReturnedFilter:
+      type: object
+      description: Filters on the record's `returned` group, named and nested as the record is.
+      properties:
+        items:
+          $ref: "#/components/schemas/AuditLogsReturnedItemsFilter"
+
+    AuditLogsReturnedItemsFilter:
+      type: object
+      properties:
+        name:
+          type: array
+          uniqueItems: true
+          maxItems: 20
+          description: |
+            Names of objects a read returned, matched exactly. A record matches when
+            any entry of its `returned.items` carries one of them. An adapter stores
+            `returned.items` however its backend can search an array of objects, and
+            must match on the name of one entry, never across two.
           items:
             type: string
 
@@ -1495,8 +1577,10 @@ components:
         schema_version:
           type: string
           description: Schema of this record. `major.minor`; major on a field removal or a
-            changed value representation, minor on an addition.
-          example: "1.0"
+            changed value representation, minor on an addition. Served as stored, so an
+            adapter that doesn't know a group added since still returns the producer's
+            version.
+          example: "1.1"
         event_id:
           type: string
           description: UUID v7, unique per record
@@ -1542,11 +1626,58 @@ components:
           $ref: "#/components/schemas/AuditLogHTTPInfo"
         resource:
           $ref: "#/components/schemas/AuditLogResource"
+        request:
+          $ref: "#/components/schemas/AuditLogRequest"
+        returned:
+          $ref: "#/components/schemas/AuditLogReturned"
         metadata:
           type: object
           additionalProperties: true
         collector:
           $ref: "#/components/schemas/AuditLogCollectorInfo"
+
+    AuditLogRequest:
+      type: object
+      description: |
+        What the operation was asked for, on reads audited under `access`. Stored but
+        not indexed; an adapter returns it and needs no filter on it.
+      properties:
+        parameters:
+          type: object
+          additionalProperties: true
+          description: |
+            The operation's own parameters under the API's names, nested where the API
+            nests them. Returned with the same keys and nesting it was published with.
+
+    AuditLogReturned:
+      type: object
+      description: What the operation handed back, never the content. Present only on success.
+      required:
+        - count
+      properties:
+        count:
+          type: integer
+          minimum: 0
+          description: Entries returned. Greater than the number of `items` when the list was cut.
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLogReturnedItem"
+
+    AuditLogReturnedItem:
+      type: object
+      required:
+        - type
+        - name
+      properties:
+        type:
+          type: string
+        namespace:
+          type: string
+        name:
+          type: string
+        uid:
+          type: string
 
     AuditLogActor:
       type: object
@@ -1611,6 +1742,9 @@ components:
           type: string
         component:
           type: string
+        release_line:
+          type: string
+          description: The component's release line. Absent for its main line
         resource:
           type: string
         uid:
@@ -1902,6 +2036,14 @@ components:
             componentUid:
               type: string
               description: The OpenChoreo component UID to query
+              format: uuid
+            releaseLineUid:
+              type: string
+              description: >
+                The UID of the component's release line the rule evaluates, filtered on the
+                openchoreo.dev/release-line-uid label alone. Absent for the component's main line,
+                which componentUid covers. Adapters that scope the rule to it set the
+                OpenChoreo-Release-Line-Applied response header to "true".
               format: uuid
         source:
           type: object

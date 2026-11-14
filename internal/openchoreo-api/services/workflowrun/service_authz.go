@@ -19,6 +19,7 @@ import (
 	"github.com/openchoreo/openchoreo/internal/openchoreo-api/models"
 	"github.com/openchoreo/openchoreo/internal/openchoreo-api/services"
 	"github.com/openchoreo/openchoreo/internal/openchoreo-api/services/component"
+	"github.com/openchoreo/openchoreo/internal/server/middleware/audit"
 )
 
 const (
@@ -78,7 +79,8 @@ func (s *workflowRunServiceWithAuthz) CreateWorkflowRun(ctx context.Context, nam
 		Hierarchy:    constructHierarchyForAuthzCheck(namespaceName, wfRun.Labels),
 		Context: authz.Context{
 			Resource: authz.ResourceAttribute{
-				Workflow: formatWorkflowAttr(namespaceName, wfRun.Spec.Workflow.Kind, wfRun.Spec.Workflow.Name),
+				Workflow:    formatWorkflowAttr(namespaceName, wfRun.Spec.Workflow.Kind, wfRun.Spec.Workflow.Name),
+				ReleaseLine: wfRun.Labels[ocLabels.LabelKeyReleaseLine],
 			},
 		},
 	}); err != nil {
@@ -104,7 +106,8 @@ func (s *workflowRunServiceWithAuthz) UpdateWorkflowRun(ctx context.Context, nam
 		Hierarchy:    constructHierarchyForAuthzCheck(namespaceName, existing.Labels),
 		Context: authz.Context{
 			Resource: authz.ResourceAttribute{
-				Workflow: formatWorkflowAttr(namespaceName, existing.Spec.Workflow.Kind, existing.Spec.Workflow.Name),
+				Workflow:    formatWorkflowAttr(namespaceName, existing.Spec.Workflow.Kind, existing.Spec.Workflow.Name),
+				ReleaseLine: existing.Labels[ocLabels.LabelKeyReleaseLine],
 			},
 		},
 	}); err != nil {
@@ -124,6 +127,7 @@ func (s *workflowRunServiceWithAuthz) ListWorkflowRuns(ctx context.Context, name
 				ResourceType: resourceTypeWorkflowRun,
 				ResourceID:   wr.Name,
 				Hierarchy:    constructHierarchyForAuthzCheck(namespaceName, wr.Labels),
+				Context:      authz.Context{Resource: authz.ResourceAttribute{ReleaseLine: wr.Labels[ocLabels.LabelKeyReleaseLine]}},
 			}
 		},
 	)
@@ -139,6 +143,7 @@ func (s *workflowRunServiceWithAuthz) GetWorkflowRun(ctx context.Context, namesp
 		ResourceType: resourceTypeWorkflowRun,
 		ResourceID:   runName,
 		Hierarchy:    constructHierarchyForAuthzCheck(namespaceName, wr.Labels),
+		Context:      authz.Context{Resource: authz.ResourceAttribute{ReleaseLine: wr.Labels[ocLabels.LabelKeyReleaseLine]}},
 	}); err != nil {
 		return nil, err
 	}
@@ -157,7 +162,8 @@ func (s *workflowRunServiceWithAuthz) DeleteWorkflowRun(ctx context.Context, nam
 		Hierarchy:    constructHierarchyForAuthzCheck(namespaceName, wr.Labels),
 		Context: authz.Context{
 			Resource: authz.ResourceAttribute{
-				Workflow: formatWorkflowAttr(namespaceName, wr.Spec.Workflow.Kind, wr.Spec.Workflow.Name),
+				Workflow:    formatWorkflowAttr(namespaceName, wr.Spec.Workflow.Kind, wr.Spec.Workflow.Name),
+				ReleaseLine: wr.Labels[ocLabels.LabelKeyReleaseLine],
 			},
 		},
 	}); err != nil {
@@ -167,6 +173,15 @@ func (s *workflowRunServiceWithAuthz) DeleteWorkflowRun(ctx context.Context, nam
 }
 
 func (s *workflowRunServiceWithAuthz) GetWorkflowRunLogs(ctx context.Context, namespaceName, runName, taskName string, sinceSeconds *int64) ([]models.WorkflowRunLogEntry, error) {
+	params := map[string]any{}
+	if taskName != "" {
+		params["task"] = taskName
+	}
+	if sinceSeconds != nil {
+		params["sinceSeconds"] = *sinceSeconds
+	}
+	audit.SetRequest(ctx, params)
+
 	wr, err := s.internal.GetWorkflowRun(ctx, namespaceName, runName)
 	if err != nil {
 		return nil, err
@@ -176,10 +191,16 @@ func (s *workflowRunServiceWithAuthz) GetWorkflowRunLogs(ctx context.Context, na
 		ResourceType: resourceTypeWorkflowRun,
 		ResourceID:   runName,
 		Hierarchy:    constructHierarchyForAuthzCheck(namespaceName, wr.Labels),
+		Context:      authz.Context{Resource: authz.ResourceAttribute{ReleaseLine: wr.Labels[ocLabels.LabelKeyReleaseLine]}},
 	}); err != nil {
 		return nil, err
 	}
-	return s.internal.GetWorkflowRunLogs(ctx, namespaceName, runName, taskName, sinceSeconds)
+	entries, err := s.internal.GetWorkflowRunLogs(ctx, namespaceName, runName, taskName, sinceSeconds)
+	if err != nil {
+		return nil, err
+	}
+	audit.SetReturned(ctx, audit.Returned{Count: len(entries)})
+	return entries, nil
 }
 
 func (s *workflowRunServiceWithAuthz) GetWorkflowRunEvents(ctx context.Context, namespaceName, runName, taskName string) ([]models.WorkflowRunEventEntry, error) {
@@ -192,6 +213,7 @@ func (s *workflowRunServiceWithAuthz) GetWorkflowRunEvents(ctx context.Context, 
 		ResourceType: resourceTypeWorkflowRun,
 		ResourceID:   runName,
 		Hierarchy:    constructHierarchyForAuthzCheck(namespaceName, wr.Labels),
+		Context:      authz.Context{Resource: authz.ResourceAttribute{ReleaseLine: wr.Labels[ocLabels.LabelKeyReleaseLine]}},
 	}); err != nil {
 		return nil, err
 	}
@@ -208,13 +230,14 @@ func (s *workflowRunServiceWithAuthz) GetWorkflowRunStatus(ctx context.Context, 
 		ResourceType: resourceTypeWorkflowRun,
 		ResourceID:   runName,
 		Hierarchy:    constructHierarchyForAuthzCheck(namespaceName, wr.Labels),
+		Context:      authz.Context{Resource: authz.ResourceAttribute{ReleaseLine: wr.Labels[ocLabels.LabelKeyReleaseLine]}},
 	}); err != nil {
 		return nil, err
 	}
 	return s.internal.GetWorkflowRunStatus(ctx, namespaceName, runName)
 }
 
-func (s *workflowRunServiceWithAuthz) TriggerWorkflow(ctx context.Context, namespaceName, projectName, componentName, commit string) (*models.WorkflowRunTriggerResponse, error) {
+func (s *workflowRunServiceWithAuthz) TriggerWorkflow(ctx context.Context, namespaceName, projectName, componentName, commit, releaseLine string) (*models.WorkflowRunTriggerResponse, error) {
 	// Resolve the component's workflow reference for the authz check
 	var workflowAttr string
 	var comp openchoreov1alpha1.Component
@@ -228,22 +251,30 @@ func (s *workflowRunServiceWithAuthz) TriggerWorkflow(ctx context.Context, names
 		workflowAttr = formatWorkflowAttr(namespaceName, comp.Spec.Workflow.Kind, comp.Spec.Workflow.Name)
 	}
 
+	// Authorize against the component's own project, so project-scoped bindings apply even to callers that
+	// address the component without its project.
+	authzProject := comp.Spec.Owner.ProjectName
+	if authzProject == "" {
+		authzProject = projectName
+	}
+
 	if err := s.authz.Check(ctx, services.CheckRequest{
 		Action:       authz.ActionCreateWorkflowRun,
 		ResourceType: resourceTypeWorkflowRun,
 		ResourceID:   componentName,
 		Hierarchy: authz.ResourceHierarchy{
 			Namespace: namespaceName,
-			Project:   projectName,
+			Project:   authzProject,
 			Component: componentName,
 		},
 		Context: authz.Context{
 			Resource: authz.ResourceAttribute{
-				Workflow: workflowAttr,
+				Workflow:    workflowAttr,
+				ReleaseLine: releaseLine,
 			},
 		},
 	}); err != nil {
 		return nil, err
 	}
-	return s.internal.TriggerWorkflow(ctx, namespaceName, projectName, componentName, commit)
+	return s.internal.TriggerWorkflow(ctx, namespaceName, projectName, componentName, commit, releaseLine)
 }

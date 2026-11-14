@@ -165,7 +165,7 @@ func resolveServiceURLs(
 
 		if idx, ok := existingByName[name]; ok {
 			result[idx].ServiceURL = svcURL
-			result[idx].Type = ep.Type
+			result[idx].Type = ep.EffectiveProtocol()
 		}
 	}
 
@@ -178,7 +178,7 @@ func resolveServiceURLs(
 		}
 		result = append(result, openchoreov1alpha1.EndpointURLStatus{
 			Name:       name,
-			Type:       ep.Type,
+			Type:       ep.EffectiveProtocol(),
 			ServiceURL: svcURL,
 		})
 	}
@@ -195,7 +195,7 @@ func buildServiceURL(svc *serviceInfo, ep openchoreov1alpha1.WorkloadEndpoint) *
 	for _, svcPort := range svc.ports {
 		if svcPort == ep.Port {
 			return &openchoreov1alpha1.EndpointURL{
-				Scheme: schemeForEndpointType(ep.Type),
+				Scheme: schemeForEndpointType(ep.EffectiveProtocol()),
 				Host:   fmt.Sprintf("%s.%s.%s", svc.name, svc.namespace, clusterLocalSuffix),
 				Port:   svcPort,
 				Path:   ep.BasePath,
@@ -206,18 +206,18 @@ func buildServiceURL(svc *serviceInfo, ep openchoreov1alpha1.WorkloadEndpoint) *
 }
 
 // schemeForEndpointType returns the URL scheme appropriate for the given endpoint type.
-func schemeForEndpointType(epType openchoreov1alpha1.EndpointType) string {
+func schemeForEndpointType(epType openchoreov1alpha1.EndpointProtocol) string {
 	switch epType {
-	case openchoreov1alpha1.EndpointTypeHTTP,
-		openchoreov1alpha1.EndpointTypeGraphQL:
+	case openchoreov1alpha1.EndpointProtocolHTTP,
+		openchoreov1alpha1.EndpointProtocolGraphQL:
 		return schemeHTTP
-	case openchoreov1alpha1.EndpointTypeWebsocket:
+	case openchoreov1alpha1.EndpointProtocolWebsocket:
 		return schemeWS
-	case openchoreov1alpha1.EndpointTypeGRPC:
+	case openchoreov1alpha1.EndpointProtocolGRPC:
 		return schemeGRPC
-	case openchoreov1alpha1.EndpointTypeTCP:
+	case openchoreov1alpha1.EndpointProtocolTCP:
 		return schemeTCP
-	case openchoreov1alpha1.EndpointTypeUDP:
+	case openchoreov1alpha1.EndpointProtocolUDP:
 		return schemeUDP
 	default:
 		return schemeHTTP

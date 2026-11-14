@@ -39,6 +39,37 @@ func TestLoad_FinOpsAdapterEnvOverride(t *testing.T) {
 	assert.Equal(t, 45*time.Second, cfg.Adapters.FinOpsAdapterTimeout)
 }
 
+func TestLoad_TracingRawQueryDefaults(t *testing.T) {
+	cfg, err := Load()
+	require.NoError(t, err, "Failed to load config")
+
+	assert.Equal(t, 30*time.Second, cfg.Adapters.TracingRawQueryTimeout)
+	assert.Equal(t, int64(1<<20), cfg.Adapters.TracingRawQueryMaxRequestBytes)
+	assert.Equal(t, int64(10<<20), cfg.Adapters.TracingRawQueryMaxResponseBytes)
+	assert.Equal(t, 4, cfg.Adapters.TracingRawQueryMaxConcurrent)
+	assert.Equal(t, 10, cfg.Adapters.TracingRawQueryRequestsPerMinute)
+	assert.Equal(t, 5, cfg.Adapters.TracingRawQueryBurst)
+}
+
+func TestLoad_TracingRawQueryEnvOverride(t *testing.T) {
+	t.Setenv("TRACING_RAW_QUERY_TIMEOUT", "20s")
+	t.Setenv("TRACING_RAW_QUERY_MAX_REQUEST_BYTES", "4096")
+	t.Setenv("TRACING_RAW_QUERY_MAX_RESPONSE_BYTES", "1048576")
+	t.Setenv("TRACING_RAW_QUERY_MAX_CONCURRENT", "0")
+	t.Setenv("TRACING_RAW_QUERY_REQUESTS_PER_MINUTE", "30")
+	t.Setenv("TRACING_RAW_QUERY_BURST", "10")
+
+	cfg, err := Load()
+	require.NoError(t, err, "Failed to load config")
+
+	assert.Equal(t, 20*time.Second, cfg.Adapters.TracingRawQueryTimeout)
+	assert.Equal(t, int64(4096), cfg.Adapters.TracingRawQueryMaxRequestBytes)
+	assert.Equal(t, int64(1<<20), cfg.Adapters.TracingRawQueryMaxResponseBytes)
+	assert.Equal(t, 0, cfg.Adapters.TracingRawQueryMaxConcurrent)
+	assert.Equal(t, 30, cfg.Adapters.TracingRawQueryRequestsPerMinute)
+	assert.Equal(t, 10, cfg.Adapters.TracingRawQueryBurst)
+}
+
 func TestLoad_WithEnvironmentVariables(t *testing.T) {
 	t.Setenv("SERVER_PORT", "8080")
 	t.Setenv("LOG_LEVEL", "debug")
@@ -138,10 +169,16 @@ func TestValidate(t *testing.T) {
 				Timeout:           30 * time.Second,
 			},
 			Adapters: AdaptersConfig{
-				MetricsAdapterURL:     "http://localhost:9090",
-				MetricsAdapterTimeout: 30 * time.Second,
-				FinOpsAdapterURL:      "http://localhost:9101",
-				FinOpsAdapterTimeout:  30 * time.Second,
+				MetricsAdapterURL:                "http://localhost:9090",
+				MetricsAdapterTimeout:            30 * time.Second,
+				FinOpsAdapterURL:                 "http://localhost:9101",
+				FinOpsAdapterTimeout:             30 * time.Second,
+				TracingRawQueryTimeout:           30 * time.Second,
+				TracingRawQueryMaxRequestBytes:   1 << 20,
+				TracingRawQueryMaxResponseBytes:  10 << 20,
+				TracingRawQueryMaxConcurrent:     4,
+				TracingRawQueryRequestsPerMinute: 10,
+				TracingRawQueryBurst:             5,
 			},
 		}
 	}
@@ -155,6 +192,53 @@ func TestValidate(t *testing.T) {
 			name:      "valid config",
 			mutate:    func(c *Config) {},
 			expectErr: false,
+		},
+		{
+			name:      "raw trace query timeout must be positive",
+			mutate:    func(c *Config) { c.Adapters.TracingRawQueryTimeout = 0 },
+			expectErr: true,
+		},
+		{
+			name:      "raw trace query max request bytes must be positive",
+			mutate:    func(c *Config) { c.Adapters.TracingRawQueryMaxRequestBytes = 0 },
+			expectErr: true,
+		},
+		{
+			name:      "raw trace query max response bytes must be positive",
+			mutate:    func(c *Config) { c.Adapters.TracingRawQueryMaxResponseBytes = 0 },
+			expectErr: true,
+		},
+		{
+			name: "raw trace query limits may be turned off",
+			mutate: func(c *Config) {
+				c.Adapters.TracingRawQueryMaxConcurrent = 0
+				c.Adapters.TracingRawQueryRequestsPerMinute = 0
+				c.Adapters.TracingRawQueryBurst = 0
+			},
+			expectErr: false,
+		},
+		{
+			name:      "raw trace query max concurrent must not be negative",
+			mutate:    func(c *Config) { c.Adapters.TracingRawQueryMaxConcurrent = -1 },
+			expectErr: true,
+		},
+		{
+			name:      "raw trace query requests per minute must not be negative",
+			mutate:    func(c *Config) { c.Adapters.TracingRawQueryRequestsPerMinute = -1 },
+			expectErr: true,
+		},
+		{
+			name:      "raw trace query burst must not be negative",
+			mutate:    func(c *Config) { c.Adapters.TracingRawQueryBurst = -1 },
+			expectErr: true,
+		},
+		{
+			name: "raw trace query burst must be at least 1 with a rate",
+			mutate: func(c *Config) {
+				c.Adapters.TracingRawQueryRequestsPerMinute = 10
+				c.Adapters.TracingRawQueryBurst = 0
+			},
+			expectErr: true,
 		},
 		{
 			name:      "invalid port - too low",
@@ -180,6 +264,19 @@ func TestValidate(t *testing.T) {
 			name:      "invalid authz timeout",
 			mutate:    func(c *Config) { c.Authz.Timeout = 0 },
 			expectErr: true,
+		},
+		{
+			name:      "missing both client secret and client assertion file",
+			mutate:    func(c *Config) { c.UIDResolver.OAuthClientSecret = "" },
+			expectErr: true,
+		},
+		{
+			name: "client assertion file replaces client secret",
+			mutate: func(c *Config) {
+				c.UIDResolver.OAuthClientSecret = ""
+				c.UIDResolver.OAuthClientAssertionFile = "${AZURE_FEDERATED_TOKEN_FILE}"
+			},
+			expectErr: false,
 		},
 		{
 			name:      "missing metrics adapter URL",

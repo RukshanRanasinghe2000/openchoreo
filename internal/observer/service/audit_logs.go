@@ -151,24 +151,26 @@ func toAuditLogsParams(req *types.AuditLogsQueryRequest) (observability.AuditLog
 			Environments: req.Resource.Environments,
 			Projects:     req.Resource.Projects,
 			Components:   req.Resource.Components,
+			ReleaseLines: req.Resource.ReleaseLines,
 			Resources:    req.Resource.Resources,
 			Names:        req.Resource.Names,
 		},
-		Actions:          req.Actions,
-		Categories:       req.Categories,
-		Results:          req.Results,
-		Producers:        req.Producers,
-		Surfaces:         req.Surfaces,
-		OperationIDs:     req.OperationIDs,
-		RequestIDs:       req.RequestIDs,
-		EventIDs:         req.EventIDs,
-		SourceIPs:        req.SourceIPs,
-		UserAgents:       req.UserAgents,
-		SearchPhrase:     req.SearchPhrase,
-		Limit:            req.Limit,
-		SortOrder:        req.SortOrder,
-		IncludeTimeline:  req.IncludeTimeline,
-		TimelineInterval: req.TimelineInterval,
+		ReturnedItemNames: req.Returned.Items.Names,
+		Actions:           req.Actions,
+		Categories:        req.Categories,
+		Results:           req.Results,
+		Producers:         req.Producers,
+		Surfaces:          req.Surfaces,
+		OperationIDs:      req.OperationIDs,
+		RequestIDs:        req.RequestIDs,
+		EventIDs:          req.EventIDs,
+		SourceIPs:         req.SourceIPs,
+		UserAgents:        req.UserAgents,
+		SearchPhrase:      req.SearchPhrase,
+		Limit:             req.Limit,
+		SortOrder:         req.SortOrder,
+		IncludeTimeline:   req.IncludeTimeline,
+		TimelineInterval:  req.TimelineInterval,
 	}, nil
 }
 
@@ -195,9 +197,29 @@ func toTypesAuditLogRecord(r observability.AuditLogRecord) types.AuditLogRecord 
 		OperationID: r.OperationID,
 		HTTP:        toTypesAuditLogHTTPInfo(r.HTTP),
 		Resource:    toTypesAuditLogResource(r.Resource),
+		Request:     toTypesAuditLogRequest(r.Request),
+		Returned:    toTypesAuditLogReturned(r.Returned),
 		Metadata:    r.Metadata,
 		Collector:   toTypesAuditLogCollectorInfo(r.Collector),
 	}
+}
+
+func toTypesAuditLogRequest(src *observability.AuditLogRequest) *types.AuditLogRequest {
+	if src == nil {
+		return nil
+	}
+	return &types.AuditLogRequest{Parameters: src.Parameters}
+}
+
+func toTypesAuditLogReturned(src *observability.AuditLogReturned) *types.AuditLogReturned {
+	if src == nil {
+		return nil
+	}
+	out := &types.AuditLogReturned{Count: src.Count}
+	for _, item := range src.Items {
+		out.Items = append(out.Items, types.AuditLogReturnedItem(item))
+	}
+	return out
 }
 
 func toTypesAuditLogHTTPInfo(src *observability.AuditLogHTTPInfo) *types.AuditLogHTTPInfo {
@@ -217,6 +239,7 @@ func toTypesAuditLogResource(src *observability.AuditLogResource) *types.AuditLo
 		Environment: src.Environment,
 		Project:     src.Project,
 		Component:   src.Component,
+		ReleaseLine: src.ReleaseLine,
 		Resource:    src.Resource,
 		UID:         src.UID,
 		Name:        src.Name,

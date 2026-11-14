@@ -30,6 +30,7 @@ type AuditLogsResourceFilter struct {
 	Environments []string `json:"environments"`
 	Projects     []string `json:"projects"`
 	Components   []string `json:"components"`
+	ReleaseLines []string `json:"releaseLines"`
 	Resources    []string `json:"resources"`
 	Names        []string `json:"names"`
 }
@@ -56,6 +57,10 @@ type AuditLogsParams struct {
 	EventIDs     []string `json:"eventIds"`
 	SourceIPs    []string `json:"sourceIps"`
 	UserAgents   []string `json:"userAgents"`
+
+	// ReturnedItemNames matches records any of whose returned.items carries one
+	// of these names.
+	ReturnedItemNames []string `json:"returnedItemNames"`
 
 	SearchPhrase string `json:"searchPhrase"`
 
@@ -100,10 +105,32 @@ type AuditLogResource struct {
 	Environment string         `json:"environment,omitempty"`
 	Project     string         `json:"project,omitempty"`
 	Component   string         `json:"component,omitempty"`
+	ReleaseLine string         `json:"release_line,omitempty"`
 	Resource    string         `json:"resource,omitempty"`
 	UID         string         `json:"uid,omitempty"`
 	Name        string         `json:"name,omitempty"`
 	Metadata    map[string]any `json:"metadata,omitempty"`
+}
+
+// AuditLogRequest is what an audited operation was asked for: its own
+// parameters under the API's names.
+type AuditLogRequest struct {
+	Parameters map[string]any `json:"parameters,omitempty"`
+}
+
+// AuditLogReturnedItem identifies one object an operation returned.
+type AuditLogReturnedItem struct {
+	Type      string `json:"type"`
+	Namespace string `json:"namespace,omitempty"`
+	Name      string `json:"name"`
+	UID       string `json:"uid,omitempty"`
+}
+
+// AuditLogReturned is what an operation handed back, never the content. Count
+// is greater than len(Items) when the list was cut.
+type AuditLogReturned struct {
+	Count int                    `json:"count"`
+	Items []AuditLogReturnedItem `json:"items,omitempty"`
 }
 
 // AuditLogCollectorInfo is where a record was collected from, as stamped by the
@@ -134,6 +161,8 @@ type AuditLogRecord struct {
 	OperationID   string                 `json:"operationId,omitempty"`
 	HTTP          *AuditLogHTTPInfo      `json:"http,omitempty"`
 	Resource      *AuditLogResource      `json:"resource,omitempty"`
+	Request       *AuditLogRequest       `json:"request,omitempty"`
+	Returned      *AuditLogReturned      `json:"returned,omitempty"`
 	Metadata      map[string]any         `json:"metadata,omitempty"`
 	Collector     *AuditLogCollectorInfo `json:"collector,omitempty"`
 }

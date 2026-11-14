@@ -1,0 +1,8 @@
+apiVersion: openchoreo.dev/v1alpha1
+kind: Trait
+metadata: {name: autoscaling, namespace: default}
+spec:
+  patches:
+    - target: {group: apps, version: v1, kind: Deployment}
+      operations:
+        - {op: replace, path: /spec/replicas, value: 3}

@@ -63,6 +63,17 @@ type AdaptersConfig struct {
 	TracingAdapterURL     string        `koanf:"tracing.adapter.url"`
 	TracingAdapterTimeout time.Duration `koanf:"tracing.adapter.timeout"`
 
+	// Raw trace queries run in the tracing backend's own query language, so
+	// they are bounded by these limits rather than by a scope.
+	TracingRawQueryTimeout          time.Duration `koanf:"tracing.rawquery.timeout"`
+	TracingRawQueryMaxRequestBytes  int64         `koanf:"tracing.rawquery.max.request.bytes"`
+	TracingRawQueryMaxResponseBytes int64         `koanf:"tracing.rawquery.max.response.bytes"`
+	// Limits on how many raw trace queries run at once and how often each
+	// caller may run them, per Observer replica. Zero turns a limit off.
+	TracingRawQueryMaxConcurrent     int `koanf:"tracing.rawquery.max.concurrent"`
+	TracingRawQueryRequestsPerMinute int `koanf:"tracing.rawquery.requests.per.minute"`
+	TracingRawQueryBurst             int `koanf:"tracing.rawquery.burst"`
+
 	MetricsAdapterURL     string        `koanf:"metrics.adapter.url"`
 	MetricsAdapterTimeout time.Duration `koanf:"metrics.adapter.timeout"`
 
@@ -180,8 +191,15 @@ type UIDResolverConfig struct {
 	OAuthTokenURL string `koanf:"oauth.token.url"`
 	// OAuthClientID is the OAuth2 client ID for authentication
 	OAuthClientID string `koanf:"oauth.client.id"`
-	// OAuthClientSecret is the OAuth2 client secret for authentication
+	// OAuthClientSecret is the OAuth2 client secret for authentication.
+	// Ignored when OAuthClientAssertionFile is set.
 	OAuthClientSecret string `koanf:"oauth.client.secret"`
+	// OAuthClientAssertionFile is the path to a file holding a JWT client assertion
+	// (RFC 7523) presented instead of a client secret. Set this to authenticate with a
+	// platform-projected identity token, such as Azure Workload Identity or EKS IRSA.
+	// Environment variable references are expanded, so ${AZURE_FEDERATED_TOKEN_FILE}
+	// follows the path the Azure Workload Identity webhook injects.
+	OAuthClientAssertionFile string `koanf:"oauth.client.assertion.file"`
 	// OAuthScope is the optional OAuth2 scope to request in the token request
 	OAuthScope string `koanf:"oauth.scope"`
 	// TLSInsecureSkipVerify skips TLS certificate verification (for development)
@@ -269,6 +287,12 @@ func Load() (*Config, error) {
 		"LOGS_ADAPTER_TIMEOUT":                      "adapters.logs.adapter.timeout",
 		"TRACING_ADAPTER_URL":                       "adapters.tracing.adapter.url",
 		"TRACING_ADAPTER_TIMEOUT":                   "adapters.tracing.adapter.timeout",
+		"TRACING_RAW_QUERY_TIMEOUT":                 "adapters.tracing.rawquery.timeout",
+		"TRACING_RAW_QUERY_MAX_REQUEST_BYTES":       "adapters.tracing.rawquery.max.request.bytes",
+		"TRACING_RAW_QUERY_MAX_RESPONSE_BYTES":      "adapters.tracing.rawquery.max.response.bytes",
+		"TRACING_RAW_QUERY_MAX_CONCURRENT":          "adapters.tracing.rawquery.max.concurrent",
+		"TRACING_RAW_QUERY_REQUESTS_PER_MINUTE":     "adapters.tracing.rawquery.requests.per.minute",
+		"TRACING_RAW_QUERY_BURST":                   "adapters.tracing.rawquery.burst",
 		"METRICS_ADAPTER_URL":                       "adapters.metrics.adapter.url",
 		"METRICS_ADAPTER_TIMEOUT":                   "adapters.metrics.adapter.timeout",
 		"FINOPS_ADAPTER_URL":                        "adapters.finops.adapter.url",
@@ -277,6 +301,7 @@ func Load() (*Config, error) {
 		"UID_RESOLVER_OAUTH_TOKEN_URL":              "uid_resolver.oauth.token.url",
 		"UID_RESOLVER_OAUTH_CLIENT_ID":              "uid_resolver.oauth.client.id",
 		"UID_RESOLVER_OAUTH_CLIENT_SECRET":          "uid_resolver.oauth.client.secret",
+		"UID_RESOLVER_OAUTH_CLIENT_ASSERTION_FILE":  "uid_resolver.oauth.client.assertion.file",
 		"UID_RESOLVER_OAUTH_SCOPE":                  "uid_resolver.oauth.scope",
 		"UID_RESOLVER_TLS_INSECURE_SKIP_VERIFY":     "uid_resolver.tls.insecure.skip.verify",
 		"UID_RESOLVER_TIMEOUT":                      "uid_resolver.timeout",
@@ -442,10 +467,19 @@ func getDefaults() map[string]interface{} {
 			"logs.adapter.timeout":    "30s",
 			"tracing.adapter.url":     "http://tracing-adapter:9100",
 			"tracing.adapter.timeout": "30s",
-			"metrics.adapter.url":     "http://metrics-adapter:9099",
-			"metrics.adapter.timeout": "30s",
-			"finops.adapter.url":      "http://finops-adapter:9101",
-			"finops.adapter.timeout":  "30s",
+
+			"tracing.rawquery.timeout":            "30s",
+			"tracing.rawquery.max.request.bytes":  1024 * 1024,
+			"tracing.rawquery.max.response.bytes": 10 * 1024 * 1024,
+			"metrics.adapter.url":                 "http://metrics-adapter:9099",
+			"metrics.adapter.timeout":             "30s",
+			"finops.adapter.url":                  "http://finops-adapter:9101",
+			"finops.adapter.timeout":              "30s",
+
+			// Raw trace query limits, per Observer replica; 0 turns a limit off.
+			"tracing.rawquery.max.concurrent":      4,
+			"tracing.rawquery.requests.per.minute": 10,
+			"tracing.rawquery.burst":               5,
 		},
 		"uid_resolver": map[string]interface{}{
 			"openchoreo.api.url":       "http://api.openchoreo.localhost:9099",
@@ -561,14 +595,39 @@ func (c *Config) validateUIDResolver() error {
 	if c.UIDResolver.OAuthClientID == "" {
 		return fmt.Errorf("uid resolver oauth client ID is required")
 	}
-	if c.UIDResolver.OAuthClientSecret == "" {
-		return fmt.Errorf("uid resolver oauth client secret is required")
+	if c.UIDResolver.OAuthClientSecret == "" && c.UIDResolver.OAuthClientAssertionFile == "" {
+		return fmt.Errorf("uid resolver oauth client secret or client assertion file is required")
 	}
 	if c.UIDResolver.Timeout <= 0 {
 		return fmt.Errorf("uid resolver timeout must be positive")
 	}
 	if c.UIDResolver.MaxAuthRetry < 0 {
 		return fmt.Errorf("uid resolver max.auth.retry must be non-negative")
+	}
+	return nil
+}
+
+func (c *Config) validateTracingRawQuery() error {
+	if c.Adapters.TracingRawQueryTimeout <= 0 {
+		return fmt.Errorf("tracing raw query timeout must be positive")
+	}
+	if c.Adapters.TracingRawQueryMaxRequestBytes <= 0 {
+		return fmt.Errorf("tracing raw query max request bytes must be positive")
+	}
+	if c.Adapters.TracingRawQueryMaxResponseBytes <= 0 {
+		return fmt.Errorf("tracing raw query max response bytes must be positive")
+	}
+	if c.Adapters.TracingRawQueryMaxConcurrent < 0 {
+		return fmt.Errorf("tracing raw query max concurrent must not be negative")
+	}
+	if c.Adapters.TracingRawQueryRequestsPerMinute < 0 {
+		return fmt.Errorf("tracing raw query requests per minute must not be negative")
+	}
+	if c.Adapters.TracingRawQueryBurst < 0 {
+		return fmt.Errorf("tracing raw query burst must not be negative")
+	}
+	if c.Adapters.TracingRawQueryRequestsPerMinute > 0 && c.Adapters.TracingRawQueryBurst < 1 {
+		return fmt.Errorf("tracing raw query burst must be at least 1 when requests per minute is set")
 	}
 	return nil
 }
@@ -608,6 +667,10 @@ func (c *Config) validate() error {
 		return err
 	}
 	if err := c.validateDeliveryInsights(); err != nil {
+		return err
+	}
+
+	if err := c.validateTracingRawQuery(); err != nil {
 		return err
 	}
 

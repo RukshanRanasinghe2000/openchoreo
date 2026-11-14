@@ -18,20 +18,10 @@ server:
       bao write auth/kubernetes/config \
         kubernetes_host="https://$KUBERNETES_PORT_443_TCP_ADDR:443"
 
-      bao policy write openchoreo-secret-reader-policy - <<POLICY
-      path "secret/data/*" { capabilities = ["read"] }
-      path "secret/metadata/*" { capabilities = ["list", "read"] }
-      POLICY
-
       bao policy write openchoreo-secret-writer-policy - <<POLICY
       path "secret/data/*" { capabilities = ["create", "read", "update", "delete"] }
       path "secret/metadata/*" { capabilities = ["create", "read", "update", "delete", "list"] }
       POLICY
-
-      bao write auth/kubernetes/role/openchoreo-secret-reader-role \
-        bound_service_account_names=default \
-        bound_service_account_namespaces="dp*" \
-        policies=openchoreo-secret-reader-policy ttl=20m
 
       bao write auth/kubernetes/role/openchoreo-secret-writer-role \
         bound_service_account_names="*" \
@@ -61,6 +51,9 @@ server:
       # OpenSearch (observability)
       bao kv put secret/opensearch-username value="admin"
       bao kv put secret/opensearch-password value="ThisIsTheOpenSearchPassword1"
+      # Read-only OpenSearch user for raw trace queries (observability-tracing-opensearch)
+      bao kv put secret/opensearch-raw-query-username value="openchoreo-traces-reader"
+      bao kv put secret/opensearch-raw-query-password value="ThisIsTheTracesReaderPassword1"
       # OpenObserve (observability)
       bao kv put secret/openobserve-admin-email value="admin@openchoreo.localhost"
       bao kv put secret/openobserve-admin-password value="ThisIsTheOpenObservePassword1!"

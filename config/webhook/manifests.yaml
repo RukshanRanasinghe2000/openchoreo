@@ -124,6 +124,26 @@ webhooks:
     resources:
     - workflows
   sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-openchoreo-dev-v1alpha1-workload
+  failurePolicy: Fail
+  name: mworkload-v1alpha1.kb.io
+  rules:
+  - apiGroups:
+    - openchoreo.dev
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - workloads
+  sideEffects: None
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
@@ -189,6 +209,26 @@ webhooks:
     - UPDATE
     resources:
     - clustercomponenttypes
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-openchoreo-dev-v1alpha1-clusterendpointtype
+  failurePolicy: Fail
+  name: vclusterendpointtype-v1alpha1.kb.io
+  rules:
+  - apiGroups:
+    - openchoreo.dev
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - clusterendpointtypes
   sideEffects: None
 - admissionReviewVersions:
   - v1
@@ -316,6 +356,46 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /validate-openchoreo-dev-v1alpha1-endpointrelease
+  failurePolicy: Fail
+  name: vendpointrelease-v1alpha1.kb.io
+  rules:
+  - apiGroups:
+    - openchoreo.dev
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - endpointreleases
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-openchoreo-dev-v1alpha1-endpointtype
+  failurePolicy: Fail
+  name: vendpointtype-v1alpha1.kb.io
+  rules:
+  - apiGroups:
+    - openchoreo.dev
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - endpointtypes
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /validate-openchoreo-dev-v1alpha1-project
   failurePolicy: Fail
   name: vproject-v1alpha1.kb.io
@@ -429,4 +509,24 @@ webhooks:
     - UPDATE
     resources:
     - workflows
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-openchoreo-dev-v1alpha1-workload
+  failurePolicy: Fail
+  name: vworkload-v1alpha1.kb.io
+  rules:
+  - apiGroups:
+    - openchoreo.dev
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - workloads
   sideEffects: None
