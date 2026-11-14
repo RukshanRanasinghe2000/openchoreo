@@ -152,7 +152,7 @@ func TestConfiguredCatalogsAndFallback(t *testing.T) {
 	root := t.TempDir()
 	key := schema.GroupVersionKind{Group: "example.com", Version: "v1", Kind: "Widget"}
 	for _, v3 := range []bool{false, true} {
-		sources := map[string][]byte{filepath.Join(root, ConfigName): []byte("version: 1\nkubernetesSchemaVersion: '1.36.3'\nschemaCatalogs: [schemas/one.json]\n"), filepath.Join(root, "schemas", "one.json"): openAPICatalog(v3, "string"), filepath.Join(root, "widget.yaml"): []byte(sampleCRD)}
+		sources := map[string][]byte{filepath.Join(root, ConfigName): []byte("version: 1\nkubernetesSchemaVersion: '1.36.4'\nschemaCatalogs: [schemas/one.json]\n"), filepath.Join(root, "schemas", "one.json"): openAPICatalog(v3, "string"), filepath.Join(root, "widget.yaml"): []byte(sampleCRD)}
 		resolver := NewScope(root, sources)
 		found, err := resolver.Resolve(key)
 		if err != nil || found == nil || found.Properties["spec"].Properties["count"].Type != "string" {

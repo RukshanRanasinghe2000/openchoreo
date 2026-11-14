@@ -79,19 +79,19 @@ type Container struct {
 	Files []FileVar `json:"files,omitempty"`
 }
 
-// EndpointType defines the different API technologies supported by the endpoint
-type EndpointType string
+// EndpointProtocol defines the different API technologies supported by the endpoint
+type EndpointProtocol string
 
 const (
-	EndpointTypeHTTP      EndpointType = "HTTP"
-	EndpointTypeGraphQL   EndpointType = "GraphQL"
-	EndpointTypeWebsocket EndpointType = "Websocket"
-	EndpointTypeGRPC      EndpointType = "gRPC"
-	EndpointTypeTCP       EndpointType = "TCP"
-	EndpointTypeUDP       EndpointType = "UDP"
+	EndpointProtocolHTTP      EndpointProtocol = "HTTP"
+	EndpointProtocolGraphQL   EndpointProtocol = "GraphQL"
+	EndpointProtocolWebsocket EndpointProtocol = "Websocket"
+	EndpointProtocolGRPC      EndpointProtocol = "gRPC"
+	EndpointProtocolTCP       EndpointProtocol = "TCP"
+	EndpointProtocolUDP       EndpointProtocol = "UDP"
 )
 
-func (e EndpointType) String() string {
+func (e EndpointProtocol) String() string {
 	return string(e)
 }
 
@@ -118,14 +118,27 @@ const (
 type WorkloadEndpoint struct {
 	// Visibility is an array of additional endpoint visibilities beyond the implicit project visibility.
 	// Every endpoint always gets project visibility. This array adds extra scopes.
+	//
+	// Deprecated: expose the endpoint through an Endpoint, whose spec.visibility
+	// carries the requested visibilities. Still honored by ComponentType templates
+	// that read it; new clients do not set it.
 	// +optional
 	// +listType=set
 	Visibility []EndpointVisibility `json:"visibility,omitempty"`
 
-	// Type indicates the protocol/technology of the endpoint.
-	// +kubebuilder:validation:Required
+	// Protocol is the protocol the endpoint serves. Replaces type; the admission
+	// webhook keeps the two equal, and one of them must be set.
+	// +optional
 	// +kubebuilder:validation:Enum=HTTP;gRPC;GraphQL;Websocket;TCP;UDP
-	Type EndpointType `json:"type"`
+	Protocol EndpointProtocol `json:"protocol,omitempty"`
+
+	// Type indicates the protocol/technology of the endpoint.
+	//
+	// Deprecated: use protocol. The admission webhook copies one to the other, so
+	// readers of either keep working; read it through EffectiveProtocol.
+	// +optional
+	// +kubebuilder:validation:Enum=HTTP;gRPC;GraphQL;Websocket;TCP;UDP
+	Type EndpointProtocol `json:"type,omitempty"`
 
 	// Port exposed by the endpoint. If targetPort is not set, platform defaults to port for both.
 	// +kubebuilder:validation:Required
@@ -152,6 +165,18 @@ type WorkloadEndpoint struct {
 	Schema *Schema `json:"schema,omitempty"`
 }
 
+// EffectiveProtocol returns the endpoint's protocol: protocol when set,
+// otherwise the deprecated type. Objects stored before protocol existed, and
+// ComponentRelease snapshots of them, carry only type, so every reader goes
+// through this rather than either field.
+func (e WorkloadEndpoint) EffectiveProtocol() EndpointProtocol {
+	if e.Protocol != "" {
+		return e.Protocol
+	}
+	//nolint:staticcheck // deprecated field still supported for backward compatibility
+	return e.Type
+}
+
 // Schema defines the API definition for an endpoint.
 type Schema struct {
 	Type    string `json:"type,omitempty"`
@@ -170,6 +195,15 @@ type WorkloadConnection struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength=1
 	Component string `json:"component"`
+
+	// ReleaseLine is the target component's release line. Empty targets its main line.
+	// It never follows the consumer's own line.
+	// +optional
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:XValidation:rule="self != 'main'",message="main is the implicit line; omit releaseLine for it"
+	// +kubebuilder:validation:XValidation:rule="self != 'default'",message="default is a reserved name; omit releaseLine for the main line"
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	ReleaseLine string `json:"releaseLine,omitempty"`
 
 	// Name is the target endpoint name on the target component.
 	// +kubebuilder:validation:Required
@@ -336,6 +370,15 @@ type WorkloadOwner struct {
 	ProjectName string `json:"projectName"`
 	// +kubebuilder:validation:MinLength=1
 	ComponentName string `json:"componentName"`
+
+	// ReleaseLine names the ReleaseLine this resource belongs to.
+	// Empty for the component's main line, which is implicit and has no ReleaseLine.
+	// +optional
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:XValidation:rule="self != 'main'",message="main is the implicit line; omit releaseLine for it"
+	// +kubebuilder:validation:XValidation:rule="self != 'default'",message="default is a reserved name; omit releaseLine for the main line"
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+	ReleaseLine string `json:"releaseLine,omitempty"`
 }
 
 type WorkloadSpec struct {

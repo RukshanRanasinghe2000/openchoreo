@@ -40,7 +40,7 @@ Export the versions used by the commands in this guide. Run this in every shell 
 export GATEWAY_API_VERSION=v1.5.1
 export CERT_MANAGER_VERSION=v1.19.4
 export ESO_VERSION=2.0.1
-export KGATEWAY_VERSION=v2.3.1
+export KGATEWAY_VERSION=v2.3.11
 export THUNDER_VERSION=1.0.1
 export OPENSEARCH_OPERATOR_VERSION=2.8.0
 
@@ -542,7 +542,8 @@ Install the logs, metrics, and tracing community modules. The steps below use Op
 
 ##### Pre-requisites
 
-Create the `opensearch-admin-credentials` secret needed by the logs and tracing modules:
+Create the `opensearch-admin-credentials` secret needed by the logs and tracing modules, and the
+`opensearch-traces-users` secret with the read-only user that raw trace queries run as:
 
 ```bash
 kubectl --context k3d-openchoreo-op apply -f - <<EOF
@@ -566,6 +567,28 @@ spec:
   - secretKey: password
     remoteRef:
       key: opensearch-password
+      property: value
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: opensearch-traces-users
+  namespace: openchoreo-observability-plane
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: default
+  target:
+    name: opensearch-traces-users
+  data:
+  - secretKey: rawQueryUsername
+    remoteRef:
+      key: opensearch-raw-query-username
+      property: value
+  - secretKey: rawQueryPassword
+    remoteRef:
+      key: opensearch-raw-query-password
       property: value
 EOF
 ```
@@ -840,7 +863,8 @@ helm upgrade --install observability-metrics-prometheus \
   --set global.installationMode="multiClusterExporter" \
   --set prometheusCustomizations.http.observabilityPlaneUrl=http://host.k3d.internal:11080/api/v1/write \
   --set kube-prometheus-stack.prometheus.enabled=false \
-  --set kube-prometheus-stack.alertmanager.enabled=false
+  --set kube-prometheus-stack.alertmanager.enabled=false \
+  --set-json 'kube-prometheus-stack.kubelet.serviceMonitor.authorization=null'
 ```
 
 ##### Cost (finops-opencost)
@@ -874,6 +898,8 @@ spec:
       value: |
 $(echo "$AGENT_CA" | sed 's/^/        /')
   observerURL: http://observer.openchoreo.localhost:11080
+  secretStoreRef:
+    name: default
 EOF
 ```
 

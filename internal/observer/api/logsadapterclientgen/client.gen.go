@@ -80,6 +80,7 @@ const (
 	ResourceName        AuditLogFilterValuesRequestFilter = "resource.name"
 	ResourceNamespace   AuditLogFilterValuesRequestFilter = "resource.namespace"
 	ResourceProject     AuditLogFilterValuesRequestFilter = "resource.project"
+	ResourceReleaseLine AuditLogFilterValuesRequestFilter = "resource.release_line"
 	ResourceResource    AuditLogFilterValuesRequestFilter = "resource.resource"
 	ResourceType        AuditLogFilterValuesRequestFilter = "resource.type"
 	Result              AuditLogFilterValuesRequestFilter = "result"
@@ -201,6 +202,9 @@ type AlertRuleRequest struct {
 
 		// ProjectUid The OpenChoreo project UID to query
 		ProjectUid openapi_types.UUID `json:"projectUid"`
+
+		// ReleaseLineUid The UID of the component's release line the rule evaluates, filtered on the openchoreo.dev/release-line-uid label alone. Absent for the component's main line, which componentUid covers. Adapters that scope the rule to it set the OpenChoreo-Release-Line-Applied response header to "true".
+		ReleaseLineUid *openapi_types.UUID `json:"releaseLineUid,omitempty"`
 	} `json:"metadata"`
 	Source struct {
 		// Query The query to execute for log based alerts
@@ -472,6 +476,10 @@ type AuditLogRecord struct {
 	// Producer Emitting service, e.g. `openchoreo-api`
 	Producer *string `json:"producer,omitempty"`
 
+	// Request What the operation was asked for, on reads audited under `access`. Stored but
+	// not indexed; an adapter returns it and needs no filter on it.
+	Request *AuditLogRequest `json:"request,omitempty"`
+
 	// RequestId Correlates this record with the access log line for the same request
 	RequestId *string `json:"request_id,omitempty"`
 
@@ -483,7 +491,10 @@ type AuditLogRecord struct {
 	// policy) at schema 1.0.
 	Result string `json:"result"`
 
-	// SchemaVersion Schema of this record. `major.minor`; major on a field removal or a changed value representation, minor on an addition.
+	// Returned What the operation handed back, never the content. Present only on success.
+	Returned *AuditLogReturned `json:"returned,omitempty"`
+
+	// SchemaVersion Schema of this record. `major.minor`; major on a field removal or a changed value representation, minor on an addition. Served as stored, so an adapter that doesn't know a group added since still returns the producer's version.
 	SchemaVersion string  `json:"schema_version"`
 	SourceIp      *string `json:"source_ip,omitempty"`
 
@@ -494,6 +505,14 @@ type AuditLogRecord struct {
 	// UserAgent Client-supplied and unverifiable, like `source_ip`. The only field that
 	// separates a portal session from occ, CI or an agent.
 	UserAgent *string `json:"user_agent,omitempty"`
+}
+
+// AuditLogRequest What the operation was asked for, on reads audited under `access`. Stored but
+// not indexed; an adapter returns it and needs no filter on it.
+type AuditLogRequest struct {
+	// Parameters The operation's own parameters under the API's names, nested where the API
+	// nests them. Returned with the same keys and nesting it was published with.
+	Parameters *map[string]interface{} `json:"parameters,omitempty"`
 }
 
 // AuditLogResource The target resource, and the point in OpenChoreo's tree the decision was
@@ -507,12 +526,30 @@ type AuditLogResource struct {
 	Name        *string                 `json:"name,omitempty"`
 	Namespace   *string                 `json:"namespace,omitempty"`
 	Project     *string                 `json:"project,omitempty"`
-	Resource    *string                 `json:"resource,omitempty"`
-	Type        *string                 `json:"type,omitempty"`
+
+	// ReleaseLine The component's release line. Absent for its main line
+	ReleaseLine *string `json:"release_line,omitempty"`
+	Resource    *string `json:"resource,omitempty"`
+	Type        *string `json:"type,omitempty"`
 
 	// Uid Server-generated identifier that is never reused. Absent when the operation
 	// returned no object — a delete, or a non-CRUD mutation.
 	Uid *string `json:"uid,omitempty"`
+}
+
+// AuditLogReturned What the operation handed back, never the content. Present only on success.
+type AuditLogReturned struct {
+	// Count Entries returned. Greater than the number of `items` when the list was cut.
+	Count int                     `json:"count"`
+	Items *[]AuditLogReturnedItem `json:"items,omitempty"`
+}
+
+// AuditLogReturnedItem defines model for AuditLogReturnedItem.
+type AuditLogReturnedItem struct {
+	Name      string  `json:"name"`
+	Namespace *string `json:"namespace,omitempty"`
+	Type      string  `json:"type"`
+	Uid       *string `json:"uid,omitempty"`
 }
 
 // AuditLogTimeline Per-interval counts across the queried window, broken down by `result`. Returned
@@ -643,6 +680,9 @@ type AuditLogsQueryRequest struct {
 	// Result Outcomes. Closed, for the same reason as `category`.
 	Result *[]AuditLogsQueryRequestResult `json:"result,omitempty"`
 
+	// Returned Filters on the record's `returned` group, named and nested as the record is.
+	Returned *AuditLogsReturnedFilter `json:"returned,omitempty"`
+
 	// SearchPhrase Free text to match within the record
 	SearchPhrase *string `json:"searchPhrase,omitempty"`
 
@@ -697,9 +737,10 @@ type AuditLogsResourceFilter struct {
 	Name *[]string `json:"name,omitempty"`
 
 	// Namespace OpenChoreo namespaces
-	Namespace *[]string `json:"namespace,omitempty"`
-	Project   *[]string `json:"project,omitempty"`
-	Resource  *[]string `json:"resource,omitempty"`
+	Namespace   *[]string `json:"namespace,omitempty"`
+	Project     *[]string `json:"project,omitempty"`
+	ReleaseLine *[]string `json:"release_line,omitempty"`
+	Resource    *[]string `json:"resource,omitempty"`
 
 	// Type Resource kinds
 	Type *[]string `json:"type,omitempty"`
@@ -724,6 +765,20 @@ type AuditLogsResponse struct {
 	// reading an understated total draws the wrong conclusion about how much
 	// happened.
 	Total int64 `json:"total"`
+}
+
+// AuditLogsReturnedFilter Filters on the record's `returned` group, named and nested as the record is.
+type AuditLogsReturnedFilter struct {
+	Items *AuditLogsReturnedItemsFilter `json:"items,omitempty"`
+}
+
+// AuditLogsReturnedItemsFilter defines model for AuditLogsReturnedItemsFilter.
+type AuditLogsReturnedItemsFilter struct {
+	// Name Names of objects a read returned, matched exactly. A record matches when
+	// any entry of its `returned.items` carries one of them. An adapter stores
+	// `returned.items` however its backend can search an array of objects, and
+	// must match on the name of one entry, never across two.
+	Name *[]string `json:"name,omitempty"`
 }
 
 // ComponentLogEntry defines model for ComponentLogEntry.
@@ -765,6 +820,12 @@ type ComponentLogEntry struct {
 
 		// ProjectUid The OpenChoreo project UID that generated the log
 		ProjectUid *openapi_types.UUID `json:"projectUid,omitempty"`
+
+		// ReleaseLineName The component's release line that generated the log, from the pod's openchoreo.dev/release-line label. Absent for its main line.
+		ReleaseLineName *string `json:"releaseLineName,omitempty"`
+
+		// ReleaseLineUid The UID of the component's release line that generated the log, from the pod's openchoreo.dev/release-line-uid label. Absent for its main line.
+		ReleaseLineUid *openapi_types.UUID `json:"releaseLineUid,omitempty"`
 	} `json:"metadata,omitempty"`
 
 	// Timestamp The timestamp of the log entry
@@ -773,10 +834,17 @@ type ComponentLogEntry struct {
 
 // ComponentSearchScope defines model for ComponentSearchScope.
 type ComponentSearchScope struct {
+	// AllReleaseLines Covers every line of the component, its main line and its release lines: openchoreo.dev/component-uid, or openchoreo.dev/release-line-component-uid, which release line pods carry instead. Has no effect without componentUid, and releaseLineUid takes precedence. Adapters that support it set the OpenChoreo-Release-Line-Applied response header to "true".
+	AllReleaseLines *bool `json:"allReleaseLines,omitempty"`
+
+	// ComponentUid The UID of the component. On its own it covers the component's main line: openchoreo.dev/component-uid without an openchoreo.dev/release-line-uid label.
 	ComponentUid   *string `json:"componentUid,omitempty"`
 	EnvironmentUid *string `json:"environmentUid,omitempty"`
 	Namespace      string  `json:"namespace"`
 	ProjectUid     *string `json:"projectUid,omitempty"`
+
+	// ReleaseLineUid The UID of one of the component's release lines to restrict the result to. Adapters that support it filter on the openchoreo.dev/release-line-uid label alone, since release line pods don't carry the openchoreo.dev/component-uid label, and set the OpenChoreo-Release-Line-Applied response header to "true".
+	ReleaseLineUid *string `json:"releaseLineUid,omitempty"`
 }
 
 // ErrorResponse defines model for ErrorResponse.

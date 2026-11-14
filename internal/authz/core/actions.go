@@ -81,6 +81,12 @@ const (
 	ActionUpdateProjectReleaseBinding = "projectreleasebinding:update"
 	ActionDeleteProjectReleaseBinding = "projectreleasebinding:delete"
 
+	// ReleaseLine actions
+	ActionCreateReleaseLine = "releaseline:create"
+	ActionViewReleaseLine   = "releaseline:view"
+	ActionUpdateReleaseLine = "releaseline:update"
+	ActionDeleteReleaseLine = "releaseline:delete"
+
 	// ReleaseBinding actions
 	ActionCreateReleaseBinding = "releasebinding:create"
 	ActionViewReleaseBinding   = "releasebinding:view"
@@ -93,6 +99,22 @@ const (
 	ActionUpdateResourceReleaseBinding = "resourcereleasebinding:update"
 	ActionDeleteResourceReleaseBinding = "resourcereleasebinding:delete"
 
+	// Endpoint actions
+	ActionCreateEndpoint = "endpoint:create"
+	ActionViewEndpoint   = "endpoint:view"
+	ActionUpdateEndpoint = "endpoint:update"
+	ActionDeleteEndpoint = "endpoint:delete"
+
+	// EndpointRelease actions
+	ActionViewEndpointRelease   = "endpointrelease:view"
+	ActionDeleteEndpointRelease = "endpointrelease:delete"
+
+	// EndpointReleaseBinding actions
+	ActionCreateEndpointReleaseBinding = "endpointreleasebinding:create"
+	ActionViewEndpointReleaseBinding   = "endpointreleasebinding:view"
+	ActionUpdateEndpointReleaseBinding = "endpointreleasebinding:update"
+	ActionDeleteEndpointReleaseBinding = "endpointreleasebinding:delete"
+
 	// ComponentType actions
 	ActionCreateComponentType = "componenttype:create"
 	ActionViewComponentType   = "componenttype:view"
@@ -104,6 +126,12 @@ const (
 	ActionViewResourceType   = "resourcetype:view"
 	ActionUpdateResourceType = "resourcetype:update"
 	ActionDeleteResourceType = "resourcetype:delete"
+
+	// EndpointType actions
+	ActionCreateEndpointType = "endpointtype:create"
+	ActionViewEndpointType   = "endpointtype:view"
+	ActionUpdateEndpointType = "endpointtype:update"
+	ActionDeleteEndpointType = "endpointtype:delete"
 
 	// ProjectType actions
 	ActionCreateProjectType = "projecttype:create"
@@ -164,6 +192,12 @@ const (
 	ActionViewClusterResourceType   = "clusterresourcetype:view"
 	ActionUpdateClusterResourceType = "clusterresourcetype:update"
 	ActionDeleteClusterResourceType = "clusterresourcetype:delete"
+
+	// ClusterEndpointType actions
+	ActionCreateClusterEndpointType = "clusterendpointtype:create"
+	ActionViewClusterEndpointType   = "clusterendpointtype:view"
+	ActionUpdateClusterEndpointType = "clusterendpointtype:update"
+	ActionDeleteClusterEndpointType = "clusterendpointtype:delete"
 
 	// ClusterProjectType actions
 	ActionCreateClusterProjectType = "clusterprojecttype:create"
@@ -287,6 +321,10 @@ const (
 
 	// Traces actions
 	ActionViewTraces = "traces:view"
+	// Cluster-scoped: runs a read-only query, in the tracing backend's own query
+	// language, over every trace the observability plane holds, with no ownership
+	// check. Operator-scoped by design, like platformlogs:view.
+	ActionRawQueryTraces = "traces:rawquery"
 
 	// Alerts actions
 	ActionViewAlerts = "alerts:view"
@@ -308,6 +346,10 @@ const (
 
 	// Delivery insights (DORA metrics) actions
 	ActionViewDeliveryInsights = "deliveryinsights:view"
+
+	// Scorecards actions
+	ActionViewScorecards   = "scorecards:view"
+	ActionManageScorecards = "scorecards:manage"
 
 	// PortalAssistant actions
 	ActionInvokePortalAssistant = "portal-assistant:invoke"
@@ -375,6 +417,12 @@ var systemActions = []Action{
 	{Name: ActionUpdateProjectReleaseBinding, LowestScope: ScopeProject, IsInternal: false},
 	{Name: ActionDeleteProjectReleaseBinding, LowestScope: ScopeProject, IsInternal: false},
 
+	// ReleaseLine
+	{Name: ActionViewReleaseLine, LowestScope: ScopeComponent, IsInternal: false},
+	{Name: ActionCreateReleaseLine, LowestScope: ScopeComponent, IsInternal: false},
+	{Name: ActionUpdateReleaseLine, LowestScope: ScopeComponent, IsInternal: false},
+	{Name: ActionDeleteReleaseLine, LowestScope: ScopeComponent, IsInternal: false},
+
 	// ReleaseBinding
 	{Name: ActionViewReleaseBinding, LowestScope: ScopeComponent, IsInternal: false},
 	{Name: ActionCreateReleaseBinding, LowestScope: ScopeComponent, IsInternal: false},
@@ -387,6 +435,19 @@ var systemActions = []Action{
 	{Name: ActionUpdateResourceReleaseBinding, LowestScope: ScopeResource, IsInternal: false},
 	{Name: ActionDeleteResourceReleaseBinding, LowestScope: ScopeResource, IsInternal: false},
 
+	// Endpoint family. Evaluated at project scope: there is no endpoint-level
+	// scope in the hierarchy, so a role grants these per project, not per Endpoint.
+	{Name: ActionViewEndpoint, LowestScope: ScopeProject, IsInternal: false},
+	{Name: ActionCreateEndpoint, LowestScope: ScopeProject, IsInternal: false},
+	{Name: ActionUpdateEndpoint, LowestScope: ScopeProject, IsInternal: false},
+	{Name: ActionDeleteEndpoint, LowestScope: ScopeProject, IsInternal: false},
+	{Name: ActionViewEndpointRelease, LowestScope: ScopeProject, IsInternal: false},
+	{Name: ActionDeleteEndpointRelease, LowestScope: ScopeProject, IsInternal: false},
+	{Name: ActionViewEndpointReleaseBinding, LowestScope: ScopeProject, IsInternal: false},
+	{Name: ActionCreateEndpointReleaseBinding, LowestScope: ScopeProject, IsInternal: false},
+	{Name: ActionUpdateEndpointReleaseBinding, LowestScope: ScopeProject, IsInternal: false},
+	{Name: ActionDeleteEndpointReleaseBinding, LowestScope: ScopeProject, IsInternal: false},
+
 	// ComponentType
 	{Name: ActionViewComponentType, LowestScope: ScopeNamespace, IsInternal: false},
 	{Name: ActionCreateComponentType, LowestScope: ScopeNamespace, IsInternal: false},
@@ -398,6 +459,12 @@ var systemActions = []Action{
 	{Name: ActionCreateResourceType, LowestScope: ScopeNamespace, IsInternal: false},
 	{Name: ActionUpdateResourceType, LowestScope: ScopeNamespace, IsInternal: false},
 	{Name: ActionDeleteResourceType, LowestScope: ScopeNamespace, IsInternal: false},
+
+	// EndpointType
+	{Name: ActionViewEndpointType, LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: ActionCreateEndpointType, LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: ActionUpdateEndpointType, LowestScope: ScopeNamespace, IsInternal: false},
+	{Name: ActionDeleteEndpointType, LowestScope: ScopeNamespace, IsInternal: false},
 
 	// ProjectType
 	{Name: ActionViewProjectType, LowestScope: ScopeNamespace, IsInternal: false},
@@ -458,6 +525,12 @@ var systemActions = []Action{
 	{Name: ActionCreateClusterResourceType, LowestScope: ScopeCluster, IsInternal: false},
 	{Name: ActionUpdateClusterResourceType, LowestScope: ScopeCluster, IsInternal: false},
 	{Name: ActionDeleteClusterResourceType, LowestScope: ScopeCluster, IsInternal: false},
+
+	// ClusterEndpointType
+	{Name: ActionViewClusterEndpointType, LowestScope: ScopeCluster, IsInternal: false},
+	{Name: ActionCreateClusterEndpointType, LowestScope: ScopeCluster, IsInternal: false},
+	{Name: ActionUpdateClusterEndpointType, LowestScope: ScopeCluster, IsInternal: false},
+	{Name: ActionDeleteClusterEndpointType, LowestScope: ScopeCluster, IsInternal: false},
 
 	// ClusterProjectType
 	{Name: ActionViewClusterProjectType, LowestScope: ScopeCluster, IsInternal: false},
@@ -563,6 +636,9 @@ var systemActions = []Action{
 
 	// traces (dynamic scope: namespace or project depending on query)
 	{Name: ActionViewTraces, LowestScope: ScopeProject, IsInternal: false},
+	// Raw trace queries are not scoped by the query, so nothing below the
+	// cluster can satisfy them.
+	{Name: ActionRawQueryTraces, LowestScope: ScopeCluster, IsInternal: false},
 
 	// alerts (dynamic scope: namespace, project, or component depending on query)
 	{Name: ActionViewAlerts, LowestScope: ScopeComponent, IsInternal: false},
@@ -585,6 +661,11 @@ var systemActions = []Action{
 	// Delivery insights (DORA metrics). Queried at namespace, project and component
 	// scope, so the lowest level it is evaluated at is the component.
 	{Name: ActionViewDeliveryInsights, LowestScope: ScopeComponent, IsInternal: false},
+
+	// Scorecards. Cluster-scoped: they gate the platform-wide Scorecards overview and
+	// check management in the portal, which span every namespace.
+	{Name: ActionViewScorecards, LowestScope: ScopeCluster, IsInternal: false},
+	{Name: ActionManageScorecards, LowestScope: ScopeCluster, IsInternal: false},
 
 	// Platform logs observability
 	{Name: ActionViewPlatformLogs, LowestScope: ScopeCluster, IsInternal: false},

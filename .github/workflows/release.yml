@@ -95,7 +95,7 @@ jobs:
           fi
 
       - name: Login to container registry
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ${{ env.OCI_REGISTRY_HOST }}
           username: ${{ env.OCI_REGISTRY_HOST == 'ghcr.io' && (secrets.OCI_REGISTRY_USERNAME || github.actor) || secrets.OCI_REGISTRY_USERNAME }}
@@ -145,7 +145,7 @@ jobs:
           done
 
       - name: Download occ artifact from the build workflow
-        uses: dawidd6/action-download-artifact@d63b86af1b34672e53c440b1b83979861906bad7 # v24
+        uses: dawidd6/action-download-artifact@a92c7ae74cf1df8810783758581e485ac3aaa309 # v28
         with:
           workflow: build-and-test.yml
           commit: ${{ env.GIT_SHA_LONG }}

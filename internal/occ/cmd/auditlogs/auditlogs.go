@@ -157,7 +157,7 @@ func buildRequest(params QueryParams, now time.Time) (obsgen.AuditLogsQueryReque
 		&params.Actions, &params.Categories, &params.Results, &params.Surfaces, &params.Producers,
 		&params.OperationIDs, &params.RequestIDs, &params.EventIDs, &params.SourceIPs, &params.UserAgents,
 		&params.ResourceTypes, &params.ResourceNames, &params.Namespaces, &params.Projects,
-		&params.Components, &params.Resources, &params.Environments,
+		&params.Components, &params.ReleaseLines, &params.Resources, &params.Environments, &params.ReturnedItems,
 	} {
 		*values = clean(*values)
 	}
@@ -226,11 +226,16 @@ func buildRequest(params QueryParams, now time.Time) (obsgen.AuditLogsQueryReque
 		Namespace:   optional(params.Namespaces),
 		Project:     optional(params.Projects),
 		Component:   optional(params.Components),
+		ReleaseLine: optional(params.ReleaseLines),
 		Resource:    optional(params.Resources),
 		Environment: optional(environments),
 	}
 	if resource != (obsgen.AuditLogsResourceFilter{}) {
 		body.Resource = &resource
+	}
+
+	if names := optional(params.ReturnedItems); names != nil {
+		body.Returned = &obsgen.AuditLogsReturnedFilter{Items: &obsgen.AuditLogsReturnedItemsFilter{Name: names}}
 	}
 
 	return body, nil
@@ -370,8 +375,10 @@ func checkCounts(params QueryParams) error {
 		{"namespace", params.Namespaces, maxFilterValues},
 		{"project", params.Projects, maxFilterValues},
 		{"component", params.Components, maxFilterValues},
+		{"release-line", params.ReleaseLines, maxFilterValues},
 		{"resource", params.Resources, maxFilterValues},
 		{"env", params.Environments, maxFilterValues},
+		{"returned-item", params.ReturnedItems, maxFilterValues},
 	} {
 		if len(f.values) > f.max {
 			return fmt.Errorf("invalid --%s: at most %d values are accepted, got %d", f.flag, f.max, len(f.values))
@@ -476,21 +483,46 @@ func printRecords(records []obsgen.AuditLogRecord, output string) error {
 		return nil
 	}
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
-	fmt.Fprintln(w, "TIME\tRESULT\tACTOR\tACTION\tNAMESPACE\tRESOURCE")
+	fmt.Fprintln(w, "TIME\tRESULT\tACTOR\tACTION\tNAMESPACE\tRESOURCE\tRETURNED")
 	for _, record := range records {
 		namespace := ""
 		if record.Resource != nil {
 			namespace = deref(record.Resource.Namespace)
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 			record.EventTime.UTC().Format(time.RFC3339),
 			record.Result,
 			orDash(record.Actor.Id),
 			record.Action,
 			orDash(namespace),
-			orDash(resourceLabel(record.Resource)))
+			orDash(resourceLabel(record.Resource)),
+			orDash(returnedLabel(record.Returned)))
 	}
 	return w.Flush()
+}
+
+// maxReturnedNames bounds the RETURNED column; -o json carries every item.
+const maxReturnedNames = 3
+
+// returnedLabel is the count of entries a read returned, followed by the
+// names of the objects among them, e.g. "2 db-creds,api-key".
+func returnedLabel(returned *obsgen.AuditLogReturned) string {
+	if returned == nil {
+		return ""
+	}
+	label := strconv.Itoa(returned.Count)
+	if returned.Items == nil || len(*returned.Items) == 0 {
+		return label
+	}
+	items := *returned.Items
+	names := make([]string, 0, maxReturnedNames+1)
+	for _, item := range items[:min(len(items), maxReturnedNames)] {
+		names = append(names, item.Name)
+	}
+	if hidden := returned.Count - len(names); hidden > 0 {
+		names = append(names, fmt.Sprintf("+%d", hidden))
+	}
+	return label + " " + strings.Join(names, ",")
 }
 
 func resourceLabel(resource *obsgen.AuditLogResource) string {

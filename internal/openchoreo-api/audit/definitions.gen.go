@@ -27,6 +27,10 @@ func generatedOperationDefs() []audit.OperationDef {
 			Category: audit.CategoryManagement,
 		},
 		{
+			ID: "CreateClusterEndpointType", Action: "create_cluster_endpoint_type", ResourceType: "clusterendpointtype",
+			Category: audit.CategoryManagement,
+		},
+		{
 			ID: "CreateClusterObservabilityPlane", Action: "create_cluster_observability_plane", ResourceType: "clusterobservabilityplane",
 			Category: audit.CategoryManagement,
 		},
@@ -67,7 +71,15 @@ func generatedOperationDefs() []audit.OperationDef {
 			Category: audit.CategoryManagement,
 		},
 		{
+			ID: "CreateComponentReleaseLine", Action: "create_component_release_line", ResourceType: "releaseline",
+			Category: audit.CategoryManagement,
+		},
+		{
 			ID: "CreateComponentType", Action: "create_component_type", ResourceType: "componenttype",
+			Category: audit.CategoryManagement,
+		},
+		{
+			ID: "CreateComponentWorkflowRun", Action: "create_component_workflow_run", ResourceType: "workflowrun",
 			Category: audit.CategoryManagement,
 		},
 		{
@@ -76,6 +88,18 @@ func generatedOperationDefs() []audit.OperationDef {
 		},
 		{
 			ID: "CreateDeploymentPipeline", Action: "create_deployment_pipeline", ResourceType: "deploymentpipeline",
+			Category: audit.CategoryManagement,
+		},
+		{
+			ID: "CreateEndpoint", Action: "create_endpoint", ResourceType: "endpoint",
+			Category: audit.CategoryManagement,
+		},
+		{
+			ID: "CreateEndpointReleaseBinding", Action: "create_endpoint_release_binding", ResourceType: "endpointreleasebinding",
+			Category: audit.CategoryManagement,
+		},
+		{
+			ID: "CreateEndpointType", Action: "create_endpoint_type", ResourceType: "endpointtype",
 			Category: audit.CategoryManagement,
 		},
 		{
@@ -179,6 +203,10 @@ func generatedOperationDefs() []audit.OperationDef {
 			Category: audit.CategoryManagement, RESTResourceParam: "cdpName",
 		},
 		{
+			ID: "DeleteClusterEndpointType", Action: "delete_cluster_endpoint_type", ResourceType: "clusterendpointtype",
+			Category: audit.CategoryManagement, RESTResourceParam: "cetName",
+		},
+		{
 			ID: "DeleteClusterObservabilityPlane", Action: "delete_cluster_observability_plane", ResourceType: "clusterobservabilityplane",
 			Category: audit.CategoryManagement, RESTResourceParam: "clusterObservabilityPlaneName",
 		},
@@ -219,6 +247,10 @@ func generatedOperationDefs() []audit.OperationDef {
 			Category: audit.CategoryManagement, RESTResourceParam: "componentReleaseName",
 		},
 		{
+			ID: "DeleteComponentReleaseLine", Action: "delete_component_release_line", ResourceType: "releaseline",
+			Category: audit.CategoryManagement, RESTResourceParam: "releaseLineName",
+		},
+		{
 			ID: "DeleteComponentType", Action: "delete_component_type", ResourceType: "componenttype",
 			Category: audit.CategoryManagement, RESTResourceParam: "ctName",
 		},
@@ -229,6 +261,22 @@ func generatedOperationDefs() []audit.OperationDef {
 		{
 			ID: "DeleteDeploymentPipeline", Action: "delete_deployment_pipeline", ResourceType: "deploymentpipeline",
 			Category: audit.CategoryManagement, RESTResourceParam: "deploymentPipelineName",
+		},
+		{
+			ID: "DeleteEndpoint", Action: "delete_endpoint", ResourceType: "endpoint",
+			Category: audit.CategoryManagement, RESTResourceParam: "endpointName",
+		},
+		{
+			ID: "DeleteEndpointRelease", Action: "delete_endpoint_release", ResourceType: "endpointrelease",
+			Category: audit.CategoryManagement, RESTResourceParam: "endpointReleaseName",
+		},
+		{
+			ID: "DeleteEndpointReleaseBinding", Action: "delete_endpoint_release_binding", ResourceType: "endpointreleasebinding",
+			Category: audit.CategoryManagement, RESTResourceParam: "endpointReleaseBindingName",
+		},
+		{
+			ID: "DeleteEndpointType", Action: "delete_endpoint_type", ResourceType: "endpointtype",
+			Category: audit.CategoryManagement, RESTResourceParam: "etName",
 		},
 		{
 			ID: "DeleteEnvironment", Action: "delete_environment", ResourceType: "environment",
@@ -327,6 +375,22 @@ func generatedOperationDefs() []audit.OperationDef {
 			Category: audit.CategoryManagement,
 		},
 		{
+			ID: "GetReleaseBindingK8sResourceLogs", Action: "read_resource_logs", ResourceType: "releasebinding",
+			Category: audit.CategoryAccess, RESTResourceParam: "releaseBindingName",
+		},
+		{
+			ID: "GetSecret", Action: "read_secret", ResourceType: "secret",
+			Category: audit.CategoryAccess, RESTResourceParam: "secretName",
+		},
+		{
+			ID: "GetWorkflowRunLogs", Action: "read_workflow_run_logs", ResourceType: "workflowrun",
+			Category: audit.CategoryAccess, RESTResourceParam: "runName",
+		},
+		{
+			ID: "ListSecrets", Action: "list_secrets", ResourceType: "secret",
+			Category: audit.CategoryAccess,
+		},
+		{
 			ID: "TriggerReleaseBindingCronJob", Action: "trigger_release_binding_cron_job", ResourceType: "releasebinding",
 			Category: audit.CategoryManagement, RESTResourceParam: "releaseBindingName",
 		},
@@ -337,6 +401,10 @@ func generatedOperationDefs() []audit.OperationDef {
 		{
 			ID: "UpdateClusterDataPlane", Action: "update_cluster_data_plane", ResourceType: "clusterdataplane",
 			Category: audit.CategoryManagement, RESTResourceParam: "cdpName",
+		},
+		{
+			ID: "UpdateClusterEndpointType", Action: "update_cluster_endpoint_type", ResourceType: "clusterendpointtype",
+			Category: audit.CategoryManagement, RESTResourceParam: "cetName",
 		},
 		{
 			ID: "UpdateClusterObservabilityPlane", Action: "update_cluster_observability_plane", ResourceType: "clusterobservabilityplane",
@@ -375,6 +443,10 @@ func generatedOperationDefs() []audit.OperationDef {
 			Category: audit.CategoryManagement, RESTResourceParam: "componentName",
 		},
 		{
+			ID: "UpdateComponentReleaseLine", Action: "update_component_release_line", ResourceType: "releaseline",
+			Category: audit.CategoryManagement, RESTResourceParam: "releaseLineName",
+		},
+		{
 			ID: "UpdateComponentType", Action: "update_component_type", ResourceType: "componenttype",
 			Category: audit.CategoryManagement, RESTResourceParam: "ctName",
 		},
@@ -385,6 +457,18 @@ func generatedOperationDefs() []audit.OperationDef {
 		{
 			ID: "UpdateDeploymentPipeline", Action: "update_deployment_pipeline", ResourceType: "deploymentpipeline",
 			Category: audit.CategoryManagement, RESTResourceParam: "deploymentPipelineName",
+		},
+		{
+			ID: "UpdateEndpoint", Action: "update_endpoint", ResourceType: "endpoint",
+			Category: audit.CategoryManagement, RESTResourceParam: "endpointName",
+		},
+		{
+			ID: "UpdateEndpointReleaseBinding", Action: "update_endpoint_release_binding", ResourceType: "endpointreleasebinding",
+			Category: audit.CategoryManagement, RESTResourceParam: "endpointReleaseBindingName",
+		},
+		{
+			ID: "UpdateEndpointType", Action: "update_endpoint_type", ResourceType: "endpointtype",
+			Category: audit.CategoryManagement, RESTResourceParam: "etName",
 		},
 		{
 			ID: "UpdateEnvironment", Action: "update_environment", ResourceType: "environment",

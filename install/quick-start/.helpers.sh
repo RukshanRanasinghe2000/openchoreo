@@ -703,7 +703,7 @@ install_openbao() {
     log_info "Installing OpenBao..."
 
     # values-openbao.yaml runs OpenBao in dev mode and, via its postStart hook,
-    # configures Kubernetes auth + reader/writer policies and seeds the platform
+    # configures Kubernetes auth for the ClusterSecretStore and seeds the platform
     # secrets that the ExternalSecrets sync into each plane. Shared with the k3d
     # installer (install/k3d/k3d-install.sh).
     local openbao_values="$SCRIPT_DIR/../k3d/common/values-openbao.yaml"
@@ -872,6 +872,8 @@ spec:
       value: |
 $(echo "$agent_ca" | sed 's/^/        /')
   observerURL: http://observer.openchoreo.localhost:11080
+  secretStoreRef:
+    name: default
 OPEOF
 
     log_success "ClusterObservabilityPlane resource created"
@@ -942,9 +944,9 @@ install_control_plane() {
     # But keep monitoring enabled to track pod status
     install_helm_chart "openchoreo-control-plane" "openchoreo-control-plane" "$CONTROL_PLANE_NS" "true" "false" "true" "1800" \
         "--values" "$SCRIPT_DIR/.values-cp.yaml" \
-        "--set" "controllerManager.image.tag=$OPENCHOREO_VERSION" \
-        "--set" "openchoreoApi.image.tag=$OPENCHOREO_VERSION" \
-        "--set" "backstage.image.tag=$BACKSTAGE_VERSION" \
+        "--set-string" "controllerManager.image.tag=$OPENCHOREO_VERSION" \
+        "--set-string" "openchoreoApi.image.tag=$OPENCHOREO_VERSION" \
+        "--set-string" "backstage.image.tag=$BACKSTAGE_VERSION" \
         ${audit_args[@]+"${audit_args[@]}"}
 
     # Wait for cluster-gateway to be ready (required for agent connections)
@@ -1086,6 +1088,29 @@ spec:
         key: opensearch-password
         property: value
 ---
+# Users of the OpenSearch tracing module, apart from the admin credentials: the read-only user raw trace queries run as
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: opensearch-traces-users
+  namespace: ${namespace}
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: default
+  target:
+    name: opensearch-traces-users
+  data:
+    - secretKey: rawQueryUsername
+      remoteRef:
+        key: opensearch-raw-query-username
+        property: value
+    - secretKey: rawQueryPassword
+      remoteRef:
+        key: opensearch-raw-query-password
+        property: value
+---
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -1107,7 +1132,7 @@ ESEOF
 
     if ! kubectl wait -n "$namespace" \
         --for=condition=Ready externalsecret/opensearch-admin-credentials \
-        externalsecret/observer-secret --timeout=120s >/dev/null 2>&1; then
+        externalsecret/opensearch-traces-users externalsecret/observer-secret --timeout=120s >/dev/null 2>&1; then
         log_error "observability ExternalSecrets did not sync in $namespace"
         return 1
     fi
@@ -1125,7 +1150,7 @@ install_observability_plane() {
 
     install_helm_chart "openchoreo-observability-plane" "openchoreo-observability-plane" "$OBSERVABILITY_NS" "true" "true" "true" "1800" \
         "--values" "$SCRIPT_DIR/.values-op.yaml" \
-        "--set" "observer.image.tag=$OPENCHOREO_VERSION" \
+        "--set-string" "observer.image.tag=$OPENCHOREO_VERSION" \
         "--set" "observer.audit.enabled=true"
 
     # Install logs and metrics observability modules

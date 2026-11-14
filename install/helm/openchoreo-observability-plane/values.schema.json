@@ -927,6 +927,16 @@
           "title": "image",
           "type": "object"
         },
+        "llmAuth": {
+          "default": "api_key",
+          "description": "How the FinOps agent authenticates to the LLM endpoint. api_key sends LLM_API_KEY from secretName. azure sends a Microsoft Entra ID token from DefaultAzureCredential instead, for an Azure OpenAI or Azure AI Foundry endpoint set in llmBaseUrl (e.g., https://\u003cresource\u003e.openai.azure.com/openai/v1/), and LLM_API_KEY is not needed. On AKS, use workload identity - serviceAccount.create, the azure.workload.identity/client-id service account annotation and the azure.workload.identity/use pod label. Set llmName to the deployment name, prefixed as openai:\u003cdeployment\u003e when the deployment is not named after its model.",
+          "enum": [
+            "api_key",
+            "azure"
+          ],
+          "required": [],
+          "title": "llmAuth"
+        },
         "llmBaseUrl": {
           "default": "",
           "description": "Optional OpenAI-compatible base URL for LLM calls. Set this to route through the ai-gateway-agentgateway module (e.g., http://agentgateway-proxy.openchoreo-data-plane) instead of calling the provider directly. When set, the provider API key is managed at the gateway and LLM_API_KEY may be a placeholder.",
@@ -937,6 +947,12 @@
           "default": "",
           "description": "LLM model name (e.g., gpt-5.2)",
           "title": "llmName",
+          "type": "string"
+        },
+        "llmTokenScope": {
+          "default": "",
+          "description": "Microsoft Entra ID scope of the LLM token when llmAuth is azure. Empty uses https://cognitiveservices.azure.com/.default, the scope of Azure OpenAI and Azure AI Foundry.",
+          "title": "llmTokenScope",
           "type": "string"
         },
         "logLevel": {
@@ -966,6 +982,12 @@
           "additionalProperties": false,
           "description": "OAuth2 client credentials configuration for FinOps agent authentication",
           "properties": {
+            "clientAssertionFile": {
+              "default": "",
+              "description": "Path to a file holding a JWT client assertion (RFC 7523), presented to the token endpoint instead of a client secret. Set this to the identity token projected by a workload identity platform. Environment variable references are expanded, so ${AZURE_FEDERATED_TOKEN_FILE} follows the per-pod path the Azure Workload Identity webhook injects. When set, OAUTH_CLIENT_SECRET is not required.",
+              "title": "clientAssertionFile",
+              "type": "string"
+            },
             "clientId": {
               "default": "openchoreo-finops-agent",
               "description": "OAuth2 client ID registered with the IDP",
@@ -1000,6 +1022,16 @@
           "description": "OpenCost MCP Server URL",
           "title": "opencostMcpServerUrl",
           "type": "string"
+        },
+        "podLabels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "description": "Labels to add to FinOps agent pods, for example azure.workload.identity/use to opt the pod into Azure Workload Identity token projection",
+          "required": [],
+          "title": "podLabels",
+          "type": "object"
         },
         "remediationEnabled": {
           "default": false,
@@ -1077,7 +1109,7 @@
         },
         "secretName": {
           "default": "finops-agent",
-          "description": "Name of an existing Secret injected via envFrom into the FinOps agent container. Required keys - LLM_API_KEY, OAUTH_CLIENT_SECRET. Optional keys - SQL_BACKEND_URI (when reportBackend is postgresql).",
+          "description": "Name of an existing Secret injected via envFrom into the FinOps agent container. Required keys - LLM_API_KEY unless llmAuth is azure, and OAUTH_CLIENT_SECRET unless oauth.clientAssertionFile is set. Optional keys - SQL_BACKEND_URI (when reportBackend is postgresql). Set to an empty string to mount no Secret when none of these keys is needed (llmAuth is azure, oauth.clientAssertionFile is set and reportBackend is sqlite).",
           "title": "secretName",
           "type": "string"
         },
@@ -1107,6 +1139,37 @@
           },
           "required": [],
           "title": "service",
+          "type": "object"
+        },
+        "serviceAccount": {
+          "additionalProperties": false,
+          "description": "Service account configuration for the FinOps agent",
+          "properties": {
+            "annotations": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "default": {},
+              "description": "Annotations to add to the FinOps agent service account, for example azure.workload.identity/client-id or eks.amazonaws.com/role-arn",
+              "required": [],
+              "title": "annotations",
+              "type": "object"
+            },
+            "create": {
+              "default": false,
+              "description": "Create a dedicated service account for the FinOps agent and run the pod as it. Required for workload identity, which binds the projected identity token to a specific service account. When false, the pod uses the namespace default service account.",
+              "title": "create",
+              "type": "boolean"
+            },
+            "name": {
+              "default": "",
+              "description": "Name of the service account. Defaults to finops-agent when create is true. Set together with create=false to run the pod as an externally managed service account.",
+              "title": "name",
+              "type": "string"
+            }
+          },
+          "required": [],
+          "title": "serviceAccount",
           "type": "object"
         },
         "sqliteStorageSize": {
@@ -1443,7 +1506,10 @@
                 {
                   "match": {
                     "operations": [
-                      "QueryAuditLogs"
+                      "QueryLogs",
+                      "GetPlatformLogs",
+                      "QuerySpansForTrace",
+                      "GetSpanDetailsForTrace"
                     ]
                   },
                   "set": {
@@ -1673,6 +1739,12 @@
           "title": "nodeSelector",
           "type": "object"
         },
+        "oauthClientAssertionFile": {
+          "default": "",
+          "description": "Path to a file holding a JWT client assertion (RFC 7523), presented to the token endpoint instead of a client secret. Set this to the identity token projected by a workload identity platform. Environment variable references are expanded, so ${AZURE_FEDERATED_TOKEN_FILE} follows the per-pod path the Azure Workload Identity webhook injects. When set, UID_RESOLVER_OAUTH_CLIENT_SECRET is not required.",
+          "title": "oauthClientAssertionFile",
+          "type": "string"
+        },
         "oauthClientId": {
           "default": "openchoreo-observer-resource-reader-client",
           "description": "OAuth2 client ID used by the Observer when calling the control plane API",
@@ -1684,6 +1756,16 @@
           "description": "Optional OAuth2 scope to request in the client credentials token request",
           "title": "oauthScope",
           "type": "string"
+        },
+        "podLabels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "description": "Labels to add to Observer pods, for example azure.workload.identity/use to opt the pod into Azure Workload Identity token projection",
+          "required": [],
+          "title": "podLabels",
+          "type": "object"
         },
         "replicas": {
           "default": 1,
@@ -1745,7 +1827,7 @@
         },
         "secretName": {
           "default": "",
-          "description": "Name of an existing Secret injected via envFrom into the Observer container. Required keys - UID_RESOLVER_OAUTH_CLIENT_SECRET; ALERT_STORE_DSN is also required when alertStoreBackend=postgresql (Observer fails to start otherwise) and ignored for sqlite (a default DSN is used).",
+          "description": "Name of an existing Secret injected via envFrom into the Observer container. Required keys - UID_RESOLVER_OAUTH_CLIENT_SECRET, unless oauthClientAssertionFile is set; ALERT_STORE_DSN is also required when alertStoreBackend=postgresql (Observer fails to start otherwise) and ignored for sqlite (a default DSN is used).",
           "title": "secretName",
           "type": "string"
         },
@@ -1840,6 +1922,25 @@
           "title": "service",
           "type": "object"
         },
+        "serviceAccount": {
+          "additionalProperties": false,
+          "description": "Service account configuration for the Observer",
+          "properties": {
+            "annotations": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "default": {},
+              "description": "Annotations to add to the Observer service account, for example azure.workload.identity/client-id or eks.amazonaws.com/role-arn",
+              "required": [],
+              "title": "annotations",
+              "type": "object"
+            }
+          },
+          "required": [],
+          "title": "serviceAccount",
+          "type": "object"
+        },
         "tolerations": {
           "default": [],
           "description": "Tolerations for pod scheduling",
@@ -1864,6 +1965,56 @@
           "additionalProperties": false,
           "description": "Configurations for tracing adapter connectivity",
           "properties": {
+            "rawQuery": {
+              "additionalProperties": false,
+              "description": "Limits for raw trace queries (POST /api/v1alpha1/traces/raw-query). A raw query is the tracing backend's native request and is not scoped, so these bound how it runs and how many run. Set the tracing module's own raw query timeout and size limits to match.",
+              "properties": {
+                "burst": {
+                  "default": 5,
+                  "description": "Raw trace queries a caller may start at once before requestsPerMinute applies. Ignored when requestsPerMinute is 0; at least 1 otherwise",
+                  "minimum": 0,
+                  "title": "burst",
+                  "type": "integer"
+                },
+                "maxConcurrent": {
+                  "default": 4,
+                  "description": "Most raw trace queries that may run at once, per Observer replica. A query over it gets 429. 0 turns the limit off",
+                  "minimum": 0,
+                  "title": "maxConcurrent",
+                  "type": "integer"
+                },
+                "maxRequestBytes": {
+                  "default": 1048576,
+                  "description": "Largest raw query request body accepted, in bytes. A larger request gets 413",
+                  "minimum": 1,
+                  "title": "maxRequestBytes",
+                  "type": "integer"
+                },
+                "maxResponseBytes": {
+                  "default": 10485760,
+                  "description": "Largest raw query result accepted, in bytes. A larger result is rejected rather than returned partially",
+                  "minimum": 1,
+                  "title": "maxResponseBytes",
+                  "type": "integer"
+                },
+                "requestsPerMinute": {
+                  "default": 10,
+                  "description": "Raw trace queries each caller may start per minute, per Observer replica. A query over it gets 429 with Retry-After. 0 turns the limit off",
+                  "minimum": 0,
+                  "title": "requestsPerMinute",
+                  "type": "integer"
+                },
+                "timeout": {
+                  "default": "30s",
+                  "description": "Query timeout. The observer waits a few seconds longer than this for the tracing adapter, which stops the query at its own timeout",
+                  "title": "timeout",
+                  "type": "string"
+                }
+              },
+              "required": [],
+              "title": "rawQuery",
+              "type": "object"
+            },
             "timeout": {
               "default": "30s",
               "description": "Timeout for tracing adapter requests",
@@ -2014,6 +2165,16 @@
           "additionalProperties": false,
           "description": "LLM configuration for AI-powered analysis",
           "properties": {
+            "auth": {
+              "default": "api_key",
+              "description": "How the RCA agent authenticates to the LLM endpoint. api_key sends RCA_LLM_API_KEY from secretName. azure sends a Microsoft Entra ID token from DefaultAzureCredential instead, for an Azure OpenAI or Azure AI Foundry endpoint set in baseUrl (e.g., https://\u003cresource\u003e.openai.azure.com/openai/v1/), and RCA_LLM_API_KEY is not needed. On AKS, use workload identity - serviceAccount.create, the azure.workload.identity/client-id service account annotation and the azure.workload.identity/use pod label. Set modelName to the deployment name, and name the deployment after its model (e.g., gpt-5-mini). The RCA agent needs a model name LangChain recognizes, so other deployment names fail, even when prefixed as openai:\u003cdeployment\u003e.",
+              "enum": [
+                "api_key",
+                "azure"
+              ],
+              "required": [],
+              "title": "auth"
+            },
             "baseUrl": {
               "default": "",
               "description": "Optional OpenAI-compatible base URL for LLM calls. Set this to route through the ai-gateway-agentgateway module (e.g., http://agentgateway-proxy.openchoreo-data-plane) instead of calling the provider directly. When set, the provider API key is managed at the gateway and RCA_LLM_API_KEY may be a placeholder.",
@@ -2024,6 +2185,12 @@
               "default": "",
               "description": "LLM model name (e.g., gpt-5.2)",
               "title": "modelName",
+              "type": "string"
+            },
+            "tokenScope": {
+              "default": "",
+              "description": "Microsoft Entra ID scope of the LLM token when auth is azure. Empty uses https://cognitiveservices.azure.com/.default, the scope of Azure OpenAI and Azure AI Foundry.",
+              "title": "tokenScope",
               "type": "string"
             }
           },
@@ -2057,6 +2224,12 @@
           "additionalProperties": false,
           "description": "OAuth2 client credentials configuration for RCA agent authentication",
           "properties": {
+            "clientAssertionFile": {
+              "default": "",
+              "description": "Path to a file holding a JWT client assertion (RFC 7523), presented to the token endpoint instead of a client secret. Set this to the identity token projected by a workload identity platform. Environment variable references are expanded, so ${AZURE_FEDERATED_TOKEN_FILE} follows the per-pod path the Azure Workload Identity webhook injects. When set, OAUTH_CLIENT_SECRET is not required.",
+              "title": "clientAssertionFile",
+              "type": "string"
+            },
             "clientId": {
               "default": "openchoreo-rca-agent",
               "description": "OAuth2 client ID registered with the IDP",
@@ -2085,6 +2258,16 @@
           "description": "OpenChoreo API base URL used by rca-agent",
           "title": "openchoreoApiUrl",
           "type": "string"
+        },
+        "podLabels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "description": "Labels to add to RCA agent pods, for example azure.workload.identity/use to opt the pod into Azure Workload Identity token projection",
+          "required": [],
+          "title": "podLabels",
+          "type": "object"
         },
         "remedAgent": {
           "default": true,
@@ -2162,7 +2345,7 @@
         },
         "secretName": {
           "default": "rca-agent-secret",
-          "description": "Name of an existing Secret injected via envFrom into the RCA agent container. Required keys - RCA_LLM_API_KEY, OAUTH_CLIENT_SECRET. Optional keys - SQL_BACKEND_URI (when reportBackend is postgresql).",
+          "description": "Name of an existing Secret injected via envFrom into the RCA agent container. Required keys - RCA_LLM_API_KEY unless llm.auth is azure, and OAUTH_CLIENT_SECRET unless oauth.clientAssertionFile is set. Optional keys - SQL_BACKEND_URI (when reportBackend is postgresql). Set to an empty string to mount no Secret when none of these keys is needed (llm.auth is azure, oauth.clientAssertionFile is set and reportBackend is sqlite).",
           "title": "secretName",
           "type": "string"
         },
@@ -2192,6 +2375,37 @@
           },
           "required": [],
           "title": "service",
+          "type": "object"
+        },
+        "serviceAccount": {
+          "additionalProperties": false,
+          "description": "Service account configuration for the RCA agent",
+          "properties": {
+            "annotations": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "default": {},
+              "description": "Annotations to add to the RCA agent service account, for example azure.workload.identity/client-id or eks.amazonaws.com/role-arn",
+              "required": [],
+              "title": "annotations",
+              "type": "object"
+            },
+            "create": {
+              "default": false,
+              "description": "Create a dedicated service account for the RCA agent and run the pod as it. Required for workload identity, which binds the projected identity token to a specific service account. When false, the pod uses the namespace default service account.",
+              "title": "create",
+              "type": "boolean"
+            },
+            "name": {
+              "default": "",
+              "description": "Name of the service account. Defaults to rca-agent when create is true. Set together with create=false to run the pod as an externally managed service account.",
+              "title": "name",
+              "type": "string"
+            }
+          },
+          "required": [],
+          "title": "serviceAccount",
           "type": "object"
         },
         "sqliteStorageSize": {

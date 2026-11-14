@@ -155,7 +155,7 @@ security:
 
 # @schema
 # type: object
-# description: Feature flags shared across the control plane (API server and Backstage).
+# description: Feature flags shared across the control plane (controller, API server and Backstage).
 # @schema
 features:
   # @schema
@@ -176,6 +176,25 @@ features:
     # default: secret
     # @schema
     remoteKeyPrefix: "secret"
+
+    # @schema
+    # enum: ["/", "-", "_", ".", "+", "=", "@"]
+    # description: Separator that joins the segments of every key written to the external secret store, including the segments of a nested remoteKeyPrefix. "/" gives path-style keys <prefix>/<namespace>/<type>/<name> for OpenBao, Vault and AWS Secrets Manager. "-" is the only separator Azure Key Vault allows and works with every store. "_" works with GCP Secret Manager, AWS Secrets Manager, OpenBao and Vault, and ".", "+", "=" and "@" work with AWS Secrets Manager, OpenBao and Vault. With "-" or ".", two different secrets can map to the same key, since those characters can also appear in namespace and secret names. This is an install-time setting, since changing it after secrets exist does not move existing entries.
+    # default: "/"
+    # @schema
+    remoteKeySeparator: "/"
+
+  # @schema
+  # type: object
+  # description: Referenced-config rollout. Controls which changes to a component restart its pods.
+  # @schema
+  referencedConfigRollout:
+    # @schema
+    # type: boolean
+    # description: Limit the configuration changes that restart a component's pods to the ConfigMaps, Secrets and ExternalSecrets their pod template references, instead of any change to the component's rendered resources, such as a Service, HTTPRoute or HorizontalPodAutoscaler. Also enables the openchoreo.dev/restart-on-change annotation, which lets ComponentType and Trait authors include or exclude a resource. Changes to the pod template itself, such as a new image, still roll out the pods. Turning it on does not restart pods by itself.
+    # default: false
+    # @schema
+    enabled: false
 
 # @schema
 # type: object
@@ -771,6 +790,25 @@ controllerManager:
     # @schema
     maxConcurrentReconciles: 1
     # @schema
+    # type: object
+    # description: RenderedRelease controller settings
+    # @schema
+    renderedRelease:
+      # @schema
+      # type: string
+      # description: How long a RenderedRelease whose resources are all stable waits before the controller checks it again (Go duration, e.g. "1m"), unless the release sets spec.interval. 20% jitter is added. Every stable release costs one reconcile per interval, so the controller needs about releases x reconcile time / interval workers; with hundreds of releases on a remote data plane raise it (e.g. "5m"). Longer intervals also delay noticing drift and health changes on stable releases, including ResourceReleaseBinding readyWhen on custom resources. Must be greater than 0. Empty uses the controller's built-in default (1m).
+      # default: "1m"
+      # pattern: ^((([0-9]+([.][0-9]+)?|[.][0-9]+)(ns|us|µs|μs|ms|s|m|h))+)?$
+      # @schema
+      stableInterval: "1m"
+      # @schema
+      # type: string
+      # description: How long a RenderedRelease with transitioning resources (Progressing, Unknown or Degraded) waits before the controller checks it again (Go duration, e.g. "10s"), unless the release sets spec.progressingInterval. 20% jitter is added. Must be greater than 0. Empty uses the controller's built-in default (10s).
+      # default: "10s"
+      # pattern: ^((([0-9]+([.][0-9]+)?|[.][0-9]+)(ns|us|µs|μs|ms|s|m|h))+)?$
+      # @schema
+      progressingInterval: "10s"
+    # @schema
     # description: |
     #   Log verbosity level for the controller-manager, passed as --zap-log-level.
     #   Empty string leaves controller-runtime's zap default (debug) in place.
@@ -1268,13 +1306,19 @@ openchoreoApi:
               system: true
               actions:
                 - "component:view"
+                - "releaseline:view"
+                - "releasebinding:view"
                 - "componenttype:view"
                 - "resource:view"
                 - "resourcerelease:view"
                 - "projectrelease:view"
                 - "resourcereleasebinding:view"
+                - "endpoint:view"
+                - "endpointrelease:view"
+                - "endpointreleasebinding:view"
                 - "projectreleasebinding:view"
                 - "resourcetype:view"
+                - "endpointtype:view"
                 - "projecttype:view"
                 - "namespace:view"
                 - "project:view"
@@ -1291,6 +1335,7 @@ openchoreoApi:
                 - "clusterdataplane:view"
                 - "clustercomponenttype:view"
                 - "clusterresourcetype:view"
+                - "clusterendpointtype:view"
                 - "clusterprojecttype:view"
                 - "clustertrait:view"
                 - "clusterworkflow:view"
@@ -1312,12 +1357,15 @@ openchoreoApi:
               system: true
               actions:
                 - "component:view"
+                - "releaseline:view"
                 - "project:view"
                 - "namespace:view"
                 - "componentrelease:view"
                 - "releasebinding:view"
                 - "resource:view"
                 - "resourcereleasebinding:view"
+                - "endpoint:view"
+                - "endpointreleasebinding:view"
                 - "workflowrun:view"
                 - "environment:view"
                 - "workload:view"
@@ -1348,6 +1396,7 @@ openchoreoApi:
                 - "project:view"
                 - "namespace:view"
                 - "environment:view"
+                - "releaseline:view"
 
             # Admin role with full permissions to all resources
             - name: admin
@@ -1363,6 +1412,7 @@ openchoreoApi:
                 - "clusterobservabilityplane:view"
                 - "clustercomponenttype:view"
                 - "clusterresourcetype:view"
+                - "clusterendpointtype:view"
                 - "clusterprojecttype:view"
                 - "clustertrait:view"
                 - "clusterworkflow:view"
@@ -1380,6 +1430,7 @@ openchoreoApi:
                 - "observabilityplane:view"
                 - "componenttype:view"
                 - "resourcetype:view"
+                - "endpointtype:view"
                 - "projecttype:view"
                 - "trait:view"
                 - "workflow:view"
@@ -1395,6 +1446,7 @@ openchoreoApi:
                 - "clusterobservabilityplane:view"
                 - "clustercomponenttype:view"
                 - "clusterresourcetype:view"
+                - "clusterendpointtype:view"
                 - "clusterprojecttype:view"
                 - "clustertrait:view"
                 - "clusterworkflow:view"
@@ -1406,6 +1458,7 @@ openchoreoApi:
                 - "observabilityplane:view"
                 - "componenttype:view"
                 - "resourcetype:view"
+                - "endpointtype:view"
                 - "projecttype:view"
                 - "trait:view"
                 - "workflow:view"
@@ -1416,6 +1469,10 @@ openchoreoApi:
                 - "component:delete"
                 - "component:exec"
                 - "component:connect"
+                - "releaseline:view"
+                - "releaseline:create"
+                - "releaseline:update"
+                - "releaseline:delete"
                 - "componentrelease:view"
                 - "componentrelease:create"
                 - "releasebinding:view"
@@ -1435,6 +1492,15 @@ openchoreoApi:
                 - "resourcereleasebinding:create"
                 - "resourcereleasebinding:update"
                 - "resourcereleasebinding:delete"
+                - "endpoint:view"
+                - "endpoint:create"
+                - "endpoint:update"
+                - "endpoint:delete"
+                - "endpointrelease:view"
+                - "endpointreleasebinding:view"
+                - "endpointreleasebinding:create"
+                - "endpointreleasebinding:update"
+                - "endpointreleasebinding:delete"
                 - "projectreleasebinding:view"
                 - "projectreleasebinding:create"
                 - "projectreleasebinding:update"
@@ -1471,6 +1537,7 @@ openchoreoApi:
                 - "clusterobservabilityplane:view"
                 - "clustercomponenttype:view"
                 - "clusterresourcetype:view"
+                - "clusterendpointtype:view"
                 - "clusterprojecttype:view"
                 - "clustertrait:view"
                 - "clusterworkflow:view"
@@ -1482,11 +1549,13 @@ openchoreoApi:
                 - "observabilityplane:view"
                 - "componenttype:view"
                 - "resourcetype:view"
+                - "endpointtype:view"
                 - "projecttype:view"
                 - "trait:view"
                 - "workflow:view"
                 - "project:view"
                 - "component:view"
+                - "releaseline:view"
                 - "componentrelease:view"
                 - "componentrelease:create"
                 - "releasebinding:view"
@@ -1497,6 +1566,10 @@ openchoreoApi:
                 - "projectrelease:view"
                 - "resourcereleasebinding:view"
                 - "resourcereleasebinding:update"
+                - "endpoint:view"
+                - "endpointrelease:view"
+                - "endpointreleasebinding:view"
+                - "endpointreleasebinding:update"
                 - "projectreleasebinding:view"
                 - "workflowrun:view"
                 - "workflowrun:create"
@@ -1537,6 +1610,10 @@ openchoreoApi:
                 - "component:delete"
                 - "component:exec"
                 - "component:connect"
+                - "releaseline:view"
+                - "releaseline:create"
+                - "releaseline:update"
+                - "releaseline:delete"
                 - "componentrelease:view"
                 - "componentrelease:create"
                 - "releasebinding:view"
@@ -1559,6 +1636,16 @@ openchoreoApi:
                 - "resourcereleasebinding:create"
                 - "resourcereleasebinding:update"
                 - "resourcereleasebinding:delete"
+                - "endpoint:view"
+                - "endpoint:create"
+                - "endpoint:update"
+                - "endpoint:delete"
+                - "endpointrelease:view"
+                - "endpointrelease:delete"
+                - "endpointreleasebinding:view"
+                - "endpointreleasebinding:create"
+                - "endpointreleasebinding:update"
+                - "endpointreleasebinding:delete"
                 - "projectreleasebinding:view"
                 - "projectreleasebinding:create"
                 - "projectreleasebinding:update"
@@ -1587,6 +1674,10 @@ openchoreoApi:
                 - "resourcetype:create"
                 - "resourcetype:update"
                 - "resourcetype:delete"
+                - "endpointtype:view"
+                - "endpointtype:create"
+                - "endpointtype:update"
+                - "endpointtype:delete"
                 - "projecttype:view"
                 - "projecttype:create"
                 - "projecttype:update"
@@ -1624,6 +1715,7 @@ openchoreoApi:
                 - "events:view"
                 - "metrics:view"
                 - "traces:view"
+                - "traces:rawquery"
                 - "alerts:view"
                 - "incidents:view"
                 - "rcareport:view"
@@ -1632,6 +1724,8 @@ openchoreoApi:
                 - "finopsreport:update"
                 - "finops:view"
                 - "deliveryinsights:view"
+                - "scorecards:view"
+                - "scorecards:manage"
                 - "portal-assistant:invoke"
                 - "observabilityalertsnotificationchannel:view"
                 - "observabilityalertsnotificationchannel:create"
@@ -1657,6 +1751,10 @@ openchoreoApi:
                 - "clusterresourcetype:create"
                 - "clusterresourcetype:update"
                 - "clusterresourcetype:delete"
+                - "clusterendpointtype:view"
+                - "clusterendpointtype:create"
+                - "clusterendpointtype:update"
+                - "clusterendpointtype:delete"
                 - "clusterprojecttype:view"
                 - "clusterprojecttype:create"
                 - "clusterprojecttype:update"
@@ -1876,10 +1974,10 @@ openchoreoApi:
       enabled: true
       # @schema
       # type: array
-      # description: "List of enabled MCP toolsets. Each toolset exposes a group of related operations. Allowed toolsets: namespace, project, component, deployment, build, pe, resource"
+      # description: "List of enabled MCP toolsets. Each toolset exposes a group of related operations. Allowed toolsets: namespace, project, component, deployment, build, pe, resource, endpoint"
       # items:
       #   type: string
-      # default: ["namespace", "project", "component", "deployment", "build", "pe", "resource"]
+      # default: ["namespace", "project", "component", "deployment", "build", "pe", "resource", "endpoint"]
       # @schema
       toolsets:
         - "namespace"
@@ -1889,6 +1987,7 @@ openchoreoApi:
         - "build"
         - "pe"
         - "resource"
+        - "endpoint"
     # @schema
     # type: object
     # description: Audit logging configuration
@@ -1943,9 +2042,19 @@ openchoreoApi:
       # items:
       #   type: object
       #   additionalProperties: true
-      # default: []
+      # default: [{"match":{"operations":["GetReleaseBindingK8sResourceLogs","GetWorkflowRunLogs"]},"set":{"publish":false}}]
       # @schema
-      policies: []
+      # Secret reads are published. Live pod and workflow log reads are
+      # defined but unpublished: occ and the portal poll them while following
+      # logs, and each record carries what was asked for and how many lines
+      # came back. Drop an operation from this entry to record its reads.
+      policies:
+        - match:
+            operations:
+              - "GetReleaseBindingK8sResourceLogs"
+              - "GetWorkflowRunLogs"
+          set:
+            publish: false
       # @schema
       # type: object
       # description: Audit actor settings
@@ -2897,6 +3006,43 @@ backstage:
 
   # @schema
   # type: object
+  # additionalProperties: false
+  # description: Startup probe for the Backstage container. Backstage can take minutes to load its plugins on a slow or busy machine; until this probe succeeds, the liveness and readiness probes are not run, so a slow start is not killed as a hung container. It gives Backstage up to periodSeconds x failureThreshold to start.
+  # @schema
+  startupProbe:
+    # @schema
+    # type: boolean
+    # description: Enable the startup probe
+    # default: true
+    # @schema
+    enabled: true
+    # @schema
+    # type: integer
+    # description: How often the startup probe is run, in seconds
+    # minimum: 1
+    # maximum: 2147483647
+    # default: 10
+    # @schema
+    periodSeconds: 10
+    # @schema
+    # type: integer
+    # description: Timeout of each startup probe check, in seconds
+    # minimum: 1
+    # maximum: 2147483647
+    # default: 10
+    # @schema
+    timeoutSeconds: 10
+    # @schema
+    # type: integer
+    # description: Consecutive failures before the container is restarted. With the defaults, Backstage has up to 5 minutes to start.
+    # minimum: 1
+    # maximum: 2147483647
+    # default: 30
+    # @schema
+    failureThreshold: 30
+
+  # @schema
+  # type: object
   # description: Service account configuration
   # @schema
   serviceAccount:
@@ -3013,6 +3159,17 @@ backstage:
       # default: false
       # @schema
       enabled: false
+    # @schema
+    # type: object
+    # description: Scorecards portal feature
+    # @schema
+    scorecards:
+      # @schema
+      # type: boolean
+      # description: Show Scorecards (Tech Insights checks) in the portal. Maps to OPENCHOREO_FEATURES_SCORECARDS_ENABLED in the Backstage container. Checks authored in the portal are stored in the Backstage database, which is SQLite on an emptyDir by default, so they are lost when the pod restarts. Set backstage.database.type to postgresql or enable backstage.database.sqlite.persistence to keep them.
+      # default: true
+      # @schema
+      enabled: true
     # @schema
     # type: object
     # description: Authentication feature flags
@@ -4472,6 +4629,7 @@ portalAssistant:
   replicas: 1
 
   llm:
+    # Secret holding PORTAL_ASSISTANT_LLM_API_KEY. Not needed when auth is azure.
     secretName: ""
     modelName: ""
     # Optional OpenAI-compatible base URL. Set to route LLM calls through the
@@ -4479,6 +4637,41 @@ portalAssistant:
     # instead of the provider directly; the provider key is then managed at the
     # gateway and the secret's PORTAL_ASSISTANT_LLM_API_KEY may be a placeholder.
     baseUrl: ""
+    # @schema
+    # description: How the Portal Assistant authenticates to the LLM endpoint. api_key sends PORTAL_ASSISTANT_LLM_API_KEY from secretName. azure sends a Microsoft Entra ID token from DefaultAzureCredential instead, for an Azure OpenAI or Azure AI Foundry endpoint set in baseUrl (e.g., https://<resource>.openai.azure.com/openai/v1/), and secretName is optional. On AKS, use workload identity - the azure.workload.identity/client-id annotation in serviceAccount.annotations and the azure.workload.identity/use label in podLabels. Set modelName to the deployment name, and name the deployment after its model (e.g., gpt-5-mini). The Portal Assistant needs a model name LangChain recognizes, so other deployment names fail, even when prefixed as openai:<deployment>.
+    # enum: [api_key, azure]
+    # default: api_key
+    # @schema
+    auth: api_key
+    # @schema
+    # type: string
+    # description: Microsoft Entra ID scope of the LLM token when auth is azure. Empty uses https://cognitiveservices.azure.com/.default, the scope of Azure OpenAI and Azure AI Foundry.
+    # default: ""
+    # @schema
+    tokenScope: ""
+
+  # @schema
+  # type: object
+  # description: Service account configuration for the Portal Assistant
+  # @schema
+  serviceAccount:
+    # @schema
+    # type: object
+    # description: Annotations to add to the Portal Assistant service account, for example azure.workload.identity/client-id or eks.amazonaws.com/role-arn
+    # additionalProperties:
+    #   type: string
+    # default: {}
+    # @schema
+    annotations: {}
+
+  # @schema
+  # type: object
+  # description: Labels to add to Portal Assistant pods, for example azure.workload.identity/use to opt the pod into Azure Workload Identity token projection
+  # additionalProperties:
+  #   type: string
+  # default: {}
+  # @schema
+  podLabels: {}
 
   config:
     openchoreoApiUrl: "http://openchoreo-api.openchoreo-control-plane.svc.cluster.local:8080"

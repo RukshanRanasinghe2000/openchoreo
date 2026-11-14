@@ -50,6 +50,10 @@ func (s *releaseBindingService) CreateReleaseBinding(ctx context.Context, namesp
 	if err := s.validateComponentExists(ctx, namespaceName, rb.Spec.Owner.ComponentName); err != nil {
 		return nil, err
 	}
+	if err := services.ValidateReleaseLineOwner(ctx, s.k8sClient, namespaceName,
+		rb.Spec.Owner.ProjectName, rb.Spec.Owner.ComponentName, rb.Spec.Owner.ReleaseLine); err != nil {
+		return nil, err
+	}
 
 	exists, err := s.releaseBindingExists(ctx, namespaceName, rb.Name)
 	if err != nil {
@@ -60,6 +64,9 @@ func (s *releaseBindingService) CreateReleaseBinding(ctx context.Context, namesp
 		s.logger.Warn("Release binding already exists", "namespace", namespaceName, "releaseBinding", rb.Name)
 		return nil, ErrReleaseBindingAlreadyExists
 	}
+	if err := s.validatePromotionPath(ctx, namespaceName, rb, nil); err != nil {
+		return nil, err
+	}
 
 	// Set defaults
 	rb.Namespace = namespaceName
@@ -69,6 +76,9 @@ func (s *releaseBindingService) CreateReleaseBinding(ctx context.Context, namesp
 	}
 	rb.Labels[labels.LabelKeyProjectName] = rb.Spec.Owner.ProjectName
 	rb.Labels[labels.LabelKeyComponentName] = rb.Spec.Owner.ComponentName
+	if rb.Spec.Owner.ReleaseLine != "" {
+		rb.Labels[labels.LabelKeyReleaseLine] = rb.Spec.Owner.ReleaseLine
+	}
 
 	if err := s.k8sClient.Create(ctx, rb); err != nil {
 		if apierrors.IsAlreadyExists(err) {
@@ -103,6 +113,9 @@ func (s *releaseBindingService) UpdateReleaseBinding(ctx context.Context, namesp
 		s.logger.Error("Failed to get release binding", "error", err)
 		return nil, fmt.Errorf("failed to get release binding: %w", err)
 	}
+	if err := s.validatePromotionPath(ctx, namespaceName, rb, existing); err != nil {
+		return nil, err
+	}
 
 	// Clear status from user input — status is server-managed
 	rb.Status = openchoreov1alpha1.ReleaseBindingStatus{}
@@ -118,6 +131,9 @@ func (s *releaseBindingService) UpdateReleaseBinding(ctx context.Context, namesp
 	}
 	existing.Labels[labels.LabelKeyProjectName] = existing.Spec.Owner.ProjectName
 	existing.Labels[labels.LabelKeyComponentName] = existing.Spec.Owner.ComponentName
+	if existing.Spec.Owner.ReleaseLine != "" {
+		existing.Labels[labels.LabelKeyReleaseLine] = existing.Spec.Owner.ReleaseLine
+	}
 
 	if err := s.k8sClient.Update(ctx, existing); err != nil {
 		if vErr := services.ExtractValidationError(err); vErr != nil {

@@ -348,7 +348,7 @@ func TestMakeComponentPolicies_UDPEndpoint(t *testing.T) {
 		ComponentName: "dns-svc",
 		PodSelectors:  map[string]string{"app": "dns-svc"},
 		Endpoints: map[string]openchoreov1alpha1.WorkloadEndpoint{
-			"dns": {Type: openchoreov1alpha1.EndpointTypeUDP, Port: 5353},
+			"dns": {Type: openchoreov1alpha1.EndpointProtocolUDP, Port: 5353},
 		},
 	})
 	if len(policies) != 1 {
@@ -402,7 +402,8 @@ spec:
   endpointSelector:
     matchLabels:
       app: test
-  ingress: []
+  ingress:
+  - {}
 `)
 }
 
@@ -417,7 +418,7 @@ func TestMakeComponentPolicies_Cilium_HTTPEndpoint(t *testing.T) {
 			labels.LabelKeyProjectName:   "my-project",
 		},
 		Endpoints: map[string]openchoreov1alpha1.WorkloadEndpoint{
-			"http": {Type: openchoreov1alpha1.EndpointTypeHTTP, Port: 8080},
+			"http": {Type: openchoreov1alpha1.EndpointProtocolHTTP, Port: 8080},
 		},
 		Provider: ProviderCilium,
 	})
@@ -457,7 +458,7 @@ func TestMakeComponentPolicies_Cilium_TCPEndpoint(t *testing.T) {
 		ComponentName: "db",
 		PodSelectors:  map[string]string{"app": "db"},
 		Endpoints: map[string]openchoreov1alpha1.WorkloadEndpoint{
-			"tcp": {Type: openchoreov1alpha1.EndpointTypeTCP, Port: 5432},
+			"tcp": {Type: openchoreov1alpha1.EndpointProtocolTCP, Port: 5432},
 		},
 		Provider: ProviderCilium,
 	})
@@ -493,8 +494,8 @@ func TestMakeComponentPolicies_Cilium_MixedL7L4Endpoints(t *testing.T) {
 		ComponentName: "mixed-svc",
 		PodSelectors:  map[string]string{"app": "mixed-svc"},
 		Endpoints: map[string]openchoreov1alpha1.WorkloadEndpoint{
-			"http": {Type: openchoreov1alpha1.EndpointTypeHTTP, Port: 8080},
-			"tcp":  {Type: openchoreov1alpha1.EndpointTypeTCP, Port: 5432},
+			"http": {Type: openchoreov1alpha1.EndpointProtocolHTTP, Port: 8080},
+			"tcp":  {Type: openchoreov1alpha1.EndpointProtocolTCP, Port: 5432},
 		},
 		Provider: ProviderCilium,
 	})
@@ -537,7 +538,7 @@ func TestMakeComponentPolicies_Cilium_ExternalVisibility(t *testing.T) {
 		PodSelectors:  map[string]string{"app": "public-api"},
 		Endpoints: map[string]openchoreov1alpha1.WorkloadEndpoint{
 			"http": {
-				Type:       openchoreov1alpha1.EndpointTypeHTTP,
+				Type:       openchoreov1alpha1.EndpointProtocolHTTP,
 				Port:       8080,
 				Visibility: []openchoreov1alpha1.EndpointVisibility{openchoreov1alpha1.EndpointVisibilityExternal},
 			},
@@ -593,7 +594,7 @@ func TestMakeComponentPolicies_Cilium_NamespaceVisibility(t *testing.T) {
 		PodSelectors:  map[string]string{"app": "grpc-svc"},
 		Endpoints: map[string]openchoreov1alpha1.WorkloadEndpoint{
 			"grpc": {
-				Type:       openchoreov1alpha1.EndpointTypeGRPC,
+				Type:       openchoreov1alpha1.EndpointProtocolGRPC,
 				Port:       9090,
 				Visibility: []openchoreov1alpha1.EndpointVisibility{openchoreov1alpha1.EndpointVisibilityNamespace},
 			},
@@ -650,7 +651,7 @@ func TestMakeComponentPolicies_Cilium_NameTruncation(t *testing.T) {
 		ComponentName: longName,
 		PodSelectors:  map[string]string{"app": "test"},
 		Endpoints: map[string]openchoreov1alpha1.WorkloadEndpoint{
-			"http": {Type: openchoreov1alpha1.EndpointTypeHTTP, Port: 8080},
+			"http": {Type: openchoreov1alpha1.EndpointProtocolHTTP, Port: 8080},
 		},
 		Provider: ProviderCilium,
 	})
@@ -684,5 +685,136 @@ func TestMakeComponentPolicies_NameTruncation(t *testing.T) {
 	name := meta["name"].(string)
 	if len(name) > 253 {
 		t.Errorf("policy name exceeds 253 chars: %d", len(name))
+	}
+}
+
+func endpointPolicyParams(visibility ...openchoreov1alpha1.EndpointVisibility) EndpointPolicyParams {
+	return EndpointPolicyParams{
+		Name:         "openchoreo-e-greeter-api-stable-1a2b3c4d",
+		Namespace:    "dp-ns",
+		CPNamespace:  "cp-ns",
+		Environment:  "development",
+		PodSelectors: map[string]string{"app": "greeter"},
+		Port:         9090,
+		Protocol:     openchoreov1alpha1.EndpointProtocolHTTP,
+		Visibility:   visibility,
+	}
+}
+
+func TestMakeEndpointPolicy_ExternalAdmitsOnlyTheGateways(t *testing.T) {
+	policy := MakeEndpointPolicy(endpointPolicyParams(openchoreov1alpha1.EndpointVisibilityExternal))
+
+	// No project rule: the backend component's own policy already admits its project.
+	assertYAMLEqual(t, "endpoint-external", policy, `
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: openchoreo-e-greeter-api-stable-1a2b3c4d
+  namespace: dp-ns
+spec:
+  podSelector:
+    matchLabels:
+      app: greeter
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector: {}
+          podSelector:
+            matchExpressions:
+              - key: openchoreo.dev/system-component
+                operator: Exists
+      ports:
+        - protocol: TCP
+          port: 9090
+`)
+}
+
+func TestMakeEndpointPolicy_NamespaceAndInternal(t *testing.T) {
+	policy := MakeEndpointPolicy(endpointPolicyParams(
+		openchoreov1alpha1.EndpointVisibilityNamespace, openchoreov1alpha1.EndpointVisibilityInternal))
+
+	assertYAMLEqual(t, "endpoint-namespace-internal", policy, `
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: openchoreo-e-greeter-api-stable-1a2b3c4d
+  namespace: dp-ns
+spec:
+  podSelector:
+    matchLabels:
+      app: greeter
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              openchoreo.dev/namespace: cp-ns
+              openchoreo.dev/environment: development
+      ports:
+        - protocol: TCP
+          port: 9090
+    - from:
+        - namespaceSelector: {}
+          podSelector:
+            matchExpressions:
+              - key: openchoreo.dev/system-component
+                operator: Exists
+      ports:
+        - protocol: TCP
+          port: 9090
+`)
+}
+
+func TestMakeEndpointPolicy_ProjectScopeRendersNothing(t *testing.T) {
+	if policy := MakeEndpointPolicy(endpointPolicyParams(openchoreov1alpha1.EndpointVisibilityProject)); policy != nil {
+		t.Fatalf("expected no policy for project scope, which the component policy already admits; got %v", policy)
+	}
+}
+
+func TestMakeEndpointPolicy_Cilium(t *testing.T) {
+	params := endpointPolicyParams(openchoreov1alpha1.EndpointVisibilityExternal)
+	params.Provider = ProviderCilium
+
+	assertYAMLEqual(t, "endpoint-cilium", MakeEndpointPolicy(params), `
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: openchoreo-e-greeter-api-stable-1a2b3c4d
+  namespace: dp-ns
+spec:
+  endpointSelector:
+    matchLabels:
+      app: greeter
+  ingress:
+    - fromEndpoints:
+        - matchExpressions:
+            - key: openchoreo.dev/system-component
+              operator: Exists
+            - key: k8s:io.kubernetes.pod.namespace
+              operator: Exists
+      toPorts:
+        - ports:
+            - port: "9090"
+              protocol: TCP
+          rules:
+            http:
+              - {}
+`)
+}
+
+func TestProviderFromAnnotations(t *testing.T) {
+	for _, tc := range []struct {
+		annotations map[string]string
+		want        Provider
+	}{
+		{nil, ProviderKubernetes},
+		{map[string]string{ProviderAnnotation: "cilium"}, ProviderCilium},
+		{map[string]string{ProviderAnnotation: "calico"}, ProviderKubernetes},
+	} {
+		if got := ProviderFromAnnotations(tc.annotations); got != tc.want {
+			t.Errorf("ProviderFromAnnotations(%v) = %s, want %s", tc.annotations, got, tc.want)
+		}
 	}
 }

@@ -58,8 +58,12 @@ var mcpEnrichment = map[string]mcpEnrichmentEntry{
 	// identity comes back from the service call, same as a body-carried REST
 	// create with no RESTResourceParam).
 	"CreateReleaseBinding": {ToolName: "create_release_binding"},
-	"UpdateReleaseBinding": {ToolName: "update_release_binding", ResourceArg: "binding_name"},
-	"DeleteReleaseBinding": {ToolName: "delete_release_binding", ResourceArg: "binding_name"},
+
+	"CreateComponentReleaseLine": {ToolName: "create_release_line", ResourceArg: "name"},
+	"UpdateComponentReleaseLine": {ToolName: "patch_release_line", ResourceArg: "release_line_name"},
+	"DeleteComponentReleaseLine": {ToolName: "delete_release_line", ResourceArg: "release_line_name"},
+	"UpdateReleaseBinding":       {ToolName: "update_release_binding", ResourceArg: "binding_name"},
+	"DeleteReleaseBinding":       {ToolName: "delete_release_binding", ResourceArg: "binding_name"},
 
 	// ComponentRelease. GenerateRelease is bound here, not exempted: its MCP
 	// tool (create_component_release) and REST's GenerateRelease handler both
@@ -73,6 +77,12 @@ var mcpEnrichment = map[string]mcpEnrichmentEntry{
 	// being executed, not the run being created, so ResourceArg is empty.
 	// trigger_workflow_run reaches the same operation — see mcpAliases.
 	"CreateWorkflowRun": {ToolName: "create_workflow_run"},
+
+	// Live log reads. Their tools declare a view action, so
+	// TestAccessReadMCPToolsAreBound, not TestAuditCoverage, requires these
+	// bindings.
+	"GetReleaseBindingK8sResourceLogs": {ToolName: "get_resource_logs", ResourceArg: "release_binding_name"},
+	"GetWorkflowRunLogs":               {ToolName: "get_workflow_run_logs", ResourceArg: "run_name"},
 
 	"CreateDeploymentPipeline": {ToolName: "create_deployment_pipeline", ResourceArg: "name"},
 	"UpdateDeploymentPipeline": {ToolName: "update_deployment_pipeline", ResourceArg: "name"},
@@ -94,6 +104,16 @@ var mcpEnrichment = map[string]mcpEnrichmentEntry{
 	"CreateProjectReleaseBinding":  {ToolName: "create_project_release_binding", ResourceArg: "name"},
 	"UpdateProjectReleaseBinding":  {ToolName: "update_project_release_binding", ResourceArg: "name"},
 	"DeleteProjectReleaseBinding":  {ToolName: "delete_project_release_binding", ResourceArg: "name"},
+
+	// Endpoint family — EndpointRelease has no create or update tool; releases
+	// are cut by the Endpoint controller.
+	"CreateEndpoint":               {ToolName: "create_endpoint", ResourceArg: "name"},
+	"UpdateEndpoint":               {ToolName: "update_endpoint", ResourceArg: "name"},
+	"DeleteEndpoint":               {ToolName: "delete_endpoint", ResourceArg: "name"},
+	"DeleteEndpointRelease":        {ToolName: "delete_endpoint_release", ResourceArg: "name"},
+	"CreateEndpointReleaseBinding": {ToolName: "create_endpoint_release_binding", ResourceArg: "name"},
+	"UpdateEndpointReleaseBinding": {ToolName: "update_endpoint_release_binding", ResourceArg: "name"},
+	"DeleteEndpointReleaseBinding": {ToolName: "delete_endpoint_release_binding", ResourceArg: "name"},
 
 	"CreateSecretReference": {ToolName: "create_secret_reference", ResourceArg: "name"},
 	"UpdateSecretReference": {ToolName: "update_secret_reference", ResourceArg: "secret_reference_name"},
@@ -137,6 +157,13 @@ var mcpEnrichment = map[string]mcpEnrichmentEntry{
 	"UpdateClusterProjectType": {ToolName: "update_project_type", Scope: "cluster", ResourceArg: "name"},
 	"DeleteProjectType":        {ToolName: "delete_project_type", Scope: "namespace", ResourceArg: "name"},
 	"DeleteClusterProjectType": {ToolName: "delete_project_type", Scope: "cluster", ResourceArg: "name"},
+
+	"CreateEndpointType":        {ToolName: "create_endpoint_type", Scope: "namespace", ResourceArg: "name"},
+	"CreateClusterEndpointType": {ToolName: "create_endpoint_type", Scope: "cluster", ResourceArg: "name"},
+	"UpdateEndpointType":        {ToolName: "update_endpoint_type", Scope: "namespace", ResourceArg: "name"},
+	"UpdateClusterEndpointType": {ToolName: "update_endpoint_type", Scope: "cluster", ResourceArg: "name"},
+	"DeleteEndpointType":        {ToolName: "delete_endpoint_type", Scope: "namespace", ResourceArg: "name"},
+	"DeleteClusterEndpointType": {ToolName: "delete_endpoint_type", Scope: "cluster", ResourceArg: "name"},
 
 	// AuthzRole/AuthzRoleBinding — the naming break: the MCP tool family is
 	// "authz_role[_binding]" but the REST operationIds are Namespace/Cluster

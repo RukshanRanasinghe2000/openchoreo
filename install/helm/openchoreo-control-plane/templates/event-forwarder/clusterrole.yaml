@@ -12,6 +12,7 @@ rules:
   resources:
   - projects
   - components
+  - releaselines
   - workloads
   - environments
   - dataplanes
@@ -24,6 +25,8 @@ rules:
   - resources
   - resourcetypes
   - projecttypes
+  - endpoints
+  - endpointtypes
   - clustercomponenttypes
   - clustertraits
   - clusterworkflows
@@ -32,6 +35,7 @@ rules:
   - clusterworkflowplanes
   - clusterresourcetypes
   - clusterprojecttypes
+  - clusterendpointtypes
   verbs:
   - get
   - list

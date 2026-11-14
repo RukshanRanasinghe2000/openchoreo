@@ -89,7 +89,7 @@ func NewMCPHandler(
 	}, nil
 }
 
-func (h *MCPHandler) QueryComponentLogs(ctx context.Context, namespace, project, component, environment,
+func (h *MCPHandler) QueryComponentLogs(ctx context.Context, namespace, project, component, environment, releaseLine string, allReleaseLines bool,
 	startTime, endTime, searchPhrase string, logLevels []string, limit int, sortOrder string) (any, error) {
 	limit, sortOrder, logLevels = setDefaults(limit, sortOrder, logLevels)
 	if err := validateTimeRange(startTime, endTime); err != nil {
@@ -98,10 +98,12 @@ func (h *MCPHandler) QueryComponentLogs(ctx context.Context, namespace, project,
 	req := &types.LogsQueryRequest{
 		SearchScope: &types.SearchScope{
 			Component: &types.ComponentSearchScope{
-				Namespace:   namespace,
-				Project:     project,
-				Component:   component,
-				Environment: environment,
+				Namespace:       namespace,
+				Project:         project,
+				Component:       component,
+				Environment:     environment,
+				ReleaseLine:     releaseLine,
+				AllReleaseLines: allReleaseLines,
 			},
 		},
 		StartTime:    startTime,
@@ -111,7 +113,8 @@ func (h *MCPHandler) QueryComponentLogs(ctx context.Context, namespace, project,
 		Limit:        limit,
 		SortOrder:    sortOrder,
 	}
-	return h.logsService.QueryLogs(ctx, req)
+	resp, err := h.logsService.QueryLogs(ctx, req)
+	return auditedResult(ctx, resp, err)
 }
 
 func (h *MCPHandler) QueryWorkflowLogs(ctx context.Context, namespace, workflowRunName, taskName,
@@ -135,10 +138,11 @@ func (h *MCPHandler) QueryWorkflowLogs(ctx context.Context, namespace, workflowR
 		Limit:        limit,
 		SortOrder:    sortOrder,
 	}
-	return h.logsService.QueryLogs(ctx, req)
+	resp, err := h.logsService.QueryLogs(ctx, req)
+	return auditedResult(ctx, resp, err)
 }
 
-func (h *MCPHandler) QueryComponentEvents(ctx context.Context, namespace, project, component, environment,
+func (h *MCPHandler) QueryComponentEvents(ctx context.Context, namespace, project, component, environment, releaseLine string, allReleaseLines bool,
 	startTime, endTime string, limit int, sortOrder string) (any, error) {
 	limit, sortOrder, _ = setDefaults(limit, sortOrder, nil)
 	if err := validateTimeRange(startTime, endTime); err != nil {
@@ -147,10 +151,12 @@ func (h *MCPHandler) QueryComponentEvents(ctx context.Context, namespace, projec
 	req := &types.EventsQueryRequest{
 		SearchScope: &types.SearchScope{
 			Component: &types.ComponentSearchScope{
-				Namespace:   namespace,
-				Project:     project,
-				Component:   component,
-				Environment: environment,
+				Namespace:       namespace,
+				Project:         project,
+				Component:       component,
+				Environment:     environment,
+				ReleaseLine:     releaseLine,
+				AllReleaseLines: allReleaseLines,
 			},
 		},
 		StartTime: startTime,
@@ -182,7 +188,7 @@ func (h *MCPHandler) QueryWorkflowEvents(ctx context.Context, namespace, workflo
 	return h.eventsService.QueryEvents(ctx, req)
 }
 
-func (h *MCPHandler) QueryResourceMetrics(ctx context.Context, namespace, project, component, environment,
+func (h *MCPHandler) QueryResourceMetrics(ctx context.Context, namespace, project, component, environment, releaseLine string, allReleaseLines bool,
 	startTime, endTime string, step *string) (any, error) {
 	if err := validateTimeRange(startTime, endTime); err != nil {
 		return nil, err
@@ -193,16 +199,18 @@ func (h *MCPHandler) QueryResourceMetrics(ctx context.Context, namespace, projec
 		EndTime:   endTime,
 		Step:      step,
 		SearchScope: types.ComponentSearchScope{
-			Namespace:   namespace,
-			Project:     project,
-			Component:   component,
-			Environment: environment,
+			Namespace:       namespace,
+			Project:         project,
+			Component:       component,
+			Environment:     environment,
+			ReleaseLine:     releaseLine,
+			AllReleaseLines: allReleaseLines,
 		},
 	}
 	return h.metricsService.QueryMetrics(ctx, req)
 }
 
-func (h *MCPHandler) QueryHTTPMetrics(ctx context.Context, namespace, project, component, environment,
+func (h *MCPHandler) QueryHTTPMetrics(ctx context.Context, namespace, project, component, environment, releaseLine string, allReleaseLines bool,
 	startTime, endTime string, step *string) (any, error) {
 	if err := validateTimeRange(startTime, endTime); err != nil {
 		return nil, err
@@ -213,16 +221,18 @@ func (h *MCPHandler) QueryHTTPMetrics(ctx context.Context, namespace, project, c
 		EndTime:   endTime,
 		Step:      step,
 		SearchScope: types.ComponentSearchScope{
-			Namespace:   namespace,
-			Project:     project,
-			Component:   component,
-			Environment: environment,
+			Namespace:       namespace,
+			Project:         project,
+			Component:       component,
+			Environment:     environment,
+			ReleaseLine:     releaseLine,
+			AllReleaseLines: allReleaseLines,
 		},
 	}
 	return h.metricsService.QueryMetrics(ctx, req)
 }
 
-func (h *MCPHandler) QueryTraces(ctx context.Context, namespace, project, component, environment,
+func (h *MCPHandler) QueryTraces(ctx context.Context, namespace, project, component, environment, releaseLine string, allReleaseLines bool,
 	startTime, endTime string, limit int, sortOrder string) (any, error) {
 	limit, sortOrder, _ = setDefaults(limit, sortOrder, nil)
 	start, err := parseRFC3339Time(startTime)
@@ -239,16 +249,18 @@ func (h *MCPHandler) QueryTraces(ctx context.Context, namespace, project, compon
 		Limit:     limit,
 		SortOrder: sortOrder,
 		SearchScope: types.ComponentSearchScope{
-			Namespace:   namespace,
-			Project:     project,
-			Component:   component,
-			Environment: environment,
+			Namespace:       namespace,
+			Project:         project,
+			Component:       component,
+			Environment:     environment,
+			ReleaseLine:     releaseLine,
+			AllReleaseLines: allReleaseLines,
 		},
 	}
 	return h.tracesService.QueryTraces(ctx, req)
 }
 
-func (h *MCPHandler) QueryTraceSpans(ctx context.Context, traceID, namespace, project, component, environment,
+func (h *MCPHandler) QueryTraceSpans(ctx context.Context, traceID, namespace, project, component, environment, releaseLine string, allReleaseLines bool,
 	startTime, endTime string, limit int, sortOrder string) (any, error) {
 	limit, sortOrder, _ = setDefaults(limit, sortOrder, nil)
 	start, err := parseRFC3339Time(startTime)
@@ -265,20 +277,24 @@ func (h *MCPHandler) QueryTraceSpans(ctx context.Context, traceID, namespace, pr
 		Limit:     limit,
 		SortOrder: sortOrder,
 		SearchScope: types.ComponentSearchScope{
-			Namespace:   namespace,
-			Project:     project,
-			Component:   component,
-			Environment: environment,
+			Namespace:       namespace,
+			Project:         project,
+			Component:       component,
+			Environment:     environment,
+			ReleaseLine:     releaseLine,
+			AllReleaseLines: allReleaseLines,
 		},
 	}
-	return h.tracesService.QuerySpans(ctx, traceID, req)
+	resp, err := h.tracesService.QuerySpans(ctx, traceID, req)
+	return auditedResult(ctx, resp, err)
 }
 
 func (h *MCPHandler) GetSpanDetails(ctx context.Context, traceID, spanID string) (any, error) {
-	return h.tracesService.GetSpanDetails(ctx, traceID, spanID)
+	span, err := h.tracesService.GetSpanDetails(ctx, traceID, spanID)
+	return auditedResult(ctx, span, err)
 }
 
-func (h *MCPHandler) QueryAlerts(ctx context.Context, namespace, project, component, environment,
+func (h *MCPHandler) QueryAlerts(ctx context.Context, namespace, project, component, environment, releaseLine string, allReleaseLines bool,
 	startTime, endTime string, limit int, sortOrder string) (any, error) {
 	limit, sortOrder, _ = setDefaults(limit, sortOrder, nil)
 	start, err := parseRFC3339Time(startTime)
@@ -296,16 +312,18 @@ func (h *MCPHandler) QueryAlerts(ctx context.Context, namespace, project, compon
 		Limit:     &limit,
 		SortOrder: &sortOrderTyped,
 		SearchScope: gen.ComponentSearchScope{
-			Namespace:   namespace,
-			Project:     strPtr(project),
-			Component:   strPtr(component),
-			Environment: strPtr(environment),
+			Namespace:       namespace,
+			Project:         strPtr(project),
+			Component:       strPtr(component),
+			Environment:     strPtr(environment),
+			ReleaseLine:     strPtr(releaseLine),
+			AllReleaseLines: truePtr(allReleaseLines),
 		},
 	}
 	return h.alertIncidentService.QueryAlerts(ctx, req)
 }
 
-func (h *MCPHandler) QueryIncidents(ctx context.Context, namespace, project, component, environment,
+func (h *MCPHandler) QueryIncidents(ctx context.Context, namespace, project, component, environment, releaseLine string, allReleaseLines bool,
 	startTime, endTime string, limit int, sortOrder string) (any, error) {
 	limit, sortOrder, _ = setDefaults(limit, sortOrder, nil)
 	start, err := parseRFC3339Time(startTime)
@@ -323,52 +341,70 @@ func (h *MCPHandler) QueryIncidents(ctx context.Context, namespace, project, com
 		Limit:     &limit,
 		SortOrder: &sortOrderTyped,
 		SearchScope: gen.ComponentSearchScope{
-			Namespace:   namespace,
-			Project:     strPtr(project),
-			Component:   strPtr(component),
-			Environment: strPtr(environment),
+			Namespace:       namespace,
+			Project:         strPtr(project),
+			Component:       strPtr(component),
+			Environment:     strPtr(environment),
+			ReleaseLine:     strPtr(releaseLine),
+			AllReleaseLines: truePtr(allReleaseLines),
 		},
 	}
 	return h.alertIncidentService.QueryIncidents(ctx, req)
 }
 
-func (h *MCPHandler) QueryCosts(ctx context.Context, namespace, environment, project, component,
+func (h *MCPHandler) QueryCosts(ctx context.Context, namespace, environment, project, component, releaseLine string, allReleaseLines bool,
 	startTime, endTime, granularity string) (any, error) {
 	if err := validateFinOpsScope(namespace, environment, project, component); err != nil {
 		return nil, err
+	}
+	if err := validateAllReleaseLines(releaseLine, allReleaseLines); err != nil {
+		return nil, err
+	}
+	if releaseLine != "" && component == "" {
+		return nil, invalidArgument(fmt.Errorf("component is required when release_line is provided"))
 	}
 	if err := validateGranularity(granularity); err != nil {
 		return nil, err
 	}
 	req := &types.CostQueryRequest{
-		Namespace:   namespace,
-		Environment: environment,
-		Project:     project,
-		Component:   component,
-		StartTime:   startTime,
-		EndTime:     endTime,
-		Granularity: granularity,
+		Namespace:       namespace,
+		Environment:     environment,
+		Project:         project,
+		Component:       component,
+		ReleaseLine:     releaseLine,
+		AllReleaseLines: allReleaseLines,
+		StartTime:       startTime,
+		EndTime:         endTime,
+		Granularity:     granularity,
 	}
 	return h.finopsService.GetComponentCosts(ctx, req)
 }
 
-func (h *MCPHandler) QueryRecommendations(ctx context.Context, namespace, environment, project, component,
+func (h *MCPHandler) QueryRecommendations(ctx context.Context, namespace, environment, project, component, releaseLine string, allReleaseLines bool,
 	startTime, endTime string) (any, error) {
 	if err := validateFinOpsScope(namespace, environment, project, component); err != nil {
 		return nil, err
 	}
+	if err := validateAllReleaseLines(releaseLine, allReleaseLines); err != nil {
+		return nil, err
+	}
+	if releaseLine != "" && component == "" {
+		return nil, invalidArgument(fmt.Errorf("component is required when release_line is provided"))
+	}
 	req := &types.RecommendationQueryRequest{
-		Namespace:   namespace,
-		Environment: environment,
-		Project:     project,
-		Component:   component,
-		StartTime:   startTime,
-		EndTime:     endTime,
+		Namespace:       namespace,
+		Environment:     environment,
+		Project:         project,
+		Component:       component,
+		ReleaseLine:     releaseLine,
+		AllReleaseLines: allReleaseLines,
+		StartTime:       startTime,
+		EndTime:         endTime,
 	}
 	return h.finopsService.GetRecommendations(ctx, req)
 }
 
-func (h *MCPHandler) QueryDoraMetrics(ctx context.Context, namespace, project, component, environment,
+func (h *MCPHandler) QueryDoraMetrics(ctx context.Context, namespace, project, component, environment, releaseLine string, allReleaseLines bool,
 	granularity, startTime, endTime string, metrics []string) (any, error) {
 	start, err := parseRFC3339Time(startTime)
 	if err != nil {
@@ -383,10 +419,12 @@ func (h *MCPHandler) QueryDoraMetrics(ctx context.Context, namespace, project, c
 		StartTime: start,
 		EndTime:   end,
 		SearchScope: gen.ComponentSearchScope{
-			Namespace:   namespace,
-			Project:     strPtr(project),
-			Component:   strPtr(component),
-			Environment: strPtr(environment),
+			Namespace:       namespace,
+			Project:         strPtr(project),
+			Component:       strPtr(component),
+			Environment:     strPtr(environment),
+			ReleaseLine:     strPtr(releaseLine),
+			AllReleaseLines: truePtr(allReleaseLines),
 		},
 	}
 	if granularity != "" {
@@ -416,7 +454,7 @@ func (h *MCPHandler) QueryDoraMetrics(ctx context.Context, namespace, project, c
 // QueryDoraDeployments lists the individual deployments behind the DORA numbers:
 // the rollouts themselves, with their outcome, lead time and commit. It is what
 // turns "change failure rate is 25%" into which four rollouts failed.
-func (h *MCPHandler) QueryDoraDeployments(ctx context.Context, namespace, project, component, environment,
+func (h *MCPHandler) QueryDoraDeployments(ctx context.Context, namespace, project, component, environment, releaseLine string, allReleaseLines bool,
 	startTime, endTime, sortOrder string, limit int) (any, error) {
 	start, err := parseRFC3339Time(startTime)
 	if err != nil {
@@ -431,10 +469,12 @@ func (h *MCPHandler) QueryDoraDeployments(ctx context.Context, namespace, projec
 		StartTime: start,
 		EndTime:   end,
 		SearchScope: gen.ComponentSearchScope{
-			Namespace:   namespace,
-			Project:     strPtr(project),
-			Component:   strPtr(component),
-			Environment: strPtr(environment),
+			Namespace:       namespace,
+			Project:         strPtr(project),
+			Component:       strPtr(component),
+			Environment:     strPtr(environment),
+			ReleaseLine:     strPtr(releaseLine),
+			AllReleaseLines: truePtr(allReleaseLines),
 		},
 	}
 	if limit > 0 {

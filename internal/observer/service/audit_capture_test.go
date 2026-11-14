@@ -1,0 +1,365 @@
+// Copyright 2026 The OpenChoreo Authors
+// SPDX-License-Identifier: Apache-2.0
+
+package service
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"net/http"
+	"strings"
+	"testing"
+	"time"
+	"unicode/utf8"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
+	coreconfig "github.com/openchoreo/openchoreo/internal/config"
+	"github.com/openchoreo/openchoreo/internal/observer/service/mocks"
+	"github.com/openchoreo/openchoreo/internal/observer/types"
+	"github.com/openchoreo/openchoreo/internal/server/middleware/audit"
+)
+
+const (
+	leakLogLine        = "DB_PASSWORD=hunter2-should-not-leak"
+	leakSpanAttribute  = "SELECT * FROM users WHERE token='should-not-leak'"
+	captureTestTraceID = "trace-1"
+)
+
+func auditedCtx(ctx context.Context) (context.Context, *audit.AuditData) {
+	return audit.NewAuditContext(ctx, &audit.Resource{}, audit.RequestInfo{})
+}
+
+// publishedRecord renders what the emitter would publish for a successful op.
+func publishedRecord(t *testing.T, ctx context.Context, data *audit.AuditData, opID string) string {
+	t.Helper()
+	policies, errs := audit.NewPolicySet(coreconfig.NewPath("audit"), audit.Settings{Publish: true}, nil)
+	require.Empty(t, errs)
+	var buf bytes.Buffer
+	emitter, err := audit.NewEmitter("observer", policies, audit.NewLogger(&buf))
+	require.NoError(t, err)
+
+	op := &audit.Operation{ID: opID, Action: "read", Category: audit.CategoryAccess}
+	audit.EmitFromContext(ctx, emitter, "", op, audit.SurfaceREST, audit.ResultSuccess, data, http.Header{}, "")
+	return buf.String()
+}
+
+func TestQueryAuditLogs_RecordsFiltersAndCount(t *testing.T) {
+	inner := mocks.NewMockAuditLogsQuerier(t)
+	inner.EXPECT().QueryAuditLogs(mock.Anything, mock.Anything).Return(&types.AuditLogsResponse{
+		Records: []types.AuditLogRecord{{EventID: "e1"}, {EventID: "e2"}},
+		Total:   40,
+	}, nil)
+	svc := NewAuditLogsServiceWithAuthz(inner, mockPDPAllow(t), testLogger())
+
+	ctx, data := auditedCtx(authedCtx())
+	_, err := svc.QueryAuditLogs(ctx, &types.AuditLogsQueryRequest{
+		StartTime:    "2026-10-01T00:00:00Z",
+		EndTime:      "2026-10-02T00:00:00Z",
+		Actor:        types.AuditLogsActorFilter{IDs: []string{"alice"}},
+		Returned:     types.AuditLogsReturnedFilter{Items: types.AuditLogsReturnedItemsFilter{Names: []string{"db-creds"}}},
+		Categories:   []string{"access"},
+		SearchPhrase: "rotate",
+		Limit:        50,
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]any{
+		"startTime":    "2026-10-01T00:00:00Z",
+		"endTime":      "2026-10-02T00:00:00Z",
+		"actor":        map[string]any{"id": []string{"alice"}},
+		"returned":     map[string]any{"items": map[string]any{"name": []string{"db-creds"}}},
+		"category":     []string{"access"},
+		"searchPhrase": "rotate",
+	}, data.Parameters)
+
+	require.NotNil(t, data.Returned)
+	// The entries handed back, not every match in the window.
+	assert.Equal(t, audit.Returned{Count: 2}, *data.Returned)
+}
+
+func TestQueryAuditLogs_DeniedRecordsRequestOnly(t *testing.T) {
+	inner := mocks.NewMockAuditLogsQuerier(t)
+	svc := NewAuditLogsServiceWithAuthz(inner, mockPDPDeny(t), testLogger())
+
+	ctx, data := auditedCtx(authedCtx())
+	_, err := svc.QueryAuditLogs(ctx, &types.AuditLogsQueryRequest{StartTime: "s", EndTime: "e"})
+	require.Error(t, err)
+
+	require.NotNil(t, data.Parameters)
+	assert.Nil(t, data.Returned)
+}
+
+func TestQueryLogs_RecordsScopeSearchAndCount(t *testing.T) {
+	inner := mocks.NewMockLogsQuerier(t)
+	inner.EXPECT().QueryLogs(mock.Anything, mock.Anything).Return(&types.LogsQueryResponse{
+		Logs: []types.LogEntry{{Log: leakLogLine}, {Log: "second"}, {Log: "third"}},
+	}, nil)
+	svc := NewLogsServiceWithAuthz(inner, mockPDPAllow(t), testLogger())
+
+	ctx, data := auditedCtx(authedCtx())
+	_, err := svc.QueryLogs(ctx, &types.LogsQueryRequest{
+		SearchScope: &types.SearchScope{Workflow: &types.WorkflowSearchScope{
+			Namespace: "acme", WorkflowRunName: "build-42",
+		}},
+		StartTime:    "2026-10-01T00:00:00Z",
+		EndTime:      "2026-10-02T00:00:00Z",
+		SearchPhrase: "password",
+		LogLevels:    []string{"ERROR"},
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]any{
+		"startTime":    "2026-10-01T00:00:00Z",
+		"endTime":      "2026-10-02T00:00:00Z",
+		"searchScope":  map[string]any{"namespace": "acme", "workflowRunName": "build-42"},
+		"searchPhrase": "password",
+		"logLevels":    []string{"ERROR"},
+	}, data.Parameters)
+	assert.Equal(t, audit.Returned{Count: 3}, *data.Returned)
+
+	record := publishedRecord(t, ctx, data, "QueryLogs")
+	assert.Contains(t, record, `"returned":{"count":3}`)
+	assert.NotContains(t, record, leakLogLine)
+}
+
+func TestQueryLogs_DeniedRecordsRequestOnly(t *testing.T) {
+	inner := mocks.NewMockLogsQuerier(t)
+	svc := NewLogsServiceWithAuthz(inner, mockPDPDeny(t), testLogger())
+
+	ctx, data := auditedCtx(authedCtx())
+	_, err := svc.QueryLogs(ctx, &types.LogsQueryRequest{
+		SearchScope: &types.SearchScope{Component: &types.ComponentSearchScope{Namespace: "ns", Component: "c"}},
+	})
+	require.Error(t, err)
+
+	require.NotNil(t, data.Parameters)
+	assert.Nil(t, data.Returned)
+}
+
+func TestQueryPlatformLogs_RecordsCoordinatesAndCount(t *testing.T) {
+	inner := mocks.NewMockPlatformLogsQuerier(t)
+	inner.EXPECT().QueryPlatformLogs(mock.Anything, mock.Anything).Return(&types.PlatformLogsResponse{
+		Logs: []types.PlatformLog{{Log: leakLogLine}},
+	}, nil)
+	svc := NewPlatformLogsServiceWithAuthz(inner, mockPDPAllow(t), testLogger())
+
+	ctx, data := auditedCtx(authedCtx())
+	req := platformLogsRequest()
+	req.PodNames = []string{"api-7f9c"}
+	req.Labels = map[string]string{"openchoreo.dev/plane": "controlplane", "app": "api"}
+	_, err := svc.QueryPlatformLogs(ctx, req)
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]any{
+		"startTime": "2026-08-14T16:30:00Z",
+		"endTime":   "2026-08-14T17:30:00Z",
+		"namespace": []string{"openchoreo-control-plane"},
+		"podName":   []string{"api-7f9c"},
+		"labels":    "app=api,openchoreo.dev/plane=controlplane",
+	}, data.Parameters)
+	assert.Equal(t, audit.Returned{Count: 1}, *data.Returned)
+
+	record := publishedRecord(t, ctx, data, "GetPlatformLogs")
+	assert.NotContains(t, record, leakLogLine)
+}
+
+func TestQuerySpans_RecordsIncludeAttributesAndCount(t *testing.T) {
+	inner := mocks.NewMockTracesQuerier(t)
+	inner.EXPECT().QuerySpans(mock.Anything, captureTestTraceID, mock.Anything).Return(&types.SpansQueryResponse{
+		Spans: []types.SpanInfo{
+			{SpanID: "s1", Attributes: map[string]interface{}{"db.statement": leakSpanAttribute}},
+			{SpanID: "s2"},
+		},
+	}, nil)
+	svc := NewTracesServiceWithAuthz(inner, mockPDPAllow(t), testLogger())
+
+	start := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	ctx, data := auditedCtx(authedCtx())
+	_, err := svc.QuerySpans(ctx, captureTestTraceID, &types.TracesQueryRequest{
+		StartTime:         start,
+		EndTime:           start.Add(time.Hour),
+		IncludeAttributes: true,
+		SearchScope:       types.ComponentSearchScope{Namespace: "ns", Component: "comp"},
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]any{
+		"startTime":         "2026-10-01T00:00:00Z",
+		"endTime":           "2026-10-01T01:00:00Z",
+		"includeAttributes": true,
+		"searchScope":       map[string]any{"namespace": "ns", "component": "comp"},
+	}, data.Parameters)
+	assert.Equal(t, audit.Returned{Count: 2}, *data.Returned)
+
+	record := publishedRecord(t, ctx, data, "QuerySpansForTrace")
+	assert.NotContains(t, record, leakSpanAttribute)
+}
+
+func TestQuerySpans_RecordsIncludeAttributesFalse(t *testing.T) {
+	inner := mocks.NewMockTracesQuerier(t)
+	inner.EXPECT().QuerySpans(mock.Anything, captureTestTraceID, mock.Anything).Return(&types.SpansQueryResponse{}, nil)
+	svc := NewTracesServiceWithAuthz(inner, nil, testLogger())
+
+	ctx, data := auditedCtx(context.Background())
+	_, err := svc.QuerySpans(ctx, captureTestTraceID, &types.TracesQueryRequest{
+		SearchScope: types.ComponentSearchScope{Namespace: "ns"},
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, false, data.Parameters["includeAttributes"])
+	assert.Equal(t, audit.Returned{Count: 0}, *data.Returned)
+
+	record := publishedRecord(t, ctx, data, "QuerySpansForTrace")
+	assert.Contains(t, record, `"includeAttributes":false`)
+	assert.Contains(t, record, `"returned":{"count":0}`)
+}
+
+func TestGetSpanDetails_RecordsSpanAndCount(t *testing.T) {
+	inner := mocks.NewMockTracesQuerier(t)
+	span := spanWithScope()
+	span.Attributes = map[string]interface{}{"db.statement": leakSpanAttribute}
+	inner.EXPECT().GetSpanDetails(mock.Anything, captureTestTraceID, "span-1").Return(span, nil)
+	svc := NewTracesServiceWithAuthz(inner, mockPDPAllow(t), testLogger())
+
+	ctx, data := auditedCtx(authedCtx())
+	_, err := svc.GetSpanDetails(ctx, captureTestTraceID, "span-1")
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]any{"spanId": "span-1"}, data.Parameters)
+	assert.Equal(t, audit.Returned{Count: 1}, *data.Returned)
+
+	record := publishedRecord(t, ctx, data, "GetSpanDetailsForTrace")
+	assert.NotContains(t, record, leakSpanAttribute)
+}
+
+// The span is fetched before the authz check, but never reaches the caller.
+func TestGetSpanDetails_DeniedRecordsRequestOnly(t *testing.T) {
+	inner := mocks.NewMockTracesQuerier(t)
+	inner.EXPECT().GetSpanDetails(mock.Anything, captureTestTraceID, "span-1").Return(spanWithScope(), nil)
+	svc := NewTracesServiceWithAuthz(inner, mockPDPDeny(t), testLogger())
+
+	ctx, data := auditedCtx(authedCtx())
+	_, err := svc.GetSpanDetails(ctx, captureTestTraceID, "span-1")
+	require.Error(t, err)
+
+	require.NotNil(t, data.Parameters)
+	assert.Nil(t, data.Returned)
+}
+
+func TestQueryRawTraces_RecordsTheRequest(t *testing.T) {
+	tests := []struct {
+		name        string
+		contentType string
+		body        string
+		want        string
+	}{
+		{"text body as written", "text/plain", "AppDependencies\n| where Success == false\n| take 10",
+			"AppDependencies\n| where Success == false\n| take 10"},
+		{"JSON body as compact JSON", "application/json",
+			"{\n  \"size\": 0,\n  \"query\": {\"term\": {\"status.code\": \"Error\"}}\n}",
+			`{"size":0,"query":{"term":{"status.code":"Error"}}}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			inner := mocks.NewMockTracesQuerier(t)
+			inner.EXPECT().QueryRawTraces(mock.Anything, mock.Anything).
+				Return(&types.RawTracesQueryResponse{Body: []byte(`{"hits":{"hits":[{"_source":{"attributes":{"db.statement":"` +
+					leakSpanAttribute + `"}}}]}}`)}, nil)
+			svc := NewTracesServiceWithAuthz(inner, mockPDPAllow(t), testLogger())
+
+			ctx, data := auditedCtx(authedCtx())
+			_, err := svc.QueryRawTraces(ctx, &types.RawTracesQueryRequest{
+				ContentType: tt.contentType, Body: []byte(tt.body),
+			})
+			require.NoError(t, err)
+
+			sum := sha256.Sum256([]byte(tt.body))
+			assert.Equal(t, map[string]any{
+				"contentType":    tt.contentType,
+				"query":          tt.want,
+				"queryBytes":     len(tt.body),
+				"querySha256":    hex.EncodeToString(sum[:]),
+				"queryTruncated": false,
+			}, data.Parameters)
+
+			record := publishedRecord(t, ctx, data, "QueryRawTraces")
+			assert.NotContains(t, record, leakSpanAttribute, "the result must never be recorded")
+		})
+	}
+}
+
+func TestQueryRawTraces_RecordsADeniedQuery(t *testing.T) {
+	inner := mocks.NewMockTracesQuerier(t)
+	svc := NewTracesServiceWithAuthz(inner, mockPDPDeny(t), testLogger())
+
+	ctx, data := auditedCtx(authedCtx())
+	_, err := svc.QueryRawTraces(ctx, &types.RawTracesQueryRequest{ContentType: "text/plain", Body: []byte("SELECT 1")})
+	require.Error(t, err)
+
+	assert.Equal(t, "SELECT 1", data.Parameters["query"])
+}
+
+func TestQueryRawTraces_CapsALongQuery(t *testing.T) {
+	inner := mocks.NewMockTracesQuerier(t)
+	inner.EXPECT().QueryRawTraces(mock.Anything, mock.Anything).
+		Return(&types.RawTracesQueryResponse{Body: []byte(`{}`)}, nil)
+	svc := NewTracesServiceWithAuthz(inner, mockPDPAllow(t), testLogger())
+
+	long := "SELECT trace_id FROM \"default\" WHERE " + strings.Repeat("http_method = 'GET' OR ", 50) + "1 = 1"
+
+	ctx, data := auditedCtx(authedCtx())
+	_, err := svc.QueryRawTraces(ctx, &types.RawTracesQueryRequest{ContentType: "text/plain", Body: []byte(long)})
+	require.NoError(t, err)
+
+	recorded, ok := data.Parameters["query"].(string)
+	require.True(t, ok)
+	assert.Equal(t, audit.MaxParameterLength, utf8.RuneCountInString(recorded))
+	assert.True(t, strings.HasPrefix(long, recorded))
+	sum := sha256.Sum256([]byte(long))
+	assert.Equal(t, true, data.Parameters["queryTruncated"], "a cut query must be flagged")
+	assert.Equal(t, len(long), data.Parameters["queryBytes"])
+	assert.Equal(t, hex.EncodeToString(sum[:]), data.Parameters["querySha256"])
+}
+
+func TestRawQueryText(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		contentType   string
+		body          string
+		maxRunes      int
+		want          string
+		wantTruncated bool
+	}{
+		{"JSON whitespace is dropped outside strings", "application/json",
+			"{ \"a\" : \"x  y\",\n\t\"b\":[1, 2] }", 100, `{"a":"x  y","b":[1,2]}`, false},
+		{"escaped quotes keep the string open", "application/json",
+			`{"a": "say \" hi \\", "b" : 1}`, 100, `{"a":"say \" hi \\","b":1}`, false},
+		{"text is kept as written", "text/plain", "a  b\n c", 100, "a  b\n c", false},
+		{"cut at the rune limit", "text/plain", "abcdef", 4, "abcd", true},
+		{"multi-byte runes are not split", "text/plain", "héllo wörld", 7, "héllo w", true},
+		{"padding in front is flagged", "application/json",
+			`{"aggs":{"pad":{"terms":{"field":"` + strings.Repeat("x", 300) + `"}}},"query":{"term":{"secret":1}}}`,
+			audit.MaxParameterLength, "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, truncated := rawQueryText(tt.contentType, []byte(tt.body), tt.maxRunes)
+			assert.Equal(t, tt.wantTruncated, truncated)
+			if truncated {
+				assert.Equal(t, tt.maxRunes, utf8.RuneCountInString(got), "a cut query keeps exactly the limit")
+			}
+			if tt.want != "" {
+				assert.Equal(t, tt.want, got)
+			}
+			assert.True(t, utf8.ValidString(got))
+		})
+	}
+}

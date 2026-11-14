@@ -61,6 +61,7 @@ const (
 	ResourceName        AuditLogFilterValuesRequestFilter = "resource.name"
 	ResourceNamespace   AuditLogFilterValuesRequestFilter = "resource.namespace"
 	ResourceProject     AuditLogFilterValuesRequestFilter = "resource.project"
+	ResourceReleaseLine AuditLogFilterValuesRequestFilter = "resource.release_line"
 	ResourceResource    AuditLogFilterValuesRequestFilter = "resource.resource"
 	ResourceType        AuditLogFilterValuesRequestFilter = "resource.type"
 	Result              AuditLogFilterValuesRequestFilter = "result"
@@ -141,13 +142,17 @@ const (
 
 // Defines values for ErrorResponseTitle.
 const (
-	BadRequest          ErrorResponseTitle = "badRequest"
-	Conflict            ErrorResponseTitle = "conflict"
-	Forbidden           ErrorResponseTitle = "forbidden"
-	InternalServerError ErrorResponseTitle = "internalServerError"
-	NotFound            ErrorResponseTitle = "notFound"
-	NotImplemented      ErrorResponseTitle = "notImplemented"
-	Unauthorized        ErrorResponseTitle = "unauthorized"
+	BadRequest           ErrorResponseTitle = "badRequest"
+	Conflict             ErrorResponseTitle = "conflict"
+	Forbidden            ErrorResponseTitle = "forbidden"
+	GatewayTimeout       ErrorResponseTitle = "gatewayTimeout"
+	InternalServerError  ErrorResponseTitle = "internalServerError"
+	NotFound             ErrorResponseTitle = "notFound"
+	NotImplemented       ErrorResponseTitle = "notImplemented"
+	PayloadTooLarge      ErrorResponseTitle = "payloadTooLarge"
+	TooManyRequests      ErrorResponseTitle = "tooManyRequests"
+	Unauthorized         ErrorResponseTitle = "unauthorized"
+	UnsupportedMediaType ErrorResponseTitle = "unsupportedMediaType"
 )
 
 // Defines values for EventsQueryRequestSortOrder.
@@ -605,6 +610,13 @@ type AuditLogRecord struct {
 	// Producer Emitting service.
 	Producer *string `json:"producer,omitempty"`
 
+	// Request What the operation was asked for, on reads audited under `access` that take
+	// parameters. It is recorded once the request reaches the service, so a denied
+	// read still shows what was attempted. A request rejected before that, for
+	// example as malformed, has none. The secret reads take no parameters and
+	// never carry it.
+	Request *AuditLogRequest `json:"request,omitempty"`
+
 	// RequestId Correlates this record with the access log line for the same request.
 	RequestId *string `json:"request_id,omitempty"`
 
@@ -616,8 +628,15 @@ type AuditLogRecord struct {
 	// policy) at schema 1.0.
 	Result string `json:"result"`
 
+	// Returned What the operation handed back, never the content itself. Present only when
+	// `result` is `success`.
+	Returned *AuditLogReturned `json:"returned,omitempty"`
+
 	// SchemaVersion Schema of this record. `major.minor`; major on a field removal or a changed
 	// value representation, minor on an addition.
+	//
+	// It describes the record as it was produced. A storage module older than 1.1
+	// serves a 1.1 record without its `request` and `returned` groups.
 	SchemaVersion string `json:"schema_version"`
 
 	// SourceIp Client address the request arrived from.
@@ -633,6 +652,24 @@ type AuditLogRecord struct {
 	UserAgent *string `json:"user_agent,omitempty"`
 }
 
+// AuditLogRequest What the operation was asked for, on reads audited under `access` that take
+// parameters. It is recorded once the request reaches the service, so a denied
+// read still shows what was attempted. A request rejected before that, for
+// example as malformed, has none. The secret reads take no parameters and
+// never carry it.
+type AuditLogRequest struct {
+	// Parameters The operation's own query and body parameters, under the API's names. Each
+	// operation records a reviewed allowlist, never the whole request. Path
+	// parameters are left out, since `http.path` and `resource` carry them, with
+	// one exception: a span read records `spanId`, because `resource.name` holds
+	// the trace and an MCP call has no `http.path`. Every string is cut to 256
+	// characters.
+	//
+	// A free-text search phrase is recorded as sent. It can hold personal data,
+	// or a value the caller was searching logs for, such as a leaked token.
+	Parameters *map[string]interface{} `json:"parameters,omitempty"`
+}
+
 // AuditLogResource The target resource, and the point in OpenChoreo's tree the decision was
 // authorized at. Absent on a rejection that resolved no operation.
 type AuditLogResource struct {
@@ -645,12 +682,36 @@ type AuditLogResource struct {
 	Namespace   *string                 `json:"namespace,omitempty"`
 	Project     *string                 `json:"project,omitempty"`
 
+	// ReleaseLine The component's release line. Absent for its main line.
+	ReleaseLine *string `json:"release_line,omitempty"`
+
 	// Resource The Resource level of the hierarchy, a sibling of `component`.
 	Resource *string `json:"resource,omitempty"`
 	Type     *string `json:"type,omitempty"`
 
 	// Uid Server-generated identifier that is never reused. Absent when the operation
 	// returned no object — a delete, or a non-CRUD mutation.
+	Uid *string `json:"uid,omitempty"`
+}
+
+// AuditLogReturned What the operation handed back, never the content itself. Present only when
+// `result` is `success`.
+type AuditLogReturned struct {
+	// Count Entries returned: secrets, log lines, spans or audit records, depending on
+	// the operation. Greater than the number of `items` when the list was cut.
+	Count int `json:"count"`
+
+	// Items Identity of each object returned, one entry for a single-object read.
+	Items *[]AuditLogReturnedItem `json:"items,omitempty"`
+}
+
+// AuditLogReturnedItem defines model for AuditLogReturnedItem.
+type AuditLogReturnedItem struct {
+	Name      string  `json:"name"`
+	Namespace *string `json:"namespace,omitempty"`
+	Type      string  `json:"type"`
+
+	// Uid Tells apart two objects created under the same name.
 	Uid *string `json:"uid,omitempty"`
 }
 
@@ -827,6 +888,10 @@ type AuditLogsQueryRequest struct {
 	// Result Outcomes. Closed, for the same reason as `category`.
 	Result *[]AuditLogsQueryRequestResult `json:"result,omitempty"`
 
+	// Returned Filters on the record's `returned` group, what a read handed back. Named and
+	// nested as the record is.
+	Returned *AuditLogsReturnedFilter `json:"returned,omitempty"`
+
 	// SearchPhrase Free text to match within the record.
 	SearchPhrase *string `json:"searchPhrase,omitempty"`
 
@@ -904,6 +969,9 @@ type AuditLogsResourceFilter struct {
 	// Project Projects.
 	Project *[]string `json:"project,omitempty"`
 
+	// ReleaseLine Release lines.
+	ReleaseLine *[]string `json:"release_line,omitempty"`
+
 	// Resource Resources, the hierarchy level that is a sibling of `component`.
 	Resource *[]string `json:"resource,omitempty"`
 
@@ -934,6 +1002,23 @@ type AuditLogsResponse struct {
 	// configured to count fully. An audit consumer reading an understated total
 	// draws the wrong conclusion about how much happened.
 	Total int64 `json:"total"`
+}
+
+// AuditLogsReturnedFilter Filters on the record's `returned` group, what a read handed back. Named and
+// nested as the record is.
+type AuditLogsReturnedFilter struct {
+	Items *AuditLogsReturnedItemsFilter `json:"items,omitempty"`
+}
+
+// AuditLogsReturnedItemsFilter defines model for AuditLogsReturnedItemsFilter.
+type AuditLogsReturnedItemsFilter struct {
+	// Name Names of objects a read returned, matched exactly. A record matches when
+	// any of its `returned.items` carries one of them, so "who read `db-creds`"
+	// is one filter whether the secret came back from a get or a list.
+	//
+	// A storage module older than schema 1.1 ignores this filter rather than
+	// rejecting it, and then returns records regardless of what they returned.
+	Name *[]string `json:"name,omitempty"`
 }
 
 // ComponentCost defines model for ComponentCost.
@@ -1000,10 +1085,15 @@ type ComponentRecommendation struct {
 
 // ComponentSearchScope defines model for ComponentSearchScope.
 type ComponentSearchScope struct {
-	Component   *string `json:"component,omitempty"`
-	Environment *string `json:"environment,omitempty"`
-	Namespace   string  `json:"namespace"`
-	Project     *string `json:"project,omitempty"`
+	// AllReleaseLines Covers every line of the component, its main line and its release lines. Can't be combined with releaseLine. Has no effect without component, since a project or environment scope already covers every line.
+	AllReleaseLines *bool   `json:"allReleaseLines,omitempty"`
+	Component       *string `json:"component,omitempty"`
+	Environment     *string `json:"environment,omitempty"`
+	Namespace       string  `json:"namespace"`
+	Project         *string `json:"project,omitempty"`
+
+	// ReleaseLine Restricts the result to one release line of the component, and main to its main line. Omitted covers the component's main line, unless allReleaseLines is set. Requires component. Logs, events, metrics and traces also require environment.
+	ReleaseLine *string `json:"releaseLine,omitempty"`
 }
 
 // CostResponse defines model for CostResponse.
@@ -1470,6 +1560,12 @@ type LogEntryMetadata struct {
 
 	// ProjectUid The OpenChoreo project UID that generated the log
 	ProjectUid *openapi_types.UUID `json:"projectUid,omitempty"`
+
+	// ReleaseLineName The component's release line that generated the log. Absent for its main line.
+	ReleaseLineName *string `json:"releaseLineName,omitempty"`
+
+	// ReleaseLineUid The UID of the component's release line that generated the log. Absent for its main line.
+	ReleaseLineUid *openapi_types.UUID `json:"releaseLineUid,omitempty"`
 }
 
 // LogsQueryRequest defines model for LogsQueryRequest.
@@ -1651,6 +1747,18 @@ type PlatformLogsResponse struct {
 	Total int64 `json:"total"`
 }
 
+// RawTracesQueryRequest The tracing backend's native request, as JSON: for example an OpenSearch
+// search body (`query`, `size`, `aggs`, `sort`, ...) or an OpenObserve search
+// body (`query.sql`, `query.start_time`, `query.end_time`, ...).
+type RawTracesQueryRequest = json.RawMessage
+
+// RawTracesQueryResponse The tracing backend's response, unchanged.
+type RawTracesQueryResponse = json.RawMessage
+
+// RawTracesQueryText The tracing backend's native request, as text, for backends where the
+// query text is the whole request (for example KQL).
+type RawTracesQueryText = string
+
 // RecommendationResponse defines model for RecommendationResponse.
 type RecommendationResponse struct {
 	// Items One recommendation per component in scope. A single element when
@@ -1680,6 +1788,12 @@ type ResourceLabels struct {
 
 	// ProjectUid The UID of the project
 	ProjectUid *openapi_types.UUID `json:"projectUid,omitempty"`
+
+	// ReleaseLineName The name of the component's release line. Absent for its main line.
+	ReleaseLineName *string `json:"releaseLineName,omitempty"`
+
+	// ReleaseLineUid The UID of the component's release line. Absent for its main line.
+	ReleaseLineUid *openapi_types.UUID `json:"releaseLineUid,omitempty"`
 }
 
 // ResourceMetricsTimeSeries defines model for ResourceMetricsTimeSeries.
@@ -2001,6 +2115,9 @@ type WorkflowSearchScope struct {
 	WorkflowRunName *string `json:"workflowRunName,omitempty"`
 }
 
+// FinOpsAllReleaseLines defines model for FinOpsAllReleaseLines.
+type FinOpsAllReleaseLines = bool
+
 // FinOpsComponent defines model for FinOpsComponent.
 type FinOpsComponent = string
 
@@ -2018,6 +2135,9 @@ type FinOpsNamespace = string
 
 // FinOpsProject defines model for FinOpsProject.
 type FinOpsProject = string
+
+// FinOpsReleaseLine defines model for FinOpsReleaseLine.
+type FinOpsReleaseLine = string
 
 // FinOpsStartTime defines model for FinOpsStartTime.
 type FinOpsStartTime = time.Time
@@ -2072,6 +2192,12 @@ type GetComponentCostsParams struct {
 	// Component Component name. When set, narrows the response to this single component. Requires `project`.
 	Component *FinOpsComponent `form:"component,omitempty" json:"component,omitempty"`
 
+	// ReleaseLine Release line of the component. When set, narrows the response to that line, and `main` narrows it to the main line. Omitted covers the component's main line, unless `allReleaseLines` is set. Requires `component`.
+	ReleaseLine *FinOpsReleaseLine `form:"releaseLine,omitempty" json:"releaseLine,omitempty"`
+
+	// AllReleaseLines Covers every line of the component, its main line and its release lines. Can't be combined with `releaseLine`. Has no effect without `component`, since an environment scope already covers every line.
+	AllReleaseLines *FinOpsAllReleaseLines `form:"allReleaseLines,omitempty" json:"allReleaseLines,omitempty"`
+
 	// StartTime Inclusive lower bound of the cost window (RFC 3339, second precision).
 	StartTime FinOpsStartTime `form:"startTime" json:"startTime"`
 
@@ -2091,6 +2217,12 @@ type GetRecommendationsParams struct {
 
 	// Component Component name. When set, narrows the response to this single component. Requires `project`.
 	Component *FinOpsComponent `form:"component,omitempty" json:"component,omitempty"`
+
+	// ReleaseLine Release line of the component. When set, narrows the response to that line, and `main` narrows it to the main line. Omitted covers the component's main line, unless `allReleaseLines` is set. Requires `component`.
+	ReleaseLine *FinOpsReleaseLine `form:"releaseLine,omitempty" json:"releaseLine,omitempty"`
+
+	// AllReleaseLines Covers every line of the component, its main line and its release lines. Can't be combined with `releaseLine`. Has no effect without `component`, since an environment scope already covers every line.
+	AllReleaseLines *FinOpsAllReleaseLines `form:"allReleaseLines,omitempty" json:"allReleaseLines,omitempty"`
 
 	// StartTime Inclusive lower bound of the cost window (RFC 3339, second precision).
 	StartTime FinOpsStartTime `form:"startTime" json:"startTime"`
@@ -2248,6 +2380,12 @@ type QueryRuntimeTopologyJSONRequestBody = RuntimeTopologyRequest
 
 // QueryTracesJSONRequestBody defines body for QueryTraces for application/json ContentType.
 type QueryTracesJSONRequestBody = TracesQueryRequest
+
+// QueryRawTracesJSONRequestBody defines body for QueryRawTraces for application/json ContentType.
+type QueryRawTracesJSONRequestBody = RawTracesQueryRequest
+
+// QueryRawTracesTextRequestBody defines body for QueryRawTraces for text/plain ContentType.
+type QueryRawTracesTextRequestBody = RawTracesQueryText
 
 // QuerySpansForTraceJSONRequestBody defines body for QuerySpansForTrace for application/json ContentType.
 type QuerySpansForTraceJSONRequestBody = TracesQueryRequest

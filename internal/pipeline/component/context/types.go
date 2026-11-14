@@ -55,6 +55,15 @@ type MetadataContext struct {
 	// Example: "cp-acme-corp"
 	ComponentNamespace string `json:"componentNamespace" validate:"required"`
 
+	// ReleaseLineName is the release line being rendered; empty for components without release lines.
+	// Example: "orders-v2"
+	ReleaseLineName string `json:"releaseLineName"`
+
+	// ComponentLineName names the component-level objects of the line being rendered, such as its Service:
+	// the component name, or a name unique to the release line. Set by the pipeline.
+	// Example: "orders-v2-1a2b3c4d"
+	ComponentLineName string `json:"componentLineName"`
+
 	// Labels are common labels to add to all resources.
 	// Example: {"openchoreo.dev/component": "my-service", ...}
 	Labels map[string]string `json:"labels" validate:"required"`
@@ -325,12 +334,16 @@ type ContainerData struct {
 
 // EndpointData contains endpoint information.
 type EndpointData struct {
-	DisplayName string   `json:"displayName,omitempty"`
-	Port        int32    `json:"port"`
-	TargetPort  int32    `json:"targetPort"`
-	Type        string   `json:"type"`
-	BasePath    string   `json:"basePath,omitempty"`
-	Visibility  []string `json:"visibility"`
+	DisplayName string `json:"displayName,omitempty"`
+	Port        int32  `json:"port"`
+	TargetPort  int32  `json:"targetPort"`
+	// Protocol and Type carry the same value: the workload endpoint's protocol,
+	// read through EffectiveProtocol. Type stays for templates written before
+	// the workload field was renamed.
+	Protocol   string   `json:"protocol"`
+	Type       string   `json:"type"`
+	BasePath   string   `json:"basePath,omitempty"`
+	Visibility []string `json:"visibility"`
 }
 
 // EndpointResourceMap maps an endpoint name to the routes extracted from its API

@@ -15,6 +15,9 @@ type ComponentSearchScope struct {
 	Project     string `json:"project,omitempty"`
 	Component   string `json:"component,omitempty"`
 	Environment string `json:"environment,omitempty"`
+	ReleaseLine string `json:"releaseLine,omitempty"`
+	// AllReleaseLines covers every line of the component. Without it, a component scope covers its main line.
+	AllReleaseLines bool `json:"allReleaseLines,omitempty"`
 }
 
 // WorkflowSearchScope defines the search scope for workflow run logs
@@ -128,6 +131,9 @@ type LogMetadata struct {
 	ComponentUID    string `json:"componentUid,omitempty"`
 	ProjectUID      string `json:"projectUid,omitempty"`
 	EnvironmentUID  string `json:"environmentUid,omitempty"`
+	// ReleaseLineName and ReleaseLineUID are empty for the component's main line.
+	ReleaseLineName string `json:"releaseLineName,omitempty"`
+	ReleaseLineUID  string `json:"releaseLineUid,omitempty"`
 	ContainerName   string `json:"containerName,omitempty"`
 	PodName         string `json:"podName,omitempty"`
 	PodNamespace    string `json:"podNamespace,omitempty"`

@@ -1,0 +1,17 @@
+apiVersion: openchoreo.dev/v1alpha1
+kind: ComponentType
+metadata: {name: widget}
+spec:
+  workloadType: deployment
+  resources:
+    - id: widget
+      template:
+        apiVersion: example.com/v1
+        kind: Widget
+        metadata: {name: widget}
+        spec:
+          coutn: '${1}'
+  postRenderValidations:
+    - target: {group: example.com, version: v1, kind: Widget}
+      rule: '${resource.spec.coutn > 0}'
+      message: widget count must be positive

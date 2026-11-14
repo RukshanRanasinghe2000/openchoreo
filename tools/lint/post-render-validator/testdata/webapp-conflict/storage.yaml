@@ -1,0 +1,8 @@
+apiVersion: openchoreo.dev/v1alpha1
+kind: Trait
+metadata: {name: storage, namespace: default}
+spec:
+  postRenderValidations:
+    - target: {group: apps, version: v1, kind: Deployment}
+      rule: '${resource.spec.replicas <= 1}'
+      message: storage requires at most 1 replica
