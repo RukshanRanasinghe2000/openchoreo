@@ -158,7 +158,7 @@ func hasDiagCode(raw json.RawMessage) bool {
 	code := unknownResourceFileCode
 
 	for _, c := range probeCodes(raw) {
-		if c == code {
+		if c == code || c == "unresolved-resource-reference" {
 			return true
 		}
 	}

@@ -104,9 +104,17 @@ func (s *Server) Initialize(
 ) (any, error) {
 	version := "0.2.0"
 
+	// Declare cluster-backed validation before document synchronization or the
+	// workspace scan can publish diagnostics. Empty/loading feeds are unknown.
+	if opts, ok := params.InitializationOptions.(map[string]any); ok && opts["clusterReferenceFeeds"] == true {
+		s.cluster.mu.Lock()
+		s.cluster.names = map[string][]string{}
+		s.cluster.mu.Unlock()
+	}
+
 	openClose := true
 	change := protocol.TextDocumentSyncKindIncremental
-	save := false
+	save := true
 	codeLensResolve := false
 
 	// Index workspace in the background so initialize responds promptly, and
@@ -170,7 +178,8 @@ func (s *Server) Initialize(
 		},
 
 		Capabilities: protocol.ServerCapabilities{
-			Workspace: &protocol.ServerCapabilitiesWorkspace{WorkspaceFolders: &protocol.WorkspaceFoldersServerCapabilities{Supported: &openClose, ChangeNotifications: &protocol.BoolOrString{Value: true}}},
+			Experimental: map[string]any{"projectRenderingValidation": true},
+			Workspace:    &protocol.ServerCapabilitiesWorkspace{WorkspaceFolders: &protocol.WorkspaceFoldersServerCapabilities{Supported: &openClose, ChangeNotifications: &protocol.BoolOrString{Value: true}}},
 			TextDocumentSync: protocol.TextDocumentSyncOptions{
 				OpenClose: &openClose,
 				Change:    &change,
@@ -188,7 +197,7 @@ func (s *Server) Initialize(
 				ResolveProvider: &codeLensResolve,
 			},
 			ExecuteCommandProvider: &protocol.ExecuteCommandOptions{
-				Commands: []string{postRenderCommand, "openchoreo.requiredFieldsPreview"},
+				Commands: []string{postRenderCommand, clusterValidationCommand, "openchoreo.requiredFieldsPreview"},
 			},
 		},
 	}, nil
@@ -205,16 +214,20 @@ func (s *Server) DidOpen(
 		int(params.TextDocument.Version),
 	)
 
-	// Update indexer with new file content
-	if err := s.indexer.UpdateFile(uri, []byte(params.TextDocument.Text)); err != nil {
-		s.notifyLog(context, protocol.MessageTypeError,
-			"indexer update failed for "+uri+": "+err.Error())
+	// Only local resources belong in the filesystem index.
+	s.reconcileClusterValidation(uri, params.TextDocument.Text)
+	if localDocumentPath(uri) != "" {
+		if err := s.indexer.UpdateFile(uri, []byte(params.TextDocument.Text)); err != nil {
+			s.notifyLog(context, protocol.MessageTypeError,
+				"indexer update failed for "+uri+": "+err.Error())
+		}
+		s.invalidatePostRenderForEdit(uri)
 	}
 
 	// The opened document's resources now exist under its declared names;
 	// other open documents may reference them.
 	s.scheduleOtherDocRevalidation(uri)
-	if path := fileURIToPath(uri); path != "" {
+	if path := localDocumentPath(uri); path != "" {
 		go s.triggerPreRenderSchemaValidationForPath(path)
 	}
 
@@ -239,10 +252,12 @@ func (s *Server) DidChange(
 		return err
 	}
 
-	// Update indexer with new content
-	if err := s.indexer.UpdateFile(uri, []byte(doc.Text)); err != nil {
-		s.notifyLog(context, protocol.MessageTypeError,
-			"indexer update failed for "+uri+": "+err.Error())
+	// Update only local filesystem entries.
+	if localDocumentPath(uri) != "" {
+		if err := s.indexer.UpdateFile(uri, []byte(doc.Text)); err != nil {
+			s.notifyLog(context, protocol.MessageTypeError,
+				"indexer update failed for "+uri+": "+err.Error())
+		}
 	}
 
 	// Any edit to a file used by the last post-render run makes the whole
@@ -263,10 +278,16 @@ func (s *Server) DidClose(
 	params *protocol.DidCloseTextDocumentParams,
 ) error {
 	uri := params.TextDocument.URI
+	path := localDocumentPath(uri)
 	closeChanged := false
 	if current := s.GetDocument(uri); current != nil {
-		saved, err := os.ReadFile(fileURIToPath(uri))
-		closeChanged = err != nil || string(saved) != current.Text
+		if path != "" {
+			saved, err := os.ReadFile(path)
+			closeChanged = err != nil || string(saved) != current.Text
+		} else {
+			// A preview close is harmless. Discarding a validated unsaved edit is not.
+			closeChanged = !sameResourceContent(uri, current.loadedText, current.Text)
+		}
 	}
 	s.CloseDocument(uri)
 	s.cancelDiagnostics(uri)
@@ -274,20 +295,19 @@ func (s *Server) DidClose(
 	if closeChanged {
 		s.invalidatePostRenderForClose(uri)
 	}
-
-	// A document closed after its file was renamed or deleted must not keep
-	// its old name in the index. Files that still exist on disk are untouched.
-	if _, err := os.Stat(fileURIToPath(uri)); err != nil {
-		s.indexer.RemoveFile(uri)
-	} else {
-		s.updateIndexedFile(fileURIToPath(uri))
+	if path != "" {
+		if _, err := os.Stat(path); err != nil {
+			s.indexer.RemoveFile(uri)
+		} else {
+			s.updateIndexedFile(path)
+		}
 	}
 
 	// Closing may have removed resource names other open documents reference.
 	s.scheduleOtherDocRevalidation(uri)
 
 	s.publishDiagnostics(context, uri, 0, nil)
-	if path := fileURIToPath(uri); path != "" {
+	if path := localDocumentPath(uri); path != "" {
 		go s.triggerPreRenderSchemaValidationForPath(path)
 	}
 
@@ -314,7 +334,8 @@ func (s *Server) DidSave(
 	params *protocol.DidSaveTextDocumentParams,
 ) error {
 	uri := params.TextDocument.URI
-	if path := fileURIToPath(uri); path != "" {
+	s.markDocumentSaved(uri)
+	if path := localDocumentPath(uri); path != "" {
 		go s.triggerPreRenderSchemaValidationForPath(path)
 	}
 	return nil

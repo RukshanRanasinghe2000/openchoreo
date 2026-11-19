@@ -40,10 +40,10 @@ type validationEntry struct {
 	combined []protocol.Diagnostic
 }
 
-// diagnosticsForCached returns the combined diagnostics for a document,
+// staticDiagnosticsForCached returns cached rule and legacy reference diagnostics,
 // reusing the cached parse and rule-engine result whenever the text is
 // unchanged. The returned slice must be treated as read-only.
-func (s *Server) diagnosticsForCached(uri, text string) []protocol.Diagnostic {
+func (s *Server) staticDiagnosticsForCached(uri, text string) []protocol.Diagnostic {
 	indexVer := s.indexer.Version()
 
 	s.cacheMu.Lock()

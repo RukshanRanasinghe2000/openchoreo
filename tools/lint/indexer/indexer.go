@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -506,9 +507,9 @@ func pathToFileURI(path string) string {
 	if err != nil {
 		return path
 	}
-	// On macOS/Linux, just prefix with file://
-	if !strings.HasPrefix(abs, "file://") {
-		return "file://" + abs
+	path = filepath.ToSlash(abs)
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
 	}
-	return abs
+	return (&url.URL{Scheme: "file", Path: path}).String()
 }
