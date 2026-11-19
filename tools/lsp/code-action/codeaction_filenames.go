@@ -23,7 +23,7 @@ import (
 // when `docker-gitops-release` is a resource name -> `Change name to
 // "docker-gitops-release"`). resourceNames is the authoritative set of
 // `metadata.name` values that a reference can resolve to.
-func fileNameRefFixes(uri string, text string, clientDiags []protocol.Diagnostic, resourceNames []string, pool []string, scopes ...ReferenceScope) []protocol.CodeAction {
+func fileNameRefFixes(uri string, text string, clientDiags []protocol.Diagnostic, _ protocol.Range, resourceNames []string, pool []string, scopes ...ReferenceScope) []protocol.CodeAction {
 	if len(pool) == 0 {
 		return nil
 	}

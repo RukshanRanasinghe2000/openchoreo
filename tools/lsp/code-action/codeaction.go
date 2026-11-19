@@ -64,7 +64,7 @@ func Handle(uri, text string, clientDiags []protocol.Diagnostic, requestRange pr
 
 	// Resource file name fixes: correct a misspelled `name` value to the
 	// most-matching resource name from the indexed list.
-	actions = append(actions, fileNameRefFixes(uri, text, clientDiags, resourceNames, pool, scopes...)...)
+	actions = append(actions, fileNameRefFixes(uri, text, clientDiags, requestRange, resourceNames, pool, scopes...)...)
 
 	if actions == nil {
 		actions = []protocol.CodeAction{}
