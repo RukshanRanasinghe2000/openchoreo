@@ -147,7 +147,7 @@ func TestLiveReferenceWarningAfterResourceNameEdit(t *testing.T) {
 func hasRefDiag(t *testing.T, s *lsp.Server, uri, text string) bool {
 	t.Helper()
 	for _, d := range s.DiagnosticsForText(uri, text) {
-		if d.Code != nil && d.Code.Value == unknownResourceFileCode {
+		if d.Code != nil && (d.Code.Value == unknownResourceFileCode || d.Code.Value == "unresolved-resource-reference") && strings.Contains(d.Message, "observability-alert-rule") {
 			return true
 		}
 	}

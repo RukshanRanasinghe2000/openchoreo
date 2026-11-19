@@ -30,7 +30,17 @@ func schemaFixes(uri string, text string, root *schema.FieldSchema, clientDiags 
 	// every known kind name as its enum so a misspelled kind value is corrected
 	// by the same schema-driven enum fixer used for every other field.
 	if kind, ok := root.Properties["kind"]; ok && len(kind.Enum) == 0 {
-		kind.Enum = template.AllKinds()
+		// Templates are shared with asynchronous validation. Add the enum to
+		// this request's view instead of mutating the cached schema.
+		localKind := *kind
+		localKind.Enum = template.AllKinds()
+		localRoot := *root
+		localRoot.Properties = make(map[string]*schema.FieldSchema, len(root.Properties))
+		for key, value := range root.Properties {
+			localRoot.Properties[key] = value
+		}
+		localRoot.Properties["kind"] = &localKind
+		root = &localRoot
 	}
 	docs, err := parser.ParseYAML([]byte(text))
 	if err != nil {
@@ -191,6 +201,10 @@ func insertSiblingEdit(lines []string, m *yaml.Node, indent, name string, child 
 func bottomLine(n *yaml.Node) int {
 	if n == nil {
 		return 0
+	}
+	// Empty mappings/sequences are leaves too; recursing on n itself overflows.
+	if len(n.Content) == 0 {
+		return n.Line - 1
 	}
 	switch n.Kind {
 	case yaml.ScalarNode, yaml.AliasNode:

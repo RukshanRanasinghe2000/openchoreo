@@ -195,11 +195,11 @@ func TestCodeActionFileNameRefTypo(t *testing.T) {
 		switch a.Title {
 		case testValueChangeNameToDockerGitopsRelease:
 			gotRef = true
-			edits := a.Edit.Changes[uri]
+			edits := []protocol.TextEdit{a.Edit.DocumentChanges[0].(protocol.TextDocumentEdit).Edits[0].(protocol.TextEdit)}
 			if len(edits) == 0 || edits[0].NewText != "docker-gitops-release" {
 				t.Fatalf("expected name fix to 'docker-gitops-release', got: %+v", a)
 			}
-		case `Change name to "standard"`:
+		case `Change to standard`:
 			gotWorkflow = true
 		case `Change name to "p1"`:
 			t.Fatalf("document's own metadata.name must not be given a file-name fix, got %+v", a)
@@ -294,7 +294,7 @@ func TestCodeActionFileNameRefAllowedTraitsAndWorkflows(t *testing.T) {
 	gotTrait, gotWorkflow := false, false
 	for _, a := range actions {
 		switch a.Title {
-		case `Change name to "api-configuration"`:
+		case `Change to api-configuration`:
 			gotTrait = true
 		case testValueChangeNameToDockerGitopsRelease:
 			gotWorkflow = true

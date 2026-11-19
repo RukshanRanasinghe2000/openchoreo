@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strings"
 
 	"github.com/openchoreo/openchoreo/tools/lint/parser"
 	"github.com/openchoreo/openchoreo/tools/lint/ruleengine"
@@ -177,6 +178,17 @@ func (e *locatedError) Unwrap() error { return e.err }
 // the document path without a precise line.
 func locateError(doc *parser.DocumentNode, path, key string, err error) error {
 	line, column := 0, 0
+	if doc != nil && key == "" && doc.Kind == "Component" && strings.Contains(err.Error(), "no Workload for Component") {
+		if metadata := doc.Metadata.Node; metadata != nil {
+			for i := 0; i+1 < len(metadata.Content); i += 2 {
+				if metadata.Content[i].Value == "name" {
+					n := metadata.Content[i+1]
+					line, column = n.Line, n.Column
+					break
+				}
+			}
+		}
+	}
 	if doc != nil && key != "" {
 		if n := findKeyNode(doc.Root, key); n != nil {
 			line, column = n.Line, n.Column

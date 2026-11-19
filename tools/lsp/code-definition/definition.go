@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/url"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	protocol "github.com/tliron/glsp/protocol_3_16"
@@ -78,13 +79,13 @@ func Handle(docText string, cursorLine, cursorCol int, sourceURI string, idx Kin
 	}
 
 	// Case 2: cursor is on a "name" value → find the specific resource
-	if parentKey == "name" {
+	if parentKey == "name" || parentKey == "releaseName" || parentKey == "resourceRelease" || parentKey == "projectRelease" {
 		name := node.Value
 		if name == "" {
 			return nil
 		}
 
-		kind := ""
+		kind := map[string]string{"releaseName": "ComponentRelease", "resourceRelease": "ResourceRelease", "projectRelease": "ProjectRelease"}[parentKey]
 
 		// 2a. Try explicit sibling "kind" field in the parent mapping
 		kindNode := lsputil.FindSiblingKey(parentMapping, "kind")
@@ -99,7 +100,15 @@ func Handle(docText string, cursorLine, cursorCol int, sourceURI string, idx Kin
 			segments := lsputil.SplitPath(normalized)
 			if len(segments) > 0 {
 				fieldName := segments[len(segments)-1]
-				registeredKinds := idx.FindAllKinds()
+				registeredKinds := append([]string(nil), idx.FindAllKinds()...)
+				// Prefer ComponentType over Component for componentType.name.
+				// Index iteration order must not decide the inferred kind.
+				sort.Slice(registeredKinds, func(i, j int) bool {
+					if len(registeredKinds[i]) != len(registeredKinds[j]) {
+						return len(registeredKinds[i]) > len(registeredKinds[j])
+					}
+					return registeredKinds[i] < registeredKinds[j]
+				})
 				kind = lsputil.FindKindByFieldName(fieldName, registeredKinds)
 			}
 		}
@@ -150,6 +159,9 @@ func Handle(docText string, cursorLine, cursorCol int, sourceURI string, idx Kin
 // location with the deepest common path prefix. Retained locations keep their
 // original order.
 func sameProjectLocations(sourceURI string, locations []protocol.Location) []protocol.Location {
+	if u, err := url.Parse(sourceURI); err == nil && u.Scheme == "openchoreo" {
+		return locations
+	}
 	if len(locations) < 2 || sourceURI == "" {
 		return locations
 	}

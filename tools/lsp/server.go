@@ -21,7 +21,6 @@ import (
 	"github.com/openchoreo/openchoreo/tools/lint/targetschema"
 	codeaction "github.com/openchoreo/openchoreo/tools/lsp/code-action"
 	codecompletion "github.com/openchoreo/openchoreo/tools/lsp/code-completion"
-	codedefinition "github.com/openchoreo/openchoreo/tools/lsp/code-definition"
 	"github.com/openchoreo/openchoreo/tools/lsp/hover"
 )
 
@@ -33,6 +32,8 @@ type outboundNotification struct {
 
 type Server struct {
 	cluster               clusterFeed
+	locations             clusterLocations
+	clusterValidation     clusterValidationState
 	schemaMu              sync.Mutex
 	schemaScopes          map[string]schemaScopeEntry
 	schemaDependencyPaths map[string]struct{}
@@ -138,7 +139,7 @@ func NewServer() *Server {
 		outbox:               make(chan outboundNotification, 256),
 		logger:               slog.New(slog.NewTextHandler(os.Stderr, nil)),
 	}
-	s.server = server.NewServer(&clusterHandler{Handler: &handler, feed: &s.cluster, report: func(err error) { s.logger.Warn("invalid cluster feed", "error", err) }}, "OpenChoreo Language Server", false)
+	s.server = server.NewServer(&clusterHandler{Handler: &handler, feed: &s.cluster, locations: &s.locations, locationChanged: func() { s.invalidateClusterValidation("") }, changed: func() { s.revalidateOpenDocumentsExcept("") }, report: func(err error) { s.logger.Warn("invalid cluster feed", "error", err) }}, "OpenChoreo Language Server", false)
 	handler.Initialize = WithRequestRecovery(s, "initialize", s.Initialize)
 	handler.Initialized = WithHandlerRecovery(s, "initialized", s.Initialized)
 	handler.SetTrace = WithHandlerRecovery(s, "setTrace", s.SetTrace)
@@ -298,7 +299,26 @@ func (s *Server) CodeAction(context *glsp.Context, params *protocol.CodeActionPa
 	}
 
 	actions := codeaction.Handle(uri, doc.Text, params.Context.Diagnostics, params.Range, s.diagnosticsForCached(uri, doc.Text), resourceNames, fileNames, codeaction.ReferenceScope{Index: s.indexer, URI: uri})
-	return actions, nil
+
+	// Replace the legacy local-only near-miss fixes for recognized references.
+	refs := s.referenceChecks(uri, doc.Text)
+	filtered := actions[:0]
+	for _, action := range actions {
+		legacy := false
+		for _, d := range action.Diagnostics {
+			if d.Code != nil && d.Code.Value == "unknown-resource-file" {
+				for _, r := range refs {
+					if replacesLegacyReference(d, r) {
+						legacy = true
+					}
+				}
+			}
+		}
+		if !legacy {
+			filtered = append(filtered, action)
+		}
+	}
+	return append(filtered, s.referenceActions(uri, doc.Text, doc.Version, params.Range)...), nil
 }
 
 // Definition handles textDocument/definition requests.
@@ -306,17 +326,7 @@ func (s *Server) Definition(
 	context *glsp.Context,
 	params *protocol.DefinitionParams,
 ) (any, error) {
-	uri := params.TextDocument.URI
-	doc := s.GetDocument(uri)
-	if doc == nil {
-		return nil, nil
-	}
-
-	cursorLine := int(params.Position.Line) + 1
-	cursorCol := int(params.Position.Character) + 1
-
-	locs := codedefinition.Handle(doc.Text, cursorLine, cursorCol, uri, s.indexer)
-	return locs, nil
+	return s.definitionLocations(context, params)
 }
 
 // Hover handles textDocument/hover requests.

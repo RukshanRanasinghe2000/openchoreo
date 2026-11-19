@@ -26,16 +26,34 @@ type clusterFeed struct {
 }
 type clusterHandler struct {
 	glsp.Handler
-	feed   *clusterFeed
-	report func(error)
+	feed            *clusterFeed
+	report          func(error)
+	locations       *clusterLocations
+	changed         func()
+	locationChanged func()
 }
 
 func (h *clusterHandler) Handle(c *glsp.Context) (any, bool, bool, error) {
+	if c.Method == resourceLocationsMethod && h.locations != nil {
+		if err := h.locations.update(c.Params); err != nil {
+			h.report(err)
+		} else {
+			if h.locationChanged != nil {
+				h.locationChanged()
+			}
+			if h.changed != nil {
+				h.changed()
+			}
+		}
+		return nil, true, true, nil
+	}
 	if c.Method != "openchoreo/updateResources" && c.Method != "openchoreo/updateResourceSchemas" {
 		return h.Handler.Handle(c)
 	}
 	if err := h.feed.update(c.Method, c.Params); err != nil {
 		h.report(err)
+	} else if h.changed != nil {
+		h.changed()
 	}
 	return nil, true, true, nil
 }

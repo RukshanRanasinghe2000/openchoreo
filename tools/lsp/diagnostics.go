@@ -191,7 +191,7 @@ func (s *Server) scheduleDiagnostics(uri string, version int, text string) {
 		s.diagMu.Unlock()
 
 		s.publishDiagnosticsAsync(uri, version, s.diagnosticsForCached(uri, text))
-		if path := fileURIToPath(uri); path != "" {
+		if path := localDocumentPath(uri); path != "" {
 			s.triggerPreRenderSchemaValidationForPath(path)
 		}
 	})

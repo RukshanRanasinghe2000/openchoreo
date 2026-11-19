@@ -12,9 +12,10 @@ import (
 )
 
 type Document struct {
-	URI     string
-	Text    string
-	Version int
+	URI        string
+	Text       string
+	Version    int
+	loadedText string // Last opened or successfully saved resource content.
 }
 
 func (s *Server) OpenDocument(uri, text string, version int) {
@@ -22,9 +23,10 @@ func (s *Server) OpenDocument(uri, text string, version int) {
 	defer s.docMu.Unlock()
 
 	s.documents[uri] = &Document{
-		URI:     uri,
-		Text:    text,
-		Version: version,
+		URI:        uri,
+		Text:       text,
+		Version:    version,
+		loadedText: text,
 	}
 }
 
@@ -38,9 +40,10 @@ func (s *Server) UpdateDocument(uri, text string, version int) error {
 	}
 
 	s.documents[uri] = &Document{
-		URI:     doc.URI,
-		Text:    text,
-		Version: version,
+		URI:        doc.URI,
+		Text:       text,
+		Version:    version,
+		loadedText: doc.loadedText,
 	}
 	return nil
 }
@@ -56,7 +59,8 @@ func (s *Server) GetDocument(uri string) *Document {
 	if doc == nil {
 		return nil
 	}
-	return &Document{URI: doc.URI, Text: doc.Text, Version: doc.Version}
+	copy := *doc
+	return &copy
 }
 
 // snapshotOpenDocuments returns value copies of every open document for
@@ -67,7 +71,7 @@ func (s *Server) snapshotOpenDocuments() []Document {
 
 	out := make([]Document, 0, len(s.documents))
 	for _, d := range s.documents {
-		out = append(out, Document{URI: d.URI, Text: d.Text, Version: d.Version})
+		out = append(out, *d)
 	}
 	return out
 }
@@ -90,7 +94,8 @@ func (s *Server) applyChangesToDocument(uri string, params *protocol.DidChangeTe
 		return nil, fmt.Errorf("document not open: %s", uri)
 	}
 
-	updated := &Document{URI: current.URI, Text: current.Text, Version: current.Version}
+	copy := *current
+	updated := &copy
 
 	// Changes in a single notification must be applied sequentially: c1 moves
 	// the document from state S to S', c2 from S' to S''.
@@ -210,4 +215,14 @@ func utf16ToByteOffset(line string, character uint32) int {
 		byteOffset += size
 	}
 	return byteOffset
+}
+
+func (s *Server) markDocumentSaved(uri string) {
+	s.docMu.Lock()
+	defer s.docMu.Unlock()
+	if doc := s.documents[uri]; doc != nil {
+		copy := *doc
+		copy.loadedText = copy.Text
+		s.documents[uri] = &copy
+	}
 }

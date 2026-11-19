@@ -32,12 +32,25 @@ func within(root, path string) bool {
 // Snapshot uses the shared index's files and latest UpdateFile content. Invalid
 // editor buffers replace disk content rather than resurrecting stale definitions.
 func (idx *Indexer) Snapshot(sourceURI string) []SnapshotDocument {
+	return idx.snapshot(sourceURI, false)
+}
+
+// DefinitionSnapshot treats virtual sources as resource identities, never paths.
+func (idx *Indexer) DefinitionSnapshot(sourceURI string) []SnapshotDocument {
+	u, err := url.Parse(sourceURI)
+	return idx.snapshot(sourceURI, err == nil && u.Scheme == "openchoreo")
+}
+
+func (idx *Indexer) snapshot(sourceURI string, unscoped bool) []SnapshotDocument {
 	idx.mu.RLock()
 	roots := append([]string(nil), idx.rootDirs...)
 	version := idx.version
 	if idx.snapshotVersion == version {
 		cached := append([]SnapshotDocument(nil), idx.snapshotDocuments...)
 		idx.mu.RUnlock()
+		if unscoped {
+			return cached
+		}
 		return scopeDocuments(cached, roots, sourceURI)
 	}
 	files := map[string][]byte{}
@@ -63,6 +76,9 @@ func (idx *Indexer) Snapshot(sourceURI string) []SnapshotDocument {
 		idx.snapshotDocuments = out
 	}
 	idx.mu.Unlock()
+	if unscoped {
+		return out
+	}
 	return scopeDocuments(out, roots, sourceURI)
 }
 func scopeDocuments(docs []SnapshotDocument, roots []string, sourceURI string) []SnapshotDocument {

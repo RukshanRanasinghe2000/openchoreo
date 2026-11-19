@@ -12,12 +12,14 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 
+	"github.com/openchoreo/openchoreo/tools/lint/indexer"
 	"github.com/openchoreo/openchoreo/tools/lint/parser"
 	postrendervalidator "github.com/openchoreo/openchoreo/tools/lint/post-render-validator"
 	prerendervalidator "github.com/openchoreo/openchoreo/tools/lint/pre-render-validator"
@@ -36,12 +38,13 @@ const (
 // The extension uses it to build the progress notification and to decide
 // whether to offer the Problems panel.
 type postRenderResult struct {
-	Files    int      `json:"files"`
-	Errors   int      `json:"errors"`
-	Warnings int      `json:"warnings"`
-	Message  string   `json:"message,omitempty"`
-	Details  []string `json:"details,omitempty"`
-	Root     string   `json:"root,omitempty"`
+	Files         int      `json:"files"`
+	Errors        int      `json:"errors"`
+	Warnings      int      `json:"warnings"`
+	Message       string   `json:"message,omitempty"`
+	Details       []string `json:"details,omitempty"`
+	Root          string   `json:"root,omitempty"`
+	ValidatedURIs []string `json:"validatedUris,omitempty"`
 }
 
 // CodeLens offers the post-render action at the top of OpenChoreo YAML files.
@@ -82,6 +85,9 @@ func (s *Server) ExecuteCommand(
 ) (any, error) {
 	if params == nil {
 		return nil, fmt.Errorf("missing executeCommand parameters")
+	}
+	if params.Command == clusterValidationCommand {
+		return s.runClusterValidation(params.Arguments)
 	}
 	if params.Command == "openchoreo.requiredFieldsPreview" {
 		var request struct {
@@ -144,7 +150,19 @@ func (s *Server) ExecuteCommand(
 			}
 		}
 	}
-	return s.runPostRenderValidation(uri), nil
+	var project *renderingProjectScope
+	if len(params.Arguments) > 2 {
+		raw, e := json.Marshal(params.Arguments[2])
+		if e != nil {
+			return nil, e
+		}
+		project = &renderingProjectScope{}
+		if e = json.Unmarshal(raw, project); e != nil {
+			return nil, e
+		}
+		project.ActiveURI = uri
+	}
+	return s.runPostRenderValidation(uri, project), nil
 }
 
 func postRenderURI(args []any) (string, error) {
@@ -162,7 +180,7 @@ func postRenderURI(args []any) (string, error) {
 	}
 }
 
-func (s *Server) runPostRenderValidation(uri string) postRenderResult {
+func (s *Server) runPostRenderValidation(uri string, scopes ...*renderingProjectScope) postRenderResult {
 	s.postRenderMu.Lock()
 	if s.postRenderRunning {
 		s.postRenderMu.Unlock()
@@ -208,10 +226,7 @@ func (s *Server) runPostRenderValidation(uri string) postRenderResult {
 		schemaOverlays[path] = []byte(text)
 	}
 	schemaScope := s.freshTargetSchemaScope(uri, schemaOverlays)
-	var parsed []postrendervalidator.SourceDocument
-	var pre []prerendervalidator.Resource
-	var findings []postrendervalidator.Finding
-	snapshotHashes := map[string][32]byte{}
+	var sources []renderingSource
 	for _, path := range files {
 		text, ok := overlays[filepath.Clean(path)]
 		if !ok {
@@ -225,19 +240,55 @@ func (s *Server) runPostRenderValidation(uri string) postRenderResult {
 			}
 			text = string(data)
 		}
-		snapshotHashes[filepath.Clean(path)] = sha256.Sum256([]byte(text))
 		if !parser.HasOpenChoreoAPIVersion([]byte(text)) {
 			continue
 		}
 		docs, e := parser.ParseYAML([]byte(text))
-		var diagnostics []protocol.Diagnostic
 		if e != nil {
-			diagnostics = []protocol.Diagnostic{parseErrorDiagnostic(e)}
-		} else {
-			for _, doc := range docs {
-				doc.ValidationContext = targetschema.WithResolver(doc.ValidationContext, schemaScope)
+			sources = append(sources, renderingSource{URI: pathToDocumentURI(path), Text: text, Err: e})
+			continue
+		}
+		for _, doc := range docs {
+			sources = append(sources, renderingSource{URI: pathToDocumentURI(path), Text: text, Doc: doc})
+		}
+	}
+	var project *renderingProjectScope
+	if len(scopes) > 0 {
+		project = scopes[0]
+	}
+	if project != nil && project.Namespace == "" {
+		for _, source := range sources {
+			if source.URI == uri && source.Doc != nil {
+				project.Namespace = indexer.NamespaceOrDefault(source.Doc.Metadata.Namespace)
+				break
 			}
-			diagnostics = validateDocs(docs)
+		}
+	}
+	sources, err = selectRenderingProject(sources, project)
+	if err != nil {
+		s.republishStructural(s.clearPostRenderAll(), "")
+		return postRenderResult{Errors: 1, Message: err.Error()}
+	}
+	var parsed []postrendervalidator.SourceDocument
+	var pre []prerendervalidator.Resource
+	var findings []postrendervalidator.Finding
+	snapshotHashes := map[string][32]byte{}
+	selectedFiles := map[string]bool{}
+	for _, source := range sources {
+		path := fileURIToPath(source.URI)
+		selectedFiles[path] = true
+		snapshotHashes[filepath.Clean(path)] = sha256.Sum256([]byte(source.Text))
+		var diagnostics []protocol.Diagnostic
+		if source.Err != nil {
+			diagnostics = []protocol.Diagnostic{parseErrorDiagnostic(source.Err)}
+		} else {
+			if project != nil && !strings.HasPrefix(source.Doc.Kind, "Cluster") && source.Doc.Metadata.Namespace == "" {
+				setSnapshotNamespace(source.Doc, project.Namespace)
+			}
+			source.Doc.ValidationContext = targetschema.WithResolver(source.Doc.ValidationContext, schemaScope)
+			diagnostics = validateDocs([]*parser.DocumentNode{source.Doc})
+			parsed = append(parsed, postrendervalidator.SourceDocument{Path: path, Document: source.Doc})
+			pre = append(pre, prerendervalidator.Resource{Path: path, Document: source.Doc})
 		}
 		for _, d := range diagnostics {
 			code := ""
@@ -257,10 +308,13 @@ func (s *Server) runPostRenderValidation(uri string) postRenderResult {
 			}
 			findings = append(findings, postrendervalidator.Finding{Path: path, Code: code, Severity: severity, Message: d.Message, Line: int(d.Range.Start.Line) + 1, Column: int(d.Range.Start.Character) + 1})
 		}
-		for _, doc := range docs {
-			parsed = append(parsed, postrendervalidator.SourceDocument{Path: path, Document: doc})
-			pre = append(pre, prerendervalidator.Resource{Path: path, Document: doc})
+	}
+	if project != nil {
+		files = nil
+		for path := range selectedFiles {
+			files = append(files, path)
 		}
+		sort.Strings(files)
 	}
 	for _, f := range prerendervalidator.ValidateDocuments(ctx, pre) {
 		findings = append(findings, postrendervalidator.Finding{Path: f.Path, Code: f.Code, Severity: string(f.Severity), Message: f.Message, Line: f.Line, Column: f.Column})
@@ -269,6 +323,12 @@ func (s *Server) runPostRenderValidation(uri string) postRenderResult {
 
 	result := s.publishPostRenderFindings(uri, activePath, files, uniqueManualFindings(findings), &epoch, snapshotHashes)
 	result.Root = root
+	if project != nil {
+		result.Root += " (OpenChoreo project " + project.ProjectName + ")"
+		for _, path := range files {
+			result.ValidatedURIs = append(result.ValidatedURIs, pathToDocumentURI(path))
+		}
+	}
 	return result
 }
 
@@ -330,7 +390,8 @@ func (s *Server) publishPostRenderFindings(
 		if samePath(finding.Path, activePath) && activeURI != "" {
 			uri = activeURI
 		}
-		byURI[uri] = append(byURI[uri], postRenderDiagnostic(finding))
+		text, _ := s.documentText(uri)
+		byURI[uri] = append(byURI[uri], postRenderDiagnosticForText(finding, text))
 	}
 
 	fileSet := make(map[string]struct{}, len(files))
@@ -489,17 +550,21 @@ func (s *Server) mergePostRenderDiagnostics(uri string, diags []protocol.Diagnos
 	cached := append([]protocol.Diagnostic(nil), s.postRenderByURI[uri]...)
 	s.postRenderMu.Unlock()
 	if len(cached) == 0 {
-		return diags
+		return s.mergeClusterValidation(uri, diags)
 	}
 	merged := make([]protocol.Diagnostic, 0, len(diags)+len(cached))
 	merged = append(merged, diags...)
 	merged = append(merged, cached...)
-	return merged
+	return s.mergeClusterValidation(uri, merged)
 }
 
 func (s *Server) documentText(uri string) (string, bool) {
 	if doc := s.GetDocument(uri); doc != nil {
 		return doc.Text, true
+	}
+	parsed, err := url.Parse(uri)
+	if err != nil || parsed.Scheme != "file" {
+		return "", false
 	}
 	data, err := os.ReadFile(fileURIToPath(uri))
 	if err != nil {
@@ -523,7 +588,13 @@ func samePath(a, b string) bool {
 // it changes, and republishes structural diagnostics for the affected open
 // documents so stale post-render findings disappear immediately.
 func (s *Server) invalidatePostRenderForEdit(uri string) {
-	path := filepath.Clean(fileURIToPath(uri))
+	if localDocumentPath(uri) == "" {
+		if doc := s.GetDocument(uri); doc != nil {
+			s.reconcileClusterValidation(uri, doc.Text)
+		}
+		return
+	}
+	path := filepath.Clean(localDocumentPath(uri))
 	current, exists := s.documentText(uri)
 	currentHash := sha256.Sum256([]byte(current))
 	s.postRenderMu.Lock()
@@ -549,7 +620,11 @@ func (s *Server) invalidatePostRenderForEdit(uri string) {
 // contributed to it closes. The closing document itself is cleared by the
 // normal didClose publish.
 func (s *Server) invalidatePostRenderForClose(uri string) {
-	path := filepath.Clean(fileURIToPath(uri))
+	if localDocumentPath(uri) == "" {
+		s.invalidateClusterValidation(uri)
+		return
+	}
+	path := filepath.Clean(localDocumentPath(uri))
 	s.postRenderMu.Lock()
 	if _, ok := s.postRenderFiles[path]; !ok && !projectContains(s.postRenderScope, path) {
 		s.postRenderMu.Unlock()
@@ -569,6 +644,7 @@ func (s *Server) invalidatePostRenderForClose(uri string) {
 // changes and every previous finding is stale. It returns the URIs that had
 // findings so closed files can be cleared too.
 func (s *Server) clearPostRenderAll() []string {
+	clusterURIs := s.clearClusterValidation()
 	s.postRenderMu.Lock()
 	s.postRenderEpoch++
 	uris := keysOfDiagnosticMap(s.postRenderByURI)
@@ -576,7 +652,7 @@ func (s *Server) clearPostRenderAll() []string {
 	s.postRenderFiles = make(map[string]struct{})
 	s.postRenderContentHashes = nil
 	s.postRenderMu.Unlock()
-	return uris
+	return append(uris, clusterURIs...)
 }
 
 func (s *Server) republishStructural(uris []string, skipURI string) {
