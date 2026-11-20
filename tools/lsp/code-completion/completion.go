@@ -63,6 +63,9 @@ func HandleWithIndex(text string, cursorLine, cursorCol int, idx ResourceIndexer
 	if len(sourceURI) > 0 {
 		uri = sourceURI[0]
 	}
+	if items, ok := celMemberItems(text, cursorLine, cursorCol); ok {
+		return protocol.CompletionList{IsIncomplete: true, Items: items}, nil
+	}
 	if items, ok := bindingReleaseItems(text, cursorLine, cursorCol, uri, idx); ok {
 		return protocol.CompletionList{Items: items}, nil
 	}

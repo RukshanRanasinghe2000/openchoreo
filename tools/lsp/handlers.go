@@ -178,7 +178,7 @@ func (s *Server) Initialize(
 		},
 
 		Capabilities: protocol.ServerCapabilities{
-			Experimental: map[string]any{"projectRenderingValidation": true},
+			Experimental: map[string]any{"projectRenderingValidation": true, "celMemberCompletion": true},
 			Workspace:    &protocol.ServerCapabilitiesWorkspace{WorkspaceFolders: &protocol.WorkspaceFoldersServerCapabilities{Supported: &openClose, ChangeNotifications: &protocol.BoolOrString{Value: true}}},
 			TextDocumentSync: protocol.TextDocumentSyncOptions{
 				OpenClose: &openClose,
