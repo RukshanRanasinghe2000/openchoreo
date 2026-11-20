@@ -34,7 +34,8 @@ func TestCLIOutputMarkers(t *testing.T) {
 					cmd.Env = append(cmd.Env, entry)
 				}
 			}
-			cmd.Env = append(cmd.Env, "NO_COLOR="+tc.noColor)
+			home := authenticatedHome(t)
+			cmd.Env = append(cmd.Env, "NO_COLOR="+tc.noColor, "HOME="+home, "USERPROFILE="+home)
 			output, err := cmd.CombinedOutput()
 			if err != nil {
 				t.Fatalf("CLI: %v\n%s", err, output)

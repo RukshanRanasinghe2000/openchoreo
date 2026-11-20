@@ -11,6 +11,7 @@ import (
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 	clivalidator "github.com/openchoreo/openchoreo/tools/lint/cli-validator"
 	"github.com/openchoreo/openchoreo/tools/lint/parser"
 	"github.com/openchoreo/openchoreo/tools/lint/ruleengine"
@@ -114,7 +115,7 @@ func (s *Server) publishDiagnostics(context *glsp.Context, uri string, version i
 
 	if s.GetDocument(uri) == nil {
 		s.preRenderSchemaMu.Lock()
-		diags = append(diags, s.workspaceStaticByURI[uri]...)
+		diags = append(diags, s.workspaceStaticByURI[pathutil.DocumentKey(uri)]...)
 		s.preRenderSchemaMu.Unlock()
 	}
 	diags = s.mergePostRenderDiagnostics(uri, diags)
@@ -125,7 +126,7 @@ func (s *Server) publishDiagnostics(context *glsp.Context, uri string, version i
 
 	diags = uniqueProjectDiagnostics(diags)
 	context.Notify(protocol.ServerTextDocumentPublishDiagnostics, &diagnosticPublication{
-		URI:         uri,
+		URI:         s.clientDocumentURI(uri),
 		Version:     diagnosticVersion(s, uri, version),
 		Diagnostics: diags,
 	})
@@ -140,7 +141,7 @@ func (s *Server) publishDiagnosticsAsync(uri string, version int, diags []protoc
 	}
 	if s.GetDocument(uri) == nil {
 		s.preRenderSchemaMu.Lock()
-		diags = append(diags, s.workspaceStaticByURI[uri]...)
+		diags = append(diags, s.workspaceStaticByURI[pathutil.DocumentKey(uri)]...)
 		s.preRenderSchemaMu.Unlock()
 	}
 	diags = s.mergePostRenderDiagnostics(uri, diags)
@@ -151,7 +152,7 @@ func (s *Server) publishDiagnosticsAsync(uri string, version int, diags []protoc
 
 	diags = uniqueProjectDiagnostics(diags)
 	s.SendAsync(protocol.ServerTextDocumentPublishDiagnostics, &diagnosticPublication{
-		URI:         uri,
+		URI:         s.clientDocumentURI(uri),
 		Version:     diagnosticVersion(s, uri, version),
 		Diagnostics: diags,
 	})
@@ -313,7 +314,7 @@ func (s *Server) validationSnapshotCurrent(uri string, version int) bool {
 		return false
 	}
 	s.cacheMu.Lock()
-	entry := s.cache[uri]
+	entry := s.cache[pathutil.DocumentKey(uri)]
 	stale := entry != nil && entry.indexVer != s.indexer.Version()
 	s.cacheMu.Unlock()
 	return !stale
@@ -345,7 +346,7 @@ func (s *Server) republishCurrentDiagnostics(uri string) {
 	if s.workspaceStaticByURI == nil {
 		s.workspaceStaticByURI = make(map[string][]protocol.Diagnostic)
 	}
-	s.workspaceStaticByURI[uri] = diags
+	s.workspaceStaticByURI[pathutil.DocumentKey(uri)] = diags
 	s.preRenderSchemaMu.Unlock()
 	s.publishDiagnosticsAsync(uri, 0, nil)
 }

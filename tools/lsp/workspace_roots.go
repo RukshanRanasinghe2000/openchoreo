@@ -4,10 +4,9 @@
 package lsp
 
 import (
-	"path/filepath"
-	"strings"
-
 	protocol "github.com/tliron/glsp/protocol_3_16"
+
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 )
 
 // resolveWorkspaceRoots extracts the working roots from an initialize request.
@@ -47,18 +46,14 @@ func NormalizeWorkspaceRoots(paths []string) []string {
 		if p == "" {
 			continue
 		}
-		abs, err := filepath.Abs(p)
+		abs, err := pathutil.Normalize(p)
 		if err != nil {
-			abs = p
-		}
-		abs = filepath.Clean(abs)
-		if abs != string(filepath.Separator) {
-			abs = strings.TrimRight(abs, string(filepath.Separator))
+			continue
 		}
 
 		duplicate := false
 		for _, existing := range out {
-			if existing == abs {
+			if pathutil.SamePath(existing, abs) {
 				duplicate = true
 				break
 			}
@@ -95,16 +90,4 @@ func NormalizeWorkspaceRoots(paths []string) []string {
 // isSubpath reports whether child lies inside parent (or equals it). The
 // ordering matters for the leaf-of-path check: a directory that merely shares
 // a name prefix ("/a/b" vs "/a/beta") must not count as a subpath.
-func isSubpath(child, parent string) bool {
-	if child == parent {
-		return true
-	}
-	rel, err := filepath.Rel(parent, child)
-	if err != nil {
-		return false
-	}
-	if rel == "." {
-		return true
-	}
-	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
-}
+func isSubpath(child, parent string) bool { return pathutil.Within(parent, child) }

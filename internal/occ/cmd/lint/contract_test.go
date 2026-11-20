@@ -35,6 +35,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -67,6 +68,9 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	binPath = filepath.Join(dir, "occ")
+	if runtime.GOOS == "windows" {
+		binPath += ".exe"
+	}
 
 	build := exec.Command("go", "build", "-o", binPath, "-ldflags", "-X "+versionPackage+"=1.2.3", modulePath)
 	build.Stderr = os.Stderr
@@ -108,8 +112,16 @@ var usageSentinels = []string{
 }
 
 func normalize(s, fixtureDir, configPath string) string {
-	s = strings.ReplaceAll(s, fixtureDir, "<FIXTURE>")
+	// JSON escapes native Windows separators. Normalize only fixture paths,
+	// keeping the production output contract and message text unchanged.
+	for _, base := range []string{fixtureDir, filepath.ToSlash(fixtureDir)} {
+		s = strings.ReplaceAll(s, strings.ReplaceAll(base, `\`, `\\`), "<FIXTURE>")
+		s = strings.ReplaceAll(s, base, "<FIXTURE>")
+	}
+	s = strings.ReplaceAll(s, `<FIXTURE>\\`, "<FIXTURE>/")
+	s = strings.ReplaceAll(s, `<FIXTURE>\`, "<FIXTURE>/")
 	if configPath != "" {
+		s = strings.ReplaceAll(s, strings.ReplaceAll(configPath, `\`, `\\`), "<CONFIG>")
 		s = strings.ReplaceAll(s, configPath, "<CONFIG>")
 	}
 	s = durationRe.ReplaceAllString(s, "<DUR>")
@@ -245,7 +257,8 @@ func runCLI(t *testing.T, args ...string) (code int, stdout, stderr string) {
 	t.Helper()
 	cmd := exec.Command(binPath, args...)
 	// Golden contracts use plain markers regardless of the invoking environment.
-	cmd.Env = append(os.Environ(), "NO_COLOR=1", "HOME="+authenticatedHome(t))
+	home := authenticatedHome(t)
+	cmd.Env = append(os.Environ(), "NO_COLOR=1", "HOME="+home, "USERPROFILE="+home)
 	var out, errBuf bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &errBuf

@@ -11,6 +11,7 @@ import (
 
 	protocol "github.com/tliron/glsp/protocol_3_16"
 
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 	lsputil "github.com/openchoreo/openchoreo/tools/lsp/lsp-util"
 )
 
@@ -68,7 +69,7 @@ func TestPostgresWorkspaceDefinitionAndSchema(t *testing.T) {
 	s.OpenDocument(uri, invalid, 2)
 	s.triggerPreRenderSchemaValidationForPath(path)
 	found := false
-	for _, d := range s.preRenderSchemaByURI[uri] {
+	for _, d := range s.preRenderSchemaByURI[pathutil.DocumentKey(uri)] {
 		if d.Code != nil && d.Code.Value == testValueSchemaParametersMismatch {
 			found = true
 		}
@@ -86,7 +87,7 @@ func TestPostgresWorkspaceDefinitionAndSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.triggerPreRenderSchemaValidationForPath(filepath.Join(root, relativeType))
-	for _, d := range s.preRenderSchemaByURI[uri] {
+	for _, d := range s.preRenderSchemaByURI[pathutil.DocumentKey(uri)] {
 		if d.Code != nil && d.Code.Value == testValueSchemaParametersMismatch {
 			t.Fatalf("dependent error did not clear for unsaved definition: %+v", d)
 		}

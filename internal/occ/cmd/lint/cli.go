@@ -21,6 +21,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 	"github.com/openchoreo/openchoreo/internal/version"
 	clivalidator "github.com/openchoreo/openchoreo/tools/lint/cli-validator"
 	"github.com/openchoreo/openchoreo/tools/lint/fixer"
@@ -856,11 +857,11 @@ func findRepoRoot(dir string) string {
 	cmd := exec.Command("git", "-C", dir, "rev-parse", "--show-toplevel")
 	if out, err := cmd.Output(); err == nil {
 		if root := strings.TrimSpace(string(out)); root != "" {
-			return root
+			return pathutil.Absolute(root)
 		}
 	}
 
-	abs, err := filepath.Abs(dir)
+	abs, err := pathutil.Normalize(dir)
 	if err != nil {
 		return dir
 	}

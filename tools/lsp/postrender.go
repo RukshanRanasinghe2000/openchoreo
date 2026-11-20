@@ -19,6 +19,7 @@ import (
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 	"github.com/openchoreo/openchoreo/tools/lint/indexer"
 	"github.com/openchoreo/openchoreo/tools/lint/parser"
 	postrendervalidator "github.com/openchoreo/openchoreo/tools/lint/post-render-validator"
@@ -60,7 +61,7 @@ func (s *Server) CodeLens(
 	if !ok || !parser.HasOpenChoreoAPIVersion([]byte(text)) {
 		return []protocol.CodeLens{}, nil
 	}
-	if len(uri) < len("file://") || uri[:len("file://")] != "file://" {
+	if localDocumentPath(uri) == "" {
 		return []protocol.CodeLens{}, nil
 	}
 
@@ -215,9 +216,8 @@ func (s *Server) runPostRenderValidation(uri string, scopes ...*renderingProject
 	overlays := map[string]string{}
 	for _, doc := range s.snapshotOpenDocuments() {
 		path := fileURIToPath(doc.URI)
-		rel, e := filepath.Rel(root, path)
-		if e == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-			overlays[filepath.Clean(path)] = doc.Text
+		if pathutil.Within(root, path) {
+			overlays[pathutil.PathKey(path)] = doc.Text
 			files = ensureActiveFile(files, path)
 		}
 	}
@@ -228,7 +228,7 @@ func (s *Server) runPostRenderValidation(uri string, scopes ...*renderingProject
 	schemaScope := s.freshTargetSchemaScope(uri, schemaOverlays)
 	var sources []renderingSource
 	for _, path := range files {
-		text, ok := overlays[filepath.Clean(path)]
+		text, ok := overlays[pathutil.PathKey(path)]
 		if !ok {
 			data, exists := schemaScope.Content(path)
 			var e error
@@ -258,7 +258,7 @@ func (s *Server) runPostRenderValidation(uri string, scopes ...*renderingProject
 	}
 	if project != nil && project.Namespace == "" {
 		for _, source := range sources {
-			if source.URI == uri && source.Doc != nil {
+			if pathutil.DocumentKey(source.URI) == pathutil.DocumentKey(uri) && source.Doc != nil {
 				project.Namespace = indexer.NamespaceOrDefault(source.Doc.Metadata.Namespace)
 				break
 			}
@@ -277,7 +277,7 @@ func (s *Server) runPostRenderValidation(uri string, scopes ...*renderingProject
 	for _, source := range sources {
 		path := fileURIToPath(source.URI)
 		selectedFiles[path] = true
-		snapshotHashes[filepath.Clean(path)] = sha256.Sum256([]byte(source.Text))
+		snapshotHashes[pathutil.PathKey(path)] = sha256.Sum256([]byte(source.Text))
 		var diagnostics []protocol.Diagnostic
 		if source.Err != nil {
 			diagnostics = []protocol.Diagnostic{parseErrorDiagnostic(source.Err)}
@@ -335,11 +335,13 @@ func (s *Server) runPostRenderValidation(uri string, scopes ...*renderingProject
 // postRenderRoot uses the containing VS Code workspace folder. Standalone
 // documents fall back to their directory; unrelated workspace folders are excluded.
 func (s *Server) postRenderRoot(activePath string) string {
+	if activePath == "" {
+		return ""
+	}
 	activeDir := filepath.Dir(activePath)
 	workspaceRoot := ""
 	for _, root := range s.workspaceRootsSnapshot() {
-		rel, err := filepath.Rel(root, activePath)
-		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		if !pathutil.Within(root, activePath) {
 			continue
 		}
 		if len(root) > len(workspaceRoot) {
@@ -356,7 +358,7 @@ func (s *Server) postRenderRoot(activePath string) string {
 func ensureActiveFile(files []string, activePath string) []string {
 	active := filepath.Clean(activePath)
 	for _, file := range files {
-		if filepath.Clean(file) == active {
+		if pathutil.SamePath(file, active) {
 			return files
 		}
 	}
@@ -387,19 +389,20 @@ func (s *Server) publishPostRenderFindings(
 	byURI := make(map[string][]protocol.Diagnostic)
 	for _, finding := range findings {
 		uri := pathToDocumentURI(finding.Path)
+		s.rememberFileURI(uri)
 		if samePath(finding.Path, activePath) && activeURI != "" {
 			uri = activeURI
 		}
 		text, _ := s.documentText(uri)
-		byURI[uri] = append(byURI[uri], postRenderDiagnosticForText(finding, text))
+		byURI[pathutil.DocumentKey(uri)] = append(byURI[pathutil.DocumentKey(uri)], postRenderDiagnosticForText(finding, text))
 	}
 
 	fileSet := make(map[string]struct{}, len(files))
 	for _, file := range files {
-		fileSet[filepath.Clean(file)] = struct{}{}
+		fileSet[pathutil.PathKey(file)] = struct{}{}
 	}
 	if activePath != "" {
-		fileSet[filepath.Clean(activePath)] = struct{}{}
+		fileSet[pathutil.PathKey(activePath)] = struct{}{}
 	}
 
 	s.postRenderMu.Lock()
@@ -421,10 +424,10 @@ func (s *Server) publishPostRenderFindings(
 
 	affected := make(map[string]struct{}, len(oldByURI)+len(byURI))
 	for uri := range oldByURI {
-		affected[uri] = struct{}{}
+		affected[pathutil.DocumentKey(uri)] = struct{}{}
 	}
 	for uri := range byURI {
-		affected[uri] = struct{}{}
+		affected[pathutil.DocumentKey(uri)] = struct{}{}
 	}
 
 	for uri := range affected {
@@ -547,7 +550,7 @@ func postRenderDiagnostic(finding postrendervalidator.Finding) protocol.Diagnost
 // structural validation complete without erasing post-render results.
 func (s *Server) mergePostRenderDiagnostics(uri string, diags []protocol.Diagnostic) []protocol.Diagnostic {
 	s.postRenderMu.Lock()
-	cached := append([]protocol.Diagnostic(nil), s.postRenderByURI[uri]...)
+	cached := append([]protocol.Diagnostic(nil), s.postRenderByURI[pathutil.DocumentKey(uri)]...)
 	s.postRenderMu.Unlock()
 	if len(cached) == 0 {
 		return s.mergeClusterValidation(uri, diags)
@@ -573,16 +576,9 @@ func (s *Server) documentText(uri string) (string, bool) {
 	return string(data), true
 }
 
-func pathToDocumentURI(path string) string {
-	return (&url.URL{Scheme: "file", Path: filepath.ToSlash(path)}).String()
-}
+func pathToDocumentURI(path string) string { return pathutil.FileURI(path) }
 
-func samePath(a, b string) bool {
-	if a == "" || b == "" {
-		return false
-	}
-	return filepath.Clean(a) == filepath.Clean(b)
-}
+func samePath(a, b string) bool { return pathutil.SamePath(a, b) }
 
 // invalidatePostRenderForEdit clears the previous result when any file used by
 // it changes, and republishes structural diagnostics for the affected open
@@ -594,7 +590,7 @@ func (s *Server) invalidatePostRenderForEdit(uri string) {
 		}
 		return
 	}
-	path := filepath.Clean(localDocumentPath(uri))
+	path := pathutil.PathKey(localDocumentPath(uri))
 	current, exists := s.documentText(uri)
 	currentHash := sha256.Sum256([]byte(current))
 	s.postRenderMu.Lock()
@@ -624,7 +620,7 @@ func (s *Server) invalidatePostRenderForClose(uri string) {
 		s.invalidateClusterValidation(uri)
 		return
 	}
-	path := filepath.Clean(localDocumentPath(uri))
+	path := pathutil.PathKey(localDocumentPath(uri))
 	s.postRenderMu.Lock()
 	if _, ok := s.postRenderFiles[path]; !ok && !projectContains(s.postRenderScope, path) {
 		s.postRenderMu.Unlock()
@@ -657,7 +653,7 @@ func (s *Server) clearPostRenderAll() []string {
 
 func (s *Server) republishStructural(uris []string, skipURI string) {
 	for _, uri := range uris {
-		if uri != skipURI {
+		if pathutil.DocumentKey(uri) != pathutil.DocumentKey(skipURI) {
 			s.republishCurrentDiagnostics(uri)
 		}
 	}
@@ -671,13 +667,7 @@ func keysOfDiagnosticMap(m map[string][]protocol.Diagnostic) []string {
 	return out
 }
 
-func projectContains(root, path string) bool {
-	if root == "" {
-		return false
-	}
-	rel, err := filepath.Rel(root, path)
-	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
-}
+func projectContains(root, path string) bool { return pathutil.Within(root, path) }
 func uniqueManualFindings(findings []postrendervalidator.Finding) []postrendervalidator.Finding {
 	var out []postrendervalidator.Finding
 	seen := map[string]bool{}

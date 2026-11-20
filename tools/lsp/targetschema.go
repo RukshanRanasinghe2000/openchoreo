@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 	"github.com/openchoreo/openchoreo/tools/lint/parser"
 	"github.com/openchoreo/openchoreo/tools/lint/targetschema"
 )
@@ -29,18 +30,21 @@ func (s *Server) targetSchemaScope(uri string, overrides map[string][]byte) *tar
 	s.schemaMu.Lock()
 	defer s.schemaMu.Unlock()
 	if cacheable {
-		if entry, ok := s.schemaScopes[root]; ok && entry.revision == revision {
+		if entry, ok := s.schemaScopes[pathutil.PathKey(root)]; ok && entry.revision == revision {
 			return entry.scope
 		}
 	}
 	sources := s.indexer.SchemaSources(uri)
 	for _, doc := range s.snapshotOpenDocuments() {
 		if p := fileURIToPath(doc.URI); p != "" {
-			sources[p] = []byte(doc.Text)
+			overlaySchemaSource(sources, p, []byte(doc.Text))
 		}
 	}
 	for path, data := range overrides {
-		sources[path] = data
+		if path == "" {
+			continue
+		}
+		overlaySchemaSource(sources, path, data)
 	}
 	scope := targetschema.NewScope(root, sources)
 	s.watchSchemaDependencies(scope.Dependencies())
@@ -49,7 +53,7 @@ func (s *Server) targetSchemaScope(uri string, overrides map[string][]byte) *tar
 		if s.schemaScopes == nil {
 			s.schemaScopes = map[string]schemaScopeEntry{}
 		}
-		s.schemaScopes[root] = schemaScopeEntry{revision, scope}
+		s.schemaScopes[pathutil.PathKey(root)] = schemaScopeEntry{revision, scope}
 	}
 	return scope
 }
@@ -62,11 +66,14 @@ func (s *Server) freshTargetSchemaScope(uri string, overrides map[string][]byte)
 	}
 	for _, doc := range s.snapshotOpenDocuments() {
 		if p := fileURIToPath(doc.URI); p != "" {
-			sources[p] = []byte(doc.Text)
+			overlaySchemaSource(sources, p, []byte(doc.Text))
 		}
 	}
 	for path, data := range overrides {
-		sources[path] = data
+		if path == "" {
+			continue
+		}
+		overlaySchemaSource(sources, path, data)
 	}
 	scope := targetschema.NewScope(root, sources)
 	s.watchSchemaDependencies(scope.Dependencies())
@@ -81,7 +88,7 @@ func (s *Server) watchSchemaDependencies(paths []string) {
 	}
 	for _, path := range paths {
 		path = filepath.Clean(path)
-		s.schemaDependencyPaths[path] = struct{}{}
+		s.schemaDependencyPaths[pathutil.PathKey(path)] = struct{}{}
 		if s.watcher != nil {
 			_ = s.watcher.Add(filepath.Dir(path))
 		}
@@ -90,7 +97,7 @@ func (s *Server) watchSchemaDependencies(paths []string) {
 func (s *Server) isSchemaDependency(path string) bool {
 	s.watchMu.Lock()
 	defer s.watchMu.Unlock()
-	_, ok := s.schemaDependencyPaths[filepath.Clean(path)]
+	_, ok := s.schemaDependencyPaths[pathutil.PathKey(path)]
 	return ok
 }
 
@@ -103,4 +110,17 @@ func (s *Server) bindTargetSchemas(uri, text string, docs []*parser.DocumentNode
 		copies = append(copies, &copyDoc)
 	}
 	return copies
+}
+
+// Drop equivalent saved spelling before inserting an unsaved schema source.
+func overlaySchemaSource(sources map[string][]byte, path string, data []byte) {
+	if path == "" {
+		return
+	}
+	for existing := range sources {
+		if pathutil.SamePath(existing, path) {
+			delete(sources, existing)
+		}
+	}
+	sources[path] = data
 }

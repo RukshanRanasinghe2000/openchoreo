@@ -9,6 +9,8 @@ import (
 	"unicode/utf8"
 
 	protocol "github.com/tliron/glsp/protocol_3_16"
+
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 )
 
 type Document struct {
@@ -22,7 +24,11 @@ func (s *Server) OpenDocument(uri, text string, version int) {
 	s.docMu.Lock()
 	defer s.docMu.Unlock()
 
-	s.documents[uri] = &Document{
+	if s.clientURIs == nil {
+		s.clientURIs = map[string]string{}
+	}
+	s.clientURIs[pathutil.DocumentKey(uri)] = uri
+	s.documents[s.documentKeyLocked(uri)] = &Document{
 		URI:        uri,
 		Text:       text,
 		Version:    version,
@@ -34,12 +40,12 @@ func (s *Server) UpdateDocument(uri, text string, version int) error {
 	s.docMu.Lock()
 	defer s.docMu.Unlock()
 
-	doc, ok := s.documents[uri]
+	doc, ok := s.documents[s.documentKeyLocked(uri)]
 	if !ok {
 		return fmt.Errorf("document not open: %s", uri)
 	}
 
-	s.documents[uri] = &Document{
+	s.documents[s.documentKeyLocked(uri)] = &Document{
 		URI:        doc.URI,
 		Text:       text,
 		Version:    version,
@@ -55,7 +61,7 @@ func (s *Server) GetDocument(uri string) *Document {
 	s.docMu.RLock()
 	defer s.docMu.RUnlock()
 
-	doc := s.documents[uri]
+	doc := s.documents[s.documentKeyLocked(uri)]
 	if doc == nil {
 		return nil
 	}
@@ -80,7 +86,7 @@ func (s *Server) CloseDocument(uri string) {
 	s.docMu.Lock()
 	defer s.docMu.Unlock()
 
-	delete(s.documents, uri)
+	delete(s.documents, s.documentKeyLocked(uri))
 }
 
 // applyChangesToDocument applies the content changes from a didChange
@@ -88,7 +94,7 @@ func (s *Server) CloseDocument(uri string) {
 // write lock; callers receive a copy they own.
 func (s *Server) applyChangesToDocument(uri string, params *protocol.DidChangeTextDocumentParams) (*Document, error) {
 	s.docMu.RLock()
-	current, ok := s.documents[uri]
+	current, ok := s.documents[s.documentKeyLocked(uri)]
 	s.docMu.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("document not open: %s", uri)
@@ -126,7 +132,7 @@ func (s *Server) applyChangesToDocument(uri string, params *protocol.DidChangeTe
 	updated.Version = int(params.TextDocument.Version)
 
 	s.docMu.Lock()
-	s.documents[uri] = updated
+	s.documents[s.documentKeyLocked(uri)] = updated
 	s.docMu.Unlock()
 
 	return updated, nil
@@ -220,9 +226,53 @@ func utf16ToByteOffset(line string, character uint32) int {
 func (s *Server) markDocumentSaved(uri string) {
 	s.docMu.Lock()
 	defer s.docMu.Unlock()
-	if doc := s.documents[uri]; doc != nil {
+	if doc := s.documents[s.documentKeyLocked(uri)]; doc != nil {
 		copy := *doc
 		copy.loadedText = copy.Text
-		s.documents[uri] = &copy
+		s.documents[s.documentKeyLocked(uri)] = &copy
 	}
+}
+
+// Remember protocol spelling separately from identity, including after close so
+// later project diagnostic clears still address the original client document.
+func (s *Server) rememberFileURI(uri string) {
+	key := pathutil.DocumentKey(uri)
+	s.docMu.Lock()
+	defer s.docMu.Unlock()
+	if s.clientURIs == nil {
+		s.clientURIs = map[string]string{}
+	}
+	if _, known := s.clientURIs[key]; !known {
+		s.clientURIs[key] = uri
+	}
+}
+func (s *Server) clientDocumentURI(uri string) string {
+	key := pathutil.DocumentKey(uri)
+	s.docMu.RLock()
+	defer s.docMu.RUnlock()
+	if original, ok := s.clientURIs[key]; ok {
+		return original
+	}
+	for _, original := range s.clientURIs {
+		if pathutil.CanonicalURI(original) == pathutil.CanonicalURI(uri) {
+			return original
+		}
+	}
+	return uri
+}
+
+// Caller holds docMu. Exact canonical spelling is a safe fallback when a
+// deleted parent can no longer report its case policy.
+func (s *Server) documentKeyLocked(uri string) string {
+	key := pathutil.DocumentKey(uri)
+	if _, ok := s.documents[key]; ok {
+		return key
+	}
+	canonical := pathutil.CanonicalURI(uri)
+	for stored, doc := range s.documents {
+		if pathutil.CanonicalURI(doc.URI) == canonical {
+			return stored
+		}
+	}
+	return key
 }

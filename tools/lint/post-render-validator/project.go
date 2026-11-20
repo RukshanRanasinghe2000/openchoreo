@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/openchoreo/openchoreo/api/v1alpha1"
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 	"github.com/openchoreo/openchoreo/tools/lint/parser"
 )
 
@@ -217,12 +218,7 @@ func loadActiveDocument(path string) (*parser.DocumentNode, []*parser.DocumentNo
 	return nil, nil, fmt.Errorf("active file %s contains no OpenChoreo documents", path)
 }
 
-func absolutePath(path string) string {
-	if abs, err := filepath.Abs(path); err == nil {
-		return abs
-	}
-	return filepath.Clean(path)
-}
+func absolutePath(path string) string { return pathutil.Absolute(path) }
 
 // buildProjectIndex decodes every known resource. Decode failures for
 // non-active files are skipped; the active document's failure is surfaced by

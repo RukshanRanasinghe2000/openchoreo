@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 )
 
 // projectRoots is a shared, concurrency-safe cache mapping a file's directory
@@ -31,9 +33,10 @@ func (r *projectRootResolver) rootFor(uri string) string {
 		return ""
 	}
 	dir := filepath.Dir(path)
+	key := pathutil.PathKey(dir)
 
 	r.mu.Lock()
-	root, ok := r.cache[dir]
+	root, ok := r.cache[key]
 	r.mu.Unlock()
 	if ok {
 		return root
@@ -42,7 +45,7 @@ func (r *projectRootResolver) rootFor(uri string) string {
 	root = gitTopLevel(dir)
 
 	r.mu.Lock()
-	r.cache[dir] = root
+	r.cache[key] = root
 	r.mu.Unlock()
 	return root
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/sourcegraph/jsonrpc2"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 	"github.com/openchoreo/openchoreo/tools/lsp"
 )
 
@@ -36,16 +37,7 @@ func normalizeTraitName(text, want string) string {
 
 // fileToURITest mirrors the server's canonical file URI form so open-document
 // URIs use the same keys as the watcher and indexer.
-func fileToURITest(p string) string {
-	abs, err := filepath.Abs(p)
-	if err != nil {
-		return p
-	}
-	if !strings.HasPrefix(abs, "file://") {
-		return "file://" + abs
-	}
-	return abs
-}
+func fileToURITest(p string) string { return pathutil.FileURI(p) }
 
 // TestLiveReferenceWarningAfterResourceNameEdit drives the server exactly like
 // the user's scenario: a real trait and a component-type that references it

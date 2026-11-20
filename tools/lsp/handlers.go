@@ -4,13 +4,12 @@
 package lsp
 
 import (
-	"net/url"
 	"os"
-	"strings"
 
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 	"github.com/openchoreo/openchoreo/tools/lint/ruleengine/template"
 	"github.com/openchoreo/openchoreo/tools/lsp/hover"
 )
@@ -87,11 +86,11 @@ func (s *Server) DidChangeConfiguration(
 	openDocs := s.snapshotOpenDocuments()
 	open := make(map[string]struct{}, len(openDocs))
 	for _, doc := range openDocs {
-		open[doc.URI] = struct{}{}
+		open[pathutil.DocumentKey(doc.URI)] = struct{}{}
 		s.publishDiagnosticsAsync(doc.URI, doc.Version, s.diagnosticsForCached(doc.URI, doc.Text))
 	}
 	for _, uri := range stalePostRender {
-		if _, ok := open[uri]; !ok {
+		if _, ok := open[pathutil.DocumentKey(uri)]; !ok {
 			s.publishDiagnosticsAsync(uri, 0, nil)
 		}
 	}
@@ -315,19 +314,7 @@ func (s *Server) DidClose(
 }
 
 // fileURIToPath converts a file:// URI to a local filesystem path.
-func fileURIToPath(uri string) string {
-	// Handle file:// URIs
-	if strings.HasPrefix(uri, "file://") {
-		path := strings.TrimPrefix(uri, "file://")
-		// URL decode the path (handles spaces and special characters)
-		decoded, err := url.PathUnescape(path)
-		if err == nil {
-			return decoded
-		}
-		return path
-	}
-	return uri
-}
+func fileURIToPath(uri string) string { return pathutil.NativePath(uri) }
 
 func (s *Server) DidSave(
 	context *glsp.Context,

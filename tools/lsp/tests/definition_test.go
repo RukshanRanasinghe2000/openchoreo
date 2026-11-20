@@ -12,6 +12,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 	"github.com/openchoreo/openchoreo/tools/lint/indexer"
 	"github.com/openchoreo/openchoreo/tools/lint/parser"
 	codedefinition "github.com/openchoreo/openchoreo/tools/lsp/code-definition"
@@ -267,20 +268,20 @@ func TestHandle_SameGitProjectOnly(t *testing.T) {
 	idx := indexer.NewIndexer()
 	// Foreign-repo candidate indexed first (mimics alphabetical workspace walk).
 	otherTrait := filepath.Join(otherRepo, "component-with-traits.yaml")
-	if err := idx.UpdateFile("file://"+otherTrait, []byte(trait)); err != nil {
+	if err := idx.UpdateFile(pathutil.FileURI(otherTrait), []byte(trait)); err != nil {
 		t.Fatalf("index foreign repo: %v", err)
 	}
 	sameTrait := filepath.Join(sourceRepo, "persistent-volume.yaml")
-	if err := idx.UpdateFile("file://"+sameTrait, []byte(trait)); err != nil {
+	if err := idx.UpdateFile(pathutil.FileURI(sameTrait), []byte(trait)); err != nil {
 		t.Fatalf("index source repo: %v", err)
 	}
 
-	sourceURI := "file://" + filepath.Join(sourceRepo, "webapp.yaml")
+	sourceURI := pathutil.FileURI(filepath.Join(sourceRepo, "webapp.yaml"))
 	locs := codedefinition.Handle(doc, 7, 15, sourceURI, idx)
 	if len(locs) != 1 {
 		t.Fatalf("expected exactly 1 definition from the source git project, got %d: %v", len(locs), locs)
 	}
-	if want := "file://" + sameTrait; locs[0].URI != want {
+	if want := pathutil.FileURI(sameTrait); locs[0].URI != want {
 		t.Errorf("definition = %s, want %s", locs[0].URI, want)
 	}
 }
@@ -310,23 +311,23 @@ func TestHandle_EncodedSourceURI_SameGitProject(t *testing.T) {
 
 	idx := indexer.NewIndexer()
 	otherTrait := filepath.Join(otherRepo, "component-with-traits.yaml")
-	if err := idx.UpdateFile("file://"+otherTrait, []byte(trait)); err != nil {
+	if err := idx.UpdateFile(pathutil.FileURI(otherTrait), []byte(trait)); err != nil {
 		t.Fatalf("index foreign repo: %v", err)
 	}
 	sameTrait := filepath.Join(sourceRepo, "persistent-volume.yaml")
-	if err := idx.UpdateFile("file://"+sameTrait, []byte(trait)); err != nil {
+	if err := idx.UpdateFile(pathutil.FileURI(sameTrait), []byte(trait)); err != nil {
 		t.Fatalf("index source repo: %v", err)
 	}
 
 	// Client sends the source URI percent-encoded; indexer paths are decoded.
 	srcPath := filepath.Join(sourceRepo, "webapp.yaml")
-	sourceURI := "file://" + strings.ReplaceAll(srcPath, "&", "%26")
+	sourceURI := strings.ReplaceAll(pathutil.FileURI(srcPath), "&", "%26")
 
 	locs := codedefinition.Handle(doc, 7, 15, sourceURI, idx)
 	if len(locs) != 1 {
 		t.Fatalf("expected exactly 1 definition, got %d: %v", len(locs), locs)
 	}
-	if want := "file://" + sameTrait; locs[0].URI != want {
+	if want := pathutil.FileURI(sameTrait); locs[0].URI != want {
 		t.Errorf("definition = %s, want %s", locs[0].URI, want)
 	}
 }
@@ -347,24 +348,24 @@ metadata:
 
 	idx := indexer.NewIndexer()
 	if err := idx.UpdateFile(
-		"file:///workspace/openchoreo/internal/pipeline/component/testdata/component-with-traits.yaml",
+		pathutil.FileURI(pathutil.Absolute("/workspace/openchoreo/internal/pipeline/component/testdata/component-with-traits.yaml")),
 		[]byte(upstreamTrait),
 	); err != nil {
 		t.Fatalf("index upstream: %v", err)
 	}
 	if err := idx.UpdateFile(
-		"file:///workspace/sample-gitops/namespaces/default/platform/traits/persistent-volume.yaml",
+		pathutil.FileURI(pathutil.Absolute("/workspace/sample-gitops/namespaces/default/platform/traits/persistent-volume.yaml")),
 		[]byte(sampleTrait),
 	); err != nil {
 		t.Fatalf("index sample: %v", err)
 	}
 
-	sourceURI := "file:///workspace/sample-gitops/namespaces/default/platform/component-types/webapp.yaml"
+	sourceURI := pathutil.FileURI(pathutil.Absolute("/workspace/sample-gitops/namespaces/default/platform/component-types/webapp.yaml"))
 	locs := codedefinition.Handle(doc, 7, 15, sourceURI, idx)
 	if len(locs) != 1 {
 		t.Fatalf("expected exactly 1 definition, got %d: %v", len(locs), locs)
 	}
-	want := "file:///workspace/sample-gitops/namespaces/default/platform/traits/persistent-volume.yaml"
+	want := pathutil.FileURI(pathutil.Absolute("/workspace/sample-gitops/namespaces/default/platform/traits/persistent-volume.yaml"))
 	if locs[0].URI != want {
 		t.Errorf("first definition = %s, want %s", locs[0].URI, want)
 	}

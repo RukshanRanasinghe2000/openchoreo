@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 	"github.com/openchoreo/openchoreo/tools/lint/parser"
 	post "github.com/openchoreo/openchoreo/tools/lint/post-render-validator"
 	protocol "github.com/tliron/glsp/protocol_3_16"
@@ -14,13 +15,7 @@ import (
 )
 
 // Virtual documents are resource identities, never filesystem paths.
-func localDocumentPath(uri string) string {
-	u, err := url.Parse(uri)
-	if err != nil || u.Scheme != "file" {
-		return ""
-	}
-	return fileURIToPath(uri)
-}
+func localDocumentPath(uri string) string { return pathutil.NativePath(uri) }
 
 func normalizedResource(uri, text string) (any, bool) {
 	docs, err := parser.ParseYAML([]byte(text))
