@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
@@ -60,7 +61,7 @@ spec:
 	s.workspaceRoots = []string{root}
 	s.OpenDocument(pathToDocumentURI(dp), strings.Replace(definition, "type: integer", "type: string", 1), 2)
 	s.triggerPreRenderSchemaValidationForPath(dp)
-	findings := s.preRenderSchemaByURI[pathToDocumentURI(cp)]
+	findings := s.preRenderSchemaByURI[pathutil.DocumentKey(pathToDocumentURI(cp))]
 	if len(findings) != 1 {
 		t.Fatalf("unsaved schema mismatch not reported: %v", findings)
 	}
@@ -89,7 +90,7 @@ func TestReleaseEnvironmentAndRuntimeLifecycle(t *testing.T) {
 	s.OpenDocument(uri, string(data), 1)
 	s.triggerPreRenderSchemaValidationForPath(path)
 	counts := map[string]int{}
-	for _, f := range s.preRenderSchemaByURI[uri] {
+	for _, f := range s.preRenderSchemaByURI[pathutil.DocumentKey(uri)] {
 		if f.Code != nil {
 			counts[f.Code.Value.(string)]++
 		}
@@ -101,7 +102,7 @@ func TestReleaseEnvironmentAndRuntimeLifecycle(t *testing.T) {
 	// structural YAML parser owns syntax errors, avoiding duplicate diagnostics.
 	s.OpenDocument(uri, "apiVersion: openchoreo.dev/v1alpha1\nkind: ComponentRelease\nspec: [broken", 2)
 	s.triggerPreRenderSchemaValidationForPath(path)
-	if len(s.preRenderSchemaByURI[uri]) != 0 {
+	if len(s.preRenderSchemaByURI[pathutil.DocumentKey(uri)]) != 0 {
 		t.Fatal("malformed overlay retained stale schema diagnostics")
 	}
 	if len(Validate("apiVersion: openchoreo.dev/v1alpha1\nkind: ComponentRelease\nspec: [broken")) != 1 {
@@ -110,14 +111,14 @@ func TestReleaseEnvironmentAndRuntimeLifecycle(t *testing.T) {
 	// Closing the buffer restores the disk snapshot.
 	s.CloseDocument(uri)
 	s.triggerPreRenderSchemaValidationForPath(path)
-	if len(s.preRenderSchemaByURI[uri]) != 4 {
+	if len(s.preRenderSchemaByURI[pathutil.DocumentKey(uri)]) != 4 {
 		t.Fatal("disk snapshot not restored")
 	}
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)
 	}
 	s.triggerPreRenderSchemaValidationForPath(path)
-	if len(s.preRenderSchemaByURI[uri]) != 0 {
+	if len(s.preRenderSchemaByURI[pathutil.DocumentKey(uri)]) != 0 {
 		t.Fatal("deleted file retained stale findings")
 	}
 }
@@ -136,12 +137,12 @@ func TestPreRenderIndependentProjectCaches(t *testing.T) {
 		s.triggerPreRenderSchemaValidationForPath(path)
 	}
 	for _, path := range paths {
-		if len(s.preRenderSchemaByURI[pathToDocumentURI(path)]) != 4 {
+		if len(s.preRenderSchemaByURI[pathutil.DocumentKey(pathToDocumentURI(path))]) != 4 {
 			t.Fatal("validation of another project cleared cached findings")
 		}
 	}
 	s.clearSchemaFindings(paths[:1])
-	if len(s.preRenderSchemaByURI[pathToDocumentURI(paths[1])]) != 4 {
+	if len(s.preRenderSchemaByURI[pathutil.DocumentKey(pathToDocumentURI(paths[1]))]) != 4 {
 		t.Fatal("clearing one project cleared another")
 	}
 }
@@ -149,7 +150,7 @@ func TestPreRenderIndependentProjectCaches(t *testing.T) {
 func TestRuntimeDiagnosticAlreadyReportedByPipeline(t *testing.T) {
 	s := NewServer()
 	uri := "file:///component.yaml"
-	s.preRenderSchemaByURI[uri] = []protocol.Diagnostic{{Code: &protocol.IntegerOrString{Value: "pre-render-validation-failed"}, Message: "rule evaluated to false"}}
+	s.preRenderSchemaByURI[pathutil.DocumentKey(uri)] = []protocol.Diagnostic{{Code: &protocol.IntegerOrString{Value: "pre-render-validation-failed"}, Message: "rule evaluated to false"}}
 	original := []protocol.Diagnostic{{Source: stringPtr("openchoreo-post-render"), Message: "component type validation failed: rule evaluated to false"}}
 	got := s.mergePreRenderSchemaDiagnostics(uri, original)
 	if len(got) != 1 {
@@ -178,7 +179,7 @@ func TestWorkspaceStaticDiagnosticsForClosedFiles(t *testing.T) {
 	}
 	s.triggerPreRenderSchemaValidationForPath(path)
 	uri := pathToDocumentURI(path)
-	if len(s.workspaceStaticByURI[uri]) == 0 {
+	if len(s.workspaceStaticByURI[pathutil.DocumentKey(uri)]) == 0 {
 		t.Fatal("unopened structural error missing")
 	}
 	if diagnosticVersion(s, uri, 0) != nil {
@@ -190,7 +191,7 @@ func TestWorkspaceStaticDiagnosticsForClosedFiles(t *testing.T) {
 	}
 	s.updateIndexedFile(path)
 	s.triggerPreRenderSchemaValidationForPath(path)
-	for _, d := range s.workspaceStaticByURI[uri] {
+	for _, d := range s.workspaceStaticByURI[pathutil.DocumentKey(uri)] {
 		if strings.Contains(d.Message, "isProduction") {
 			t.Fatalf("stale error: %+v", d)
 		}
@@ -200,7 +201,7 @@ func TestWorkspaceStaticDiagnosticsForClosedFiles(t *testing.T) {
 	}
 	s.updateIndexedFile(path)
 	s.triggerPreRenderSchemaValidationForPath(path)
-	if len(s.workspaceStaticByURI[uri]) != 0 {
+	if len(s.workspaceStaticByURI[pathutil.DocumentKey(uri)]) != 0 {
 		t.Fatal("deleted file retained diagnostics")
 	}
 }
@@ -218,7 +219,7 @@ func TestWorkspaceFolderRefreshIsolatesAndClearsClosedDiagnostics(t *testing.T) 
 	s.refreshWorkspaceFolders()
 	uri := pathToDocumentURI(filepath.Join(first, "environment.yaml"))
 	s.preRenderSchemaMu.Lock()
-	count := len(s.workspaceStaticByURI[uri])
+	count := len(s.workspaceStaticByURI[pathutil.DocumentKey(uri)])
 	s.preRenderSchemaMu.Unlock()
 	if count == 0 {
 		t.Fatal("unopened first workspace did not validate")
@@ -229,10 +230,10 @@ func TestWorkspaceFolderRefreshIsolatesAndClearsClosedDiagnostics(t *testing.T) 
 	s.refreshWorkspaceFolders()
 	s.preRenderSchemaMu.Lock()
 	defer s.preRenderSchemaMu.Unlock()
-	if _, exists := s.workspaceStaticByURI[uri]; exists {
+	if _, exists := s.workspaceStaticByURI[pathutil.DocumentKey(uri)]; exists {
 		t.Fatal("removed workspace retained automatic diagnostics")
 	}
-	if len(s.workspaceStaticByURI[pathToDocumentURI(filepath.Join(second, "environment.yaml"))]) == 0 {
+	if len(s.workspaceStaticByURI[pathutil.DocumentKey(pathToDocumentURI(filepath.Join(second, "environment.yaml")))]) == 0 {
 		t.Fatal("remaining workspace lost diagnostics")
 	}
 }

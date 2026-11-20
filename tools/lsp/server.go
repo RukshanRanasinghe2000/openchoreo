@@ -39,6 +39,7 @@ type Server struct {
 	schemaDependencyPaths map[string]struct{}
 	server                *server.Server
 	documents             map[string]*Document
+	clientURIs            map[string]string
 	docMu                 sync.RWMutex
 	indexer               *indexer.Indexer
 	// workspaceRoots are the normalized, non-overlapping working directories

@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,13 +14,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 	"github.com/sourcegraph/jsonrpc2"
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
 func definitionURI(path string) string {
-	return (&url.URL{Scheme: "file", Path: filepath.ToSlash(path)}).String()
+	return pathutil.FileURI(path)
 }
 func definitionSource(kind, name, namespace string) string {
 	return fmt.Sprintf("apiVersion: openchoreo.dev/v1alpha1\nkind: Component\nmetadata: {name: app, namespace: %s}\nspec:\n  componentType:\n    kind: %s\n    name: %s\n", namespace, kind, name)

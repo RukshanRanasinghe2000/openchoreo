@@ -8,6 +8,8 @@ import (
 
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
+
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 )
 
 func (s *Server) workspaceRootsSnapshot() []string {
@@ -21,10 +23,10 @@ func (s *Server) DidChangeWorkspaceFolders(_ *glsp.Context, params *protocol.Did
 	s.workspaceRootsMu.Lock()
 	roots := append([]string(nil), s.workspaceRoots...)
 	for _, removed := range params.Event.Removed {
-		path := filepath.Clean(fileURIToPath(removed.URI))
+		path := fileURIToPath(removed.URI)
 		var kept []string
 		for _, root := range roots {
-			if root != path {
+			if !pathutil.SamePath(root, path) {
 				kept = append(kept, root)
 			}
 		}
@@ -69,9 +71,9 @@ func (s *Server) refreshWorkspaceFolders() {
 			}
 		}
 		if !belongs {
-			delete(s.workspaceStaticByURI, uri)
-			delete(s.preRenderSchemaByURI, uri)
-			delete(s.preRenderSchemaFiles, fileURIToPath(uri))
+			delete(s.workspaceStaticByURI, pathutil.DocumentKey(uri))
+			delete(s.preRenderSchemaByURI, pathutil.DocumentKey(uri))
+			delete(s.preRenderSchemaFiles, pathutil.PathKey(fileURIToPath(uri)))
 			removed = append(removed, uri)
 		}
 	}

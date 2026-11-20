@@ -15,6 +15,7 @@ import (
 	"github.com/sourcegraph/jsonrpc2"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 	"github.com/openchoreo/openchoreo/tools/lsp"
 )
 
@@ -99,7 +100,7 @@ func watchServer(t *testing.T, root string) (*lsp.Server, net.Conn) {
 // watcher has a pre-existing subdirectory to observe.
 func makeWatchRoot(t *testing.T) string {
 	t.Helper()
-	root := filepath.Join(t.TempDir(), "workspace")
+	root := filepath.Join(t.TempDir(), "workspace 日本語 # %20")
 	if err := os.MkdirAll(filepath.Join(root, "resources"), 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
@@ -328,7 +329,7 @@ func TestWatchRenameReferencedFileWhileOpenUpdatesDiagnostics(t *testing.T) {
 
 	// Both files are open (split window): the target by its real path, the
 	// referencing document under a virtual URI.
-	refURI := "file://" + created
+	refURI := pathutil.FileURI(created)
 	openDoc(t, s, refURI, watchPipelineFileName, 1)
 
 	openURI := testValueFileVirtualOpenYaml
@@ -416,7 +417,7 @@ func TestDidChangeResourceNameRevalidatesReferencingDocuments(t *testing.T) {
 
 	// Split window: the trait file and the document referencing it are both
 	// open.
-	traitURI := "file://" + target
+	traitURI := pathutil.FileURI(target)
 	openDoc(t, s, traitURI, watchTraitsTarget, 1)
 
 	openURI := "file:///virtual/webapp.yaml"
@@ -461,7 +462,7 @@ func TestWatchIgnoresChangesToOpenDocuments(t *testing.T) {
 	// The open document's in-memory text is authoritative: on-disk writes to
 	// its file must not trigger a republish (the editor owns those edits).
 	path := filepath.Join(root, "app.yaml")
-	openURI := "file://" + path
+	openURI := pathutil.FileURI(path)
 	openDoc(t, s, openURI, watchOpenComponent, 1)
 	expectNoFrame(t, client, 300*time.Millisecond)
 

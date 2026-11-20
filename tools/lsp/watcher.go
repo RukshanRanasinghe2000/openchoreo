@@ -13,6 +13,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 	"github.com/openchoreo/openchoreo/tools/lint/targetschema"
 )
 
@@ -139,18 +140,19 @@ func (s *Server) handleWatchEvent(w *fsnotify.Watcher, event fsnotify.Event) {
 // debounce window, the previous timer is reset so only the final state of the
 // burst is processed.
 func (s *Server) debounceWatch(path string) {
+	key := pathutil.PathKey(path)
 	s.watchMu.Lock()
 	defer s.watchMu.Unlock()
 
 	if s.watchPending == nil {
 		s.watchPending = make(map[string]*time.Timer)
 	}
-	if timer := s.watchPending[path]; timer != nil {
+	if timer := s.watchPending[key]; timer != nil {
 		timer.Stop()
 	}
-	s.watchPending[path] = time.AfterFunc(watchDebounceDelay, func() {
+	s.watchPending[key] = time.AfterFunc(watchDebounceDelay, func() {
 		s.watchMu.Lock()
-		delete(s.watchPending, path)
+		delete(s.watchPending, key)
 		s.watchMu.Unlock()
 		s.processWatchChange(path)
 	})
@@ -237,7 +239,7 @@ func (s *Server) resyncIndexWithDisk() {
 	}
 
 	for _, uri := range s.indexer.URIs() {
-		if !strings.HasPrefix(uri, "file://") {
+		if fileURIToPath(uri) == "" {
 			continue
 		}
 		if _, err := os.Stat(fileURIToPath(uri)); err != nil {
@@ -333,13 +335,4 @@ func isYAMLWatchName(path string) bool {
 
 // fileToURI builds the file:// URI the indexer uses as a document key, which
 // must match the URIs handed to didOpen by clients.
-func fileToURI(path string) string {
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		return path
-	}
-	if !strings.HasPrefix(abs, "file://") {
-		return "file://" + abs
-	}
-	return abs
-}
+func fileToURI(path string) string { return pathutil.FileURI(path) }

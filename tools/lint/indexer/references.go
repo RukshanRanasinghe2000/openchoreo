@@ -5,9 +5,9 @@ package indexer
 
 import (
 	"net/url"
-	"path/filepath"
 	"strings"
 
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 	"github.com/openchoreo/openchoreo/tools/lint/parser"
 )
 
@@ -17,17 +17,8 @@ type SnapshotDocument struct {
 	Document *parser.DocumentNode
 }
 
-func uriPath(uri string) string {
-	u, e := url.Parse(uri)
-	if e == nil && u.Scheme == "file" {
-		return filepath.FromSlash(u.Path)
-	}
-	return uri
-}
-func within(root, path string) bool {
-	rel, e := filepath.Rel(root, path)
-	return e == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
-}
+func uriPath(uri string) string     { return pathutil.NativePath(uri) }
+func within(root, path string) bool { return pathutil.Within(root, path) }
 
 // Snapshot uses the shared index's files and latest UpdateFile content. Invalid
 // editor buffers replace disk content rather than resurrecting stale definitions.
@@ -55,7 +46,7 @@ func (idx *Indexer) snapshot(sourceURI string, unscoped bool) []SnapshotDocument
 	}
 	files := map[string][]byte{}
 	for uri, data := range idx.contents {
-		files[uri] = append([]byte(nil), data...)
+		files[idx.fileURIs[uri]] = append([]byte(nil), data...)
 	}
 	idx.mu.RUnlock()
 	var out []SnapshotDocument
@@ -176,7 +167,7 @@ func (idx *Indexer) SchemaSources(sourceURI string) map[string][]byte {
 		return out
 	}
 	for uri, data := range idx.contents {
-		path := uriPath(uri)
+		path := uriPath(idx.fileURIs[uri])
 		if root == "" || within(root, path) {
 			out[path] = append([]byte(nil), data...)
 		}
@@ -188,6 +179,6 @@ func (idx *Indexer) SchemaSources(sourceURI string) map[string][]byte {
 func (idx *Indexer) SourceContent(uri string) ([]byte, bool) {
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
-	data, ok := idx.contents[uri]
+	data, ok := idx.contents[idx.uriKeyLocked(uri)]
 	return append([]byte(nil), data...), ok
 }

@@ -12,6 +12,7 @@ import (
 
 	protocol "github.com/tliron/glsp/protocol_3_16"
 
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 	"github.com/openchoreo/openchoreo/tools/lsp"
 	lsputil "github.com/openchoreo/openchoreo/tools/lsp/lsp-util"
 )
@@ -23,7 +24,7 @@ import (
 func indexServer(t *testing.T, dir string) *lsp.Server {
 	t.Helper()
 	s := lsp.NewServer()
-	rootURI := "file://" + dir
+	rootURI := pathutil.FileURI(dir)
 	if _, err := s.Initialize(nil, &protocol.InitializeParams{RootURI: &rootURI}); err != nil {
 		t.Fatal(err)
 	}

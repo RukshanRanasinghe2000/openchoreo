@@ -13,6 +13,7 @@ import (
 
 	protocol "github.com/tliron/glsp/protocol_3_16"
 
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 	"github.com/openchoreo/openchoreo/tools/lint/parser"
 	prerendervalidator "github.com/openchoreo/openchoreo/tools/lint/pre-render-validator"
 	lsputil "github.com/openchoreo/openchoreo/tools/lsp/lsp-util"
@@ -28,30 +29,30 @@ func (s *Server) runPreRenderSchemaValidationFiles(files []string) {
 	revision := s.indexer.Version()
 	overlays := make(map[string]string)
 	for _, doc := range s.snapshotOpenDocuments() {
-		overlays[filepath.Clean(fileURIToPath(doc.URI))] = doc.Text
+		overlays[pathutil.PathKey(fileURIToPath(doc.URI))] = doc.Text
 	}
 	indexed := map[string][]*parser.DocumentNode{}
 	if len(files) > 0 {
 		for _, entry := range s.indexer.Snapshot(pathToDocumentURI(files[0])) {
-			p := filepath.Clean(fileURIToPath(entry.URI))
-			indexed[p] = append(indexed[p], entry.Document)
+			p := fileURIToPath(entry.URI)
+			indexed[pathutil.PathKey(p)] = append(indexed[pathutil.PathKey(p)], entry.Document)
 		}
 	}
 	var resources []prerendervalidator.Resource
-	seen := make(map[string]bool)
+	seen := make(map[string]string)
 	for _, path := range files {
-		path = filepath.Clean(path)
-		if seen[path] {
+		path = pathutil.Absolute(path)
+		if _, ok := seen[pathutil.PathKey(path)]; ok {
 			continue
 		}
-		seen[path] = true
-		if _, open := overlays[path]; !open && len(indexed[path]) > 0 {
-			for _, doc := range indexed[path] {
+		seen[pathutil.PathKey(path)] = path
+		if _, open := overlays[pathutil.PathKey(path)]; !open && len(indexed[pathutil.PathKey(path)]) > 0 {
+			for _, doc := range indexed[pathutil.PathKey(path)] {
 				resources = append(resources, prerendervalidator.Resource{Path: path, Document: doc})
 			}
 			continue
 		}
-		text, open := overlays[path]
+		text, open := overlays[pathutil.PathKey(path)]
 		if !open {
 			data, err := os.ReadFile(path)
 			if err != nil {
@@ -70,14 +71,14 @@ func (s *Server) runPreRenderSchemaValidationFiles(files []string) {
 	if len(files) > 0 {
 		seenDocs := map[string]bool{}
 		for _, r := range resources {
-			seenDocs[fmt.Sprintf("%s:%d", filepath.Clean(r.Path), r.Document.DocumentIndex)] = true
+			seenDocs[fmt.Sprintf("%s:%d", pathutil.PathKey(r.Path), r.Document.DocumentIndex)] = true
 		}
 		for _, entry := range s.indexer.Snapshot(pathToDocumentURI(files[0])) {
-			p := filepath.Clean(fileURIToPath(entry.URI))
-			if _, open := overlays[p]; open {
+			p := fileURIToPath(entry.URI)
+			if _, open := overlays[pathutil.PathKey(p)]; open {
 				continue
 			}
-			key := fmt.Sprintf("%s:%d", p, entry.Document.DocumentIndex)
+			key := fmt.Sprintf("%s:%d", pathutil.PathKey(p), entry.Document.DocumentIndex)
 			if !seenDocs[key] {
 				resources = append(resources, prerendervalidator.Resource{Path: p, Document: entry.Document})
 			}
@@ -89,9 +90,10 @@ func (s *Server) runPreRenderSchemaValidationFiles(files []string) {
 	if len(files) > 0 {
 		rawSources = s.indexer.SchemaSources(pathToDocumentURI(files[0]))
 	}
-	for path := range seen {
+	for _, path := range seen {
 		uri := pathToDocumentURI(path)
-		text, open := overlays[path]
+		s.rememberFileURI(uri)
+		text, open := overlays[pathutil.PathKey(path)]
 		if !open {
 			data, ok := rawSources[path]
 			var err error
@@ -100,12 +102,12 @@ func (s *Server) runPreRenderSchemaValidationFiles(files []string) {
 			}
 			if err != nil {
 				s.deleteValidationEntry(uri)
-				static[uri] = nil
+				static[pathutil.DocumentKey(uri)] = nil
 				continue
 			}
 			text = string(data)
 		}
-		static[uri] = s.diagnosticsForCached(uri, text)
+		static[pathutil.DocumentKey(uri)] = s.diagnosticsForCached(uri, text)
 	}
 	findings := prerendervalidator.ValidateDocuments(context.Background(), resources)
 	if s.indexer.Version() != revision {
@@ -120,7 +122,7 @@ func (s *Server) publishPreRenderFindings(files []string, static map[string][]pr
 		s.workspaceStaticByURI = make(map[string][]protocol.Diagnostic)
 	}
 	for uri, diags := range static {
-		s.workspaceStaticByURI[uri] = diags
+		s.workspaceStaticByURI[pathutil.DocumentKey(uri)] = diags
 	}
 	s.preRenderSchemaMu.Unlock()
 	if len(findings) == 0 {
@@ -131,7 +133,8 @@ func (s *Server) publishPreRenderFindings(files []string, static map[string][]pr
 	byURI := make(map[string][]protocol.Diagnostic)
 	for _, finding := range findings {
 		uri := pathToDocumentURI(finding.Path)
-		byURI[uri] = append(byURI[uri], schemaFindingToDiagnostic(finding))
+		s.rememberFileURI(uri)
+		byURI[pathutil.DocumentKey(uri)] = append(byURI[pathutil.DocumentKey(uri)], schemaFindingToDiagnostic(finding))
 	}
 
 	s.preRenderSchemaMu.Lock()
@@ -144,24 +147,25 @@ func (s *Server) publishPreRenderFindings(files []string, static map[string][]pr
 	}
 	for _, f := range files {
 		uri := pathToDocumentURI(f)
-		if _, hadSchema := s.preRenderSchemaByURI[uri]; hadSchema || s.GetDocument(uri) == nil {
-			affected[uri] = struct{}{}
+		s.rememberFileURI(uri)
+		if _, hadSchema := s.preRenderSchemaByURI[pathutil.DocumentKey(uri)]; hadSchema || s.GetDocument(uri) == nil {
+			affected[pathutil.DocumentKey(uri)] = struct{}{}
 		}
-		delete(s.preRenderSchemaByURI, uri)
-		s.preRenderSchemaFiles[filepath.Clean(f)] = struct{}{}
+		delete(s.preRenderSchemaByURI, pathutil.DocumentKey(uri))
+		s.preRenderSchemaFiles[pathutil.PathKey(f)] = struct{}{}
 	}
 	for uri, diags := range byURI {
-		s.preRenderSchemaByURI[uri] = diags
-		affected[uri] = struct{}{}
+		s.preRenderSchemaByURI[pathutil.DocumentKey(uri)] = diags
+		affected[pathutil.DocumentKey(uri)] = struct{}{}
 	}
 	s.preRenderSchemaMu.Unlock()
 
 	open := make(map[string]Document)
 	for _, doc := range s.snapshotOpenDocuments() {
-		open[doc.URI] = doc
+		open[pathutil.DocumentKey(doc.URI)] = doc
 	}
 	for uri := range affected {
-		if doc, ok := open[uri]; ok {
+		if doc, ok := open[pathutil.DocumentKey(uri)]; ok {
 			structural := s.diagnosticsForCached(uri, doc.Text)
 			s.publishDiagnosticsAsync(uri, doc.Version, structural)
 		} else {
@@ -178,20 +182,21 @@ func (s *Server) clearSchemaFindings(files []string) {
 	affected := make(map[string]struct{})
 	for _, f := range files {
 		uri := pathToDocumentURI(f)
-		if _, hadSchema := s.preRenderSchemaByURI[uri]; hadSchema || s.GetDocument(uri) == nil {
-			affected[uri] = struct{}{}
+		s.rememberFileURI(uri)
+		if _, hadSchema := s.preRenderSchemaByURI[pathutil.DocumentKey(uri)]; hadSchema || s.GetDocument(uri) == nil {
+			affected[pathutil.DocumentKey(uri)] = struct{}{}
 		}
-		delete(s.preRenderSchemaByURI, uri)
-		delete(s.preRenderSchemaFiles, filepath.Clean(f))
+		delete(s.preRenderSchemaByURI, pathutil.DocumentKey(uri))
+		delete(s.preRenderSchemaFiles, pathutil.PathKey(f))
 	}
 	s.preRenderSchemaMu.Unlock()
 
 	open := make(map[string]Document)
 	for _, doc := range s.snapshotOpenDocuments() {
-		open[doc.URI] = doc
+		open[pathutil.DocumentKey(doc.URI)] = doc
 	}
 	for uri := range affected {
-		if doc, ok := open[uri]; ok {
+		if doc, ok := open[pathutil.DocumentKey(uri)]; ok {
 			structural := s.diagnosticsForCached(uri, doc.Text)
 			s.publishDiagnosticsAsync(uri, doc.Version, structural)
 		} else {
@@ -270,7 +275,7 @@ func (s *Server) triggerPreRenderSchemaValidationForPath(path string) {
 		// ensure path included
 		found := false
 		for _, f := range files {
-			if filepath.Clean(f) == filepath.Clean(path) {
+			if pathutil.SamePath(f, path) {
 				found = true
 				break
 			}
@@ -281,8 +286,7 @@ func (s *Server) triggerPreRenderSchemaValidationForPath(path string) {
 	}
 	for _, doc := range s.snapshotOpenDocuments() {
 		p := fileURIToPath(doc.URI)
-		rel, e := filepath.Rel(dir, p)
-		if e == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		if pathutil.Within(dir, p) {
 			files = append(files, p)
 		}
 	}
@@ -290,8 +294,7 @@ func (s *Server) triggerPreRenderSchemaValidationForPath(path string) {
 	files = append(files, path)
 	s.preRenderSchemaMu.Lock()
 	for prior := range s.preRenderSchemaFiles {
-		rel, e := filepath.Rel(dir, prior)
-		if e == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		if pathutil.Within(dir, prior) {
 			files = append(files, prior)
 		}
 	}
@@ -307,7 +310,7 @@ func (s *Server) triggerPreRenderSchemaValidationForPath(path string) {
 
 func (s *Server) mergePreRenderSchemaDiagnostics(uri string, diags []protocol.Diagnostic) []protocol.Diagnostic {
 	s.preRenderSchemaMu.Lock()
-	cached := append([]protocol.Diagnostic(nil), s.preRenderSchemaByURI[uri]...)
+	cached := append([]protocol.Diagnostic(nil), s.preRenderSchemaByURI[pathutil.DocumentKey(uri)]...)
 	s.preRenderSchemaMu.Unlock()
 	if len(cached) == 0 {
 		return diags

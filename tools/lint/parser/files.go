@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 )
 
 // CollectYAMLFiles returns the .yaml/.yml files under folder that declare an
@@ -14,6 +16,9 @@ import (
 // otherwise it only looks at the files directly inside folder. Unreadable and
 // non-OpenChoreo YAML files are ignored.
 func CollectYAMLFiles(folder string, recursive bool) ([]string, error) {
+	if folder != "" {
+		folder = pathutil.Clean(folder)
+	}
 	var files []string
 	if recursive {
 		err := filepath.WalkDir(folder, func(path string, d os.DirEntry, err error) error {

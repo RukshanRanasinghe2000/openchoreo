@@ -7,13 +7,14 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 )
 
 // ResourceKey identifies a resource by its kind and name.
@@ -32,6 +33,7 @@ type Location struct {
 // Indexer maintains an in-memory index of all resources in the workspace.
 type Indexer struct {
 	mu                sync.RWMutex
+	fileURIs          map[string]string
 	contents          map[string][]byte
 	snapshotVersion   uint64
 	snapshotDocuments []SnapshotDocument
@@ -86,6 +88,7 @@ func (idx *Indexer) IndexWorkspacesWithProgress(roots []string, onProgress func(
 	}
 
 	newContents := make(map[string][]byte)
+	newURIs := make(map[string]string)
 	newIndex := make(map[ResourceKey][]Location)
 	newFileIndex := make(map[string][]ResourceKey)
 
@@ -100,11 +103,13 @@ func (idx *Indexer) IndexWorkspacesWithProgress(roots []string, onProgress func(
 			}
 
 			uri := pathToFileURI(path)
+			keyURI := pathutil.DocumentKey(uri)
+			newURIs[keyURI] = uri
 			data, readErr := os.ReadFile(path)
 			if readErr != nil {
 				return nil
 			}
-			newContents[uri] = data
+			newContents[keyURI] = data
 			resources := scanYAMLBytes(data)
 
 			for _, r := range resources {
@@ -115,7 +120,7 @@ func (idx *Indexer) IndexWorkspacesWithProgress(roots []string, onProgress func(
 				}
 				key := ResourceKey{Kind: r.Kind, Name: r.Name}
 				newIndex[key] = append(newIndex[key], loc)
-				newFileIndex[uri] = append(newFileIndex[uri], key)
+				newFileIndex[keyURI] = append(newFileIndex[keyURI], key)
 			}
 
 			scanned++
@@ -132,6 +137,7 @@ func (idx *Indexer) IndexWorkspacesWithProgress(roots []string, onProgress func(
 
 	idx.mu.Lock()
 	idx.contents = newContents
+	idx.fileURIs = newURIs
 	idx.rootDirs = roots
 	idx.index = newIndex
 	idx.fileIndex = newFileIndex
@@ -176,17 +182,22 @@ func countYAMLFiles(roots []string) (int, error) {
 func (idx *Indexer) UpdateFile(uri string, content []byte) error {
 	idx.mu.Lock()
 	defer idx.mu.Unlock()
+	keyURI := idx.uriKeyLocked(uri)
 	if idx.contents == nil {
 		idx.contents = map[string][]byte{}
 	}
-	idx.contents[uri] = append([]byte(nil), content...)
+	if idx.fileURIs == nil {
+		idx.fileURIs = map[string]string{}
+	}
+	idx.fileURIs[keyURI] = uri
+	idx.contents[keyURI] = append([]byte(nil), content...)
 
 	// Remove old entries for this file
-	if oldKeys, ok := idx.fileIndex[uri]; ok {
+	if oldKeys, ok := idx.fileIndex[keyURI]; ok {
 		for _, key := range oldKeys {
 			locations := idx.index[key]
 			for i := len(locations) - 1; i >= 0; i-- {
-				if locations[i].URI == uri {
+				if pathutil.DocumentKey(locations[i].URI) == keyURI || pathutil.CanonicalURI(locations[i].URI) == pathutil.CanonicalURI(uri) {
 					idx.index[key] = append(locations[:i], locations[i+1:]...)
 				}
 			}
@@ -194,7 +205,7 @@ func (idx *Indexer) UpdateFile(uri string, content []byte) error {
 				delete(idx.index, key)
 			}
 		}
-		delete(idx.fileIndex, uri)
+		delete(idx.fileIndex, keyURI)
 	}
 
 	idx.version++
@@ -210,7 +221,7 @@ func (idx *Indexer) UpdateFile(uri string, content []byte) error {
 		}
 		key := ResourceKey{Kind: r.Kind, Name: r.Name}
 		idx.index[key] = append(idx.index[key], loc)
-		idx.fileIndex[uri] = append(idx.fileIndex[uri], key)
+		idx.fileIndex[keyURI] = append(idx.fileIndex[keyURI], key)
 	}
 
 	return nil
@@ -220,13 +231,15 @@ func (idx *Indexer) UpdateFile(uri string, content []byte) error {
 func (idx *Indexer) RemoveFile(uri string) {
 	idx.mu.Lock()
 	defer idx.mu.Unlock()
-	delete(idx.contents, uri)
+	keyURI := idx.uriKeyLocked(uri)
+	delete(idx.contents, keyURI)
+	delete(idx.fileURIs, keyURI)
 
-	if oldKeys, ok := idx.fileIndex[uri]; ok {
+	if oldKeys, ok := idx.fileIndex[keyURI]; ok {
 		for _, key := range oldKeys {
 			locations := idx.index[key]
 			for i := len(locations) - 1; i >= 0; i-- {
-				if locations[i].URI == uri {
+				if pathutil.DocumentKey(locations[i].URI) == keyURI || pathutil.CanonicalURI(locations[i].URI) == pathutil.CanonicalURI(uri) {
 					idx.index[key] = append(locations[:i], locations[i+1:]...)
 				}
 			}
@@ -234,7 +247,7 @@ func (idx *Indexer) RemoveFile(uri string) {
 				delete(idx.index, key)
 			}
 		}
-		delete(idx.fileIndex, uri)
+		delete(idx.fileIndex, keyURI)
 	}
 
 	idx.version++
@@ -315,7 +328,7 @@ func (idx *Indexer) URIs() []string {
 
 	uris := make([]string, 0, len(idx.fileIndex))
 	for uri := range idx.fileIndex {
-		uris = append(uris, uri)
+		uris = append(uris, idx.fileURIs[uri])
 	}
 	return uris
 }
@@ -377,7 +390,7 @@ func (idx *Indexer) FileNames() []string {
 		seen[n] = true
 	}
 	for uri := range idx.fileIndex {
-		base := filepath.Base(uri)
+		base := filepath.Base(pathutil.NativePath(idx.fileURIs[uri]))
 		name := strings.TrimSuffix(base, filepath.Ext(base))
 		if name != "" && !seen[name] {
 			seen[name] = true
@@ -502,14 +515,20 @@ func isYAMLFile(path string) bool {
 }
 
 // pathToFileURI converts an OS path to a file:// URI.
-func pathToFileURI(path string) string {
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		return path
+func pathToFileURI(path string) string { return pathutil.FileURI(path) }
+
+// Caller holds mu. Keep deletion/removal stable even when a removed directory
+// can no longer expose its Windows case policy.
+func (idx *Indexer) uriKeyLocked(uri string) string {
+	key := pathutil.DocumentKey(uri)
+	if _, ok := idx.contents[key]; ok {
+		return key
 	}
-	path = filepath.ToSlash(abs)
-	if !strings.HasPrefix(path, "/") {
-		path = "/" + path
+	canonical := pathutil.CanonicalURI(uri)
+	for stored, original := range idx.fileURIs {
+		if pathutil.CanonicalURI(original) == canonical {
+			return stored
+		}
 	}
-	return (&url.URL{Scheme: "file", Path: path}).String()
+	return key
 }

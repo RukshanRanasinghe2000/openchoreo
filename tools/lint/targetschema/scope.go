@@ -17,6 +17,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 	schemas "github.com/openchoreo/openchoreo/internal/schema"
 	"github.com/openchoreo/openchoreo/tools/lint/parser"
 )
@@ -59,15 +60,9 @@ type Scope struct {
 	warnings     []Warning
 }
 
-func absolute(path string) string {
-	p, e := filepath.Abs(path)
-	if e != nil {
-		return filepath.Clean(path)
-	}
-	return filepath.Clean(p)
-}
+func absolute(path string) string { return pathutil.Absolute(path) }
 func (s *Scope) Content(path string) ([]byte, bool) {
-	data, ok := s.sources[absolute(path)]
+	data, ok := s.sources[pathutil.PathKey(path)]
 	return data, ok
 }
 func (s *Scope) Resolve(gvk schema.GroupVersionKind) (*structural.Structural, error) {
@@ -143,16 +138,15 @@ func NewScope(root string, sources map[string][]byte) *Scope {
 	paths := make([]string, 0, len(sources))
 	for path, data := range sources {
 		path = absolute(path)
-		s.sources[path] = append([]byte(nil), data...)
+		s.sources[pathutil.PathKey(path)] = append([]byte(nil), data...)
 		paths = append(paths, path)
 	}
 	sort.Strings(paths)
 	for _, path := range paths {
-		rel, e := filepath.Rel(root, path)
-		if e != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		if !pathutil.Within(root, path) {
 			continue
 		}
-		docs, err := parser.ParseYAML(s.sources[path])
+		docs, err := parser.ParseYAML(s.sources[pathutil.PathKey(path)])
 		if err != nil {
 			continue
 		}
@@ -191,6 +185,9 @@ func NewScope(root string, sources map[string][]byte) *Scope {
 		}
 	}
 	root = absolute(root)
+	if root == "" {
+		return s
+	} // Virtual/invalid roots must never read CWD config.
 	for dir := root; ; dir = filepath.Dir(dir) {
 		path := filepath.Join(dir, ConfigName)
 		data, ok := s.Content(path)

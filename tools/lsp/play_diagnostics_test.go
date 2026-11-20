@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
@@ -27,20 +28,20 @@ func TestUnchangedWatchEventsPreservePlayFindings(t *testing.T) {
 		t.Fatal(err)
 	}
 	seed := func() {
-		s.postRenderByURI = map[string][]protocol.Diagnostic{uri: {{Message: "manual failure"}}}
-		s.postRenderFiles = map[string]struct{}{path: {}}
+		s.postRenderByURI = map[string][]protocol.Diagnostic{pathutil.DocumentKey(uri): {{Message: "manual failure"}}}
+		s.postRenderFiles = map[string]struct{}{pathutil.PathKey(path): {}}
 		s.postRenderScope = root
 	}
 	seed()
 	revision, epoch := s.indexer.Version(), s.postRenderEpoch
 	s.processWatchChange(path)
 	s.resyncIndexWithDisk()
-	if len(s.postRenderByURI[uri]) != 1 || s.postRenderEpoch != epoch || s.indexer.Version() != revision {
+	if len(s.postRenderByURI[pathutil.DocumentKey(uri)]) != 1 || s.postRenderEpoch != epoch || s.indexer.Version() != revision {
 		t.Fatal("unchanged disk events erased Play results or changed index revision")
 	}
 	s.OpenDocument(uri, text, 1)
 	s.processWatchChange(path)
-	if len(s.postRenderByURI[uri]) != 1 {
+	if len(s.postRenderByURI[pathutil.DocumentKey(uri)]) != 1 {
 		t.Fatal("save event for open document erased Play results")
 	}
 	s.CloseDocument(uri)
@@ -68,11 +69,11 @@ func TestClosedPlayPublicationRefreshesStaleStaticLane(t *testing.T) {
 	s := NewServer()
 	s.workspaceRoots = []string{root}
 	s.diagnosticsForCached(uri, old)
-	s.workspaceStaticByURI = map[string][]protocol.Diagnostic{uri: s.diagnosticsForCached(uri, old)}
+	s.workspaceStaticByURI = map[string][]protocol.Diagnostic{pathutil.DocumentKey(uri): s.diagnosticsForCached(uri, old)}
 	if err := s.indexer.UpdateFile(uri, []byte(corrected)); err != nil {
 		t.Fatal(err)
 	}
-	s.postRenderByURI = map[string][]protocol.Diagnostic{uri: {{Message: "manual failure"}}}
+	s.postRenderByURI = map[string][]protocol.Diagnostic{pathutil.DocumentKey(uri): {{Message: "manual failure"}}}
 	if s.validationSnapshotCurrent(uri, 0) {
 		t.Fatal("expected stale automatic cache")
 	}
@@ -80,12 +81,12 @@ func TestClosedPlayPublicationRefreshesStaleStaticLane(t *testing.T) {
 	if !s.validationSnapshotCurrent(uri, 0) {
 		t.Fatal("Play publication would still be suppressed by stale cache")
 	}
-	for _, d := range s.workspaceStaticByURI[uri] {
+	for _, d := range s.workspaceStaticByURI[pathutil.DocumentKey(uri)] {
 		if d.Message != "" && d.Code != nil && d.Code.Value == "invalid-environment.spec.isProduction" {
 			t.Fatal("stale structural diagnostic survived refresh")
 		}
 	}
-	if len(s.postRenderByURI[uri]) != 1 {
+	if len(s.postRenderByURI[pathutil.DocumentKey(uri)]) != 1 {
 		t.Fatal("automatic refresh removed manual findings")
 	}
 }
@@ -102,8 +103,8 @@ func TestClosingSavedDocumentPreservesPlayFindings(t *testing.T) {
 	s.workspaceRoots = []string{root}
 	seed := func() {
 		s.postRenderMu.Lock()
-		s.postRenderByURI = map[string][]protocol.Diagnostic{uri: {{Message: "manual failure"}}}
-		s.postRenderFiles = map[string]struct{}{path: {}}
+		s.postRenderByURI = map[string][]protocol.Diagnostic{pathutil.DocumentKey(uri): {{Message: "manual failure"}}}
+		s.postRenderFiles = map[string]struct{}{pathutil.PathKey(path): {}}
 		s.postRenderScope = root
 		s.postRenderMu.Unlock()
 	}
@@ -114,7 +115,7 @@ func TestClosingSavedDocumentPreservesPlayFindings(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.postRenderMu.Lock()
-	retained := len(s.postRenderByURI[uri])
+	retained := len(s.postRenderByURI[pathutil.DocumentKey(uri)])
 	s.postRenderMu.Unlock()
 	if retained != 1 {
 		t.Fatal("closing saved buffer erased Play findings")
@@ -144,13 +145,13 @@ func TestLateWatchEventMatchingRenderedSnapshotPreservesFindings(t *testing.T) {
 	s := NewServer()
 	s.workspaceRoots = []string{root}
 	_ = s.indexer.UpdateFile(uri, []byte(old))
-	s.postRenderByURI = map[string][]protocol.Diagnostic{uri: {{Message: "manual failure"}}}
-	s.postRenderFiles = map[string]struct{}{path: {}}
+	s.postRenderByURI = map[string][]protocol.Diagnostic{pathutil.DocumentKey(uri): {{Message: "manual failure"}}}
+	s.postRenderFiles = map[string]struct{}{pathutil.PathKey(path): {}}
 	s.postRenderScope = root
-	s.postRenderContentHashes = map[string][32]byte{path: sha256.Sum256([]byte(rendered))}
+	s.postRenderContentHashes = map[string][32]byte{pathutil.PathKey(path): sha256.Sum256([]byte(rendered))}
 	s.processWatchChange(path)
 	s.postRenderMu.Lock()
-	retained := len(s.postRenderByURI[uri])
+	retained := len(s.postRenderByURI[pathutil.DocumentKey(uri)])
 	s.postRenderMu.Unlock()
 	if retained != 1 {
 		t.Fatal("late index update erased a result rendered from the same content")

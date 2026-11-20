@@ -6,6 +6,7 @@ package lsp
 import (
 	protocol "github.com/tliron/glsp/protocol_3_16"
 
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 	"github.com/openchoreo/openchoreo/tools/lint/parser"
 	codeaction "github.com/openchoreo/openchoreo/tools/lsp/code-action"
 )
@@ -49,7 +50,7 @@ func (s *Server) staticDiagnosticsForCached(uri, text string) []protocol.Diagnos
 	s.cacheMu.Lock()
 	defer s.cacheMu.Unlock()
 
-	entry := s.cache[uri]
+	entry := s.cache[pathutil.DocumentKey(uri)]
 
 	if entry != nil && entry.text == text {
 		if entry.indexVer == indexVer {
@@ -73,7 +74,7 @@ func (s *Server) staticDiagnosticsForCached(uri, text string) []protocol.Diagnos
 	s.cacheMisses++
 
 	rebuilt := s.computeValidation(uri, text, indexVer)
-	s.cache[uri] = rebuilt
+	s.cache[pathutil.DocumentKey(uri)] = rebuilt
 	return rebuilt.combined
 }
 
@@ -89,7 +90,7 @@ func (s *Server) invalidateValidationCache() {
 func (s *Server) deleteValidationEntry(uri string) {
 	s.cacheMu.Lock()
 	defer s.cacheMu.Unlock()
-	delete(s.cache, uri)
+	delete(s.cache, pathutil.DocumentKey(uri))
 }
 
 // computeValidation parses and validates a document from scratch. It returns a
@@ -172,7 +173,7 @@ func (s *Server) CacheStats() (hits uint64, misses uint64) {
 func (s *Server) CacheHasParsedDocs(uri string) bool {
 	s.cacheMu.Lock()
 	defer s.cacheMu.Unlock()
-	entry := s.cache[uri]
+	entry := s.cache[pathutil.DocumentKey(uri)]
 	return entry != nil && entry.docs != nil
 }
 

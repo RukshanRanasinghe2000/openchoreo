@@ -13,6 +13,7 @@ import (
 	protocol "github.com/tliron/glsp/protocol_3_16"
 	"gopkg.in/yaml.v3"
 
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 	"github.com/openchoreo/openchoreo/tools/lint/indexer"
 	"github.com/openchoreo/openchoreo/tools/lint/parser"
 	lsputil "github.com/openchoreo/openchoreo/tools/lsp/lsp-util"
@@ -173,7 +174,7 @@ func sameProjectLocations(sourceURI string, locations []protocol.Location) []pro
 
 	result := make([]protocol.Location, 0, len(locations))
 	for _, loc := range locations {
-		if projectRoots.rootFor(loc.URI) == sourceRoot {
+		if pathutil.SamePath(projectRoots.rootFor(loc.URI), sourceRoot) {
 			result = append(result, loc)
 		}
 	}
@@ -217,8 +218,8 @@ func closestByPathDepth(sourceURI string, locations []protocol.Location) []proto
 // the client (e.g. OpenChoreoLSP%26MCPToolkit) still compares equal to the
 // decoded path the indexer stores (OpenChoreoLSP&MCPToolkit).
 func pathSharedDepth(a, b string) int {
-	aPath := filepath.ToSlash(fileURIToPath(a))
-	bPath := filepath.ToSlash(fileURIToPath(b))
+	aPath := filepath.ToSlash(pathutil.PathKey(fileURIToPath(a)))
+	bPath := filepath.ToSlash(pathutil.PathKey(fileURIToPath(b)))
 	aSegs := strings.Split(aPath, "/")
 	bSegs := strings.Split(bPath, "/")
 	n := len(aSegs)
@@ -236,19 +237,9 @@ func pathSharedDepth(a, b string) int {
 }
 
 // fileURIToPath converts a file:// URI to a local filesystem path, decoding
-// percent-escapes so the path always matches what is on disk. Non-file URIs
-// are returned unchanged.
-func fileURIToPath(uri string) string {
-	if !strings.HasPrefix(uri, "file://") {
-		return uri
-	}
-	path := strings.TrimPrefix(uri, "file://")
-	decoded, err := url.PathUnescape(path)
-	if err != nil {
-		return path
-	}
-	return decoded
-}
+// percent-escapes so the path always matches what is on disk. Non-file or
+// malformed URIs return empty rather than masquerading as local paths.
+func fileURIToPath(uri string) string { return pathutil.NativePath(uri) }
 
 // toLSPLocations converts indexer locations to LSP locations.
 func toLSPLocations(locations []indexer.Location) []protocol.Location {

@@ -6,7 +6,6 @@ package lsp_test
 import (
 	"encoding/json"
 	"net"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +14,7 @@ import (
 
 	protocol "github.com/tliron/glsp/protocol_3_16"
 
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 	"github.com/openchoreo/openchoreo/tools/lsp"
 )
 
@@ -116,7 +116,7 @@ func postRenderProject(t *testing.T) (componentPath, workloadPath string) {
 }
 
 func fileURI(path string) string {
-	return (&url.URL{Scheme: "file", Path: filepath.ToSlash(path)}).String()
+	return pathutil.FileURI(path)
 }
 
 type postRenderRun struct {

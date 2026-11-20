@@ -200,7 +200,8 @@ func TestCompletionE2E(t *testing.T) {
 		t.Fatalf("build LSP: %v\n%s", err, output)
 	}
 	cmd := exec.Command(lspBinary, "lsp")
-	cmd.Env = append(os.Environ(), "HOME="+authenticatedHome(t))
+	home := authenticatedHome(t)
+	cmd.Env = append(os.Environ(), "HOME="+home, "USERPROFILE="+home)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		t.Fatalf("stdin pipe: %v", err)

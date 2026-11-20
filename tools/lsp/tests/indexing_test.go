@@ -18,6 +18,7 @@ import (
 	"github.com/sourcegraph/jsonrpc2"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 	"github.com/openchoreo/openchoreo/tools/lsp"
 )
 
@@ -42,7 +43,7 @@ type progressKind struct {
 // Window capability struct can be populated with the WorkDoneProgress flag.
 func initializeIndexingParams(t *testing.T, root string, workDoneProgress bool) *protocol.InitializeParams {
 	t.Helper()
-	rootJSON, err := json.Marshal("file://" + root)
+	rootJSON, err := json.Marshal(pathutil.FileURI(root))
 	if err != nil {
 		t.Fatalf("marshal root: %v", err)
 	}
@@ -62,7 +63,7 @@ func initializeWorkspaceFoldersParams(t *testing.T, roots []string, workDoneProg
 	folders := make([]map[string]string, 0, len(roots))
 	for i, root := range roots {
 		folders = append(folders, map[string]string{
-			"uri":         "file://" + root,
+			"uri":         pathutil.FileURI(root),
 			testValueName: fmt.Sprintf("folder-%d", i),
 		})
 	}

@@ -41,7 +41,7 @@ require (
 	github.com/tidwall/sjson v1.2.5
 	github.com/tliron/commonlog v0.2.8 // indirect
 	github.com/tliron/glsp v0.2.2
-	github.com/tliron/kutil v0.3.11 // indirect
+	github.com/tliron/kutil v0.3.13 // indirect
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.36.4
 	k8s.io/apiextensions-apiserver v0.36.4

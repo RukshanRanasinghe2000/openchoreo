@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 	"github.com/openchoreo/openchoreo/tools/lint/parser"
 	post "github.com/openchoreo/openchoreo/tools/lint/post-render-validator"
 	"github.com/tliron/glsp"
@@ -54,7 +55,7 @@ func TestClusterProblemsNavigationPreservesAllFindings(t *testing.T) {
 	r.Documents = r.Documents[:2] // No Workload, including for an unopened Component.
 	_ = runCluster(t, s, r)
 	uri := r.Documents[1].URI
-	diag := missingWorkloadDiagnostic(s.clusterValidation.byURI[uri])
+	diag := missingWorkloadDiagnostic(s.clusterValidation.byURI[pathutil.DocumentKey(uri)])
 	if diag == nil {
 		t.Fatal("missing workload finding")
 	}
@@ -147,7 +148,7 @@ func TestLocalProblemsOpenCloseAndDiscard(t *testing.T) {
 	if _, err := s.ExecuteCommand(nil, &protocol.ExecuteCommandParams{Command: postRenderCommand, Arguments: []any{uri}}); err != nil {
 		t.Fatal(err)
 	}
-	original := missingWorkloadDiagnostic(s.postRenderByURI[uri])
+	original := missingWorkloadDiagnostic(s.postRenderByURI[pathutil.DocumentKey(uri)])
 	if original == nil {
 		t.Fatal("missing local workload error")
 	}

@@ -5,6 +5,7 @@ package lsp
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"sort"
 	"strings"
 	"sync"
@@ -110,16 +111,22 @@ func (f *clusterFeed) update(method string, data []byte) error {
 
 // completionIndex is a request-scoped overlay. It never enters the filesystem index.
 type completionIndex struct {
-	names  map[string][]string
-	docs   []indexer.SnapshotDocument
-	remote map[string][]string
+	names             map[string][]string
+	docs              []indexer.SnapshotDocument
+	remote            map[string][]string
+	local             []indexer.SnapshotDocument
+	navigation        locationSnapshot
+	locationsReceived bool
 }
 
 func (i *completionIndex) ClusterNames(kind string) []string          { return i.remote[kind] }
 func (i *completionIndex) NamesByKind() map[string][]string           { return i.names }
 func (i *completionIndex) Snapshot(string) []indexer.SnapshotDocument { return i.docs }
 func (s *Server) clusterCompletionIndex(uri, text string) *completionIndex {
-	out := &completionIndex{names: map[string][]string{}, docs: s.indexer.Snapshot(uri)}
+	out := &completionIndex{names: map[string][]string{}, docs: s.indexer.Snapshot(uri), local: s.indexer.DefinitionSnapshot(uri)}
+	s.locations.mu.RLock()
+	out.navigation, out.locationsReceived = s.locations.snapshot, s.locations.received
+	s.locations.mu.RUnlock()
 	for k, v := range s.indexer.NamesByKind() {
 		out.names[k] = append([]string(nil), v...)
 	}
@@ -221,4 +228,33 @@ func validateFeedSchema(s map[string]any) error {
 		}
 	}
 	return nil
+}
+
+// ReferenceNames uses real workspace definitions plus the existing client feed.
+// Remote schema adapter documents are intentionally not filesystem candidates.
+func (i *completionIndex) ReferenceNames(kind, namespace, api, uri string) []string {
+	var names []string
+	for _, entry := range i.local {
+		d := entry.Document
+		if d != nil && d.Kind == kind && (api == "" || d.APIVersion == api) && (strings.HasPrefix(kind, "Cluster") || indexer.NamespaceOrDefault(d.Metadata.Namespace) == namespace) {
+			names = append(names, d.Metadata.Name)
+		}
+	}
+	remoteAllowed := true
+	if i.locationsReceived {
+		if i.navigation.ContextID == nil {
+			remoteAllowed = false
+		}
+		if u, err := url.Parse(uri); err == nil && u.Scheme == "openchoreo" && (i.navigation.ContextID == nil || u.Host != *i.navigation.ContextID) {
+			remoteAllowed = false
+		}
+		if !strings.HasPrefix(kind, "Cluster") && i.navigation.Namespace != nil && namespace != *i.navigation.Namespace {
+			remoteAllowed = false
+		}
+	}
+	if remoteAllowed {
+		names = append(names, i.remote[kind]...)
+	}
+	sort.Strings(names)
+	return names
 }
