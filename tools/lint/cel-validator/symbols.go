@@ -36,6 +36,7 @@ type inspection struct {
 	line, column int
 	result       *ExpressionInfo
 	schemas      SchemaPair
+	members      *memberInspection
 }
 
 // InspectExpression reuses the validation walk, including target and forEach scopes.
@@ -266,7 +267,7 @@ func fieldSuggestion(env *cel.Env, expr, message string, offset int) string {
 }
 func (c *checker) inspectSymbol(node *yaml.Node, env *cel.Env, expr string) {
 	q := c.inspection
-	if q == nil || q.result != nil {
+	if q == nil || q.members != nil || q.result != nil {
 		return
 	}
 	for _, span := range expressionSymbols(expr) {

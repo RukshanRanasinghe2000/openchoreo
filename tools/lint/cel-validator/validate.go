@@ -327,6 +327,7 @@ done:
 // on the first issue. It returns the checked AST, or nil when anything failed.
 func (c *checker) checkCompile(node *yaml.Node, env *cel.Env, expr, full string) *cel.Ast {
 	c.currentEnv = env
+	c.inspectMembers(node, env)
 	c.inspectSymbol(node, env, expr)
 	ast, issues := env.Parse(expr)
 	if issues != nil && issues.Err() != nil {
@@ -389,6 +390,7 @@ func (c *checker) checkIterable(node *yaml.Node, env *cel.Env, expr, full string
 // expression) is reported too — FindCELExpressions only surfaces balanced
 // markers, so an unclosed one would otherwise be silently ignored.
 func (c *checker) checkString(node *yaml.Node, env *cel.Env) {
+	c.inspectMembers(node, env)
 	matches, err := template.FindCELExpressions(node.Value)
 	if err != nil {
 		c.reportAt(c.markerSpan(node, node.Value), CodeCELParseError,
@@ -454,6 +456,7 @@ func (c *checker) templateBool(node *yaml.Node, env *cel.Env, what string) {
 	if node == nil {
 		return
 	}
+	c.inspectMembers(node, env)
 	inner, ok := extractTemplate(node.Value)
 	if !ok {
 		c.reportAt(c.markerSpan(node, node.Value), CodeCELParseError,
@@ -506,6 +509,7 @@ func (c *checker) forEachEnv(env *cel.Env, provider *apiservercel.DeclTypeProvid
 	if forEach == nil {
 		return nil
 	}
+	c.inspectMembers(forEach, env)
 	inner, ok := extractTemplate(forEach.Value)
 	if !ok {
 		c.reportAt(c.markerSpan(forEach, forEach.Value), CodeCELParseError,
