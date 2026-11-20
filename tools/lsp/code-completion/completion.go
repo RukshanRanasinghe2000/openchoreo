@@ -72,6 +72,9 @@ func HandleWithIndex(text string, cursorLine, cursorCol int, idx ResourceIndexer
 	if items, ok := workflowPolicyItems(text, cursorLine, cursorCol, uri, idx); ok {
 		return protocol.CompletionList{Items: items}, nil
 	}
+	if items, ok := referenceNameItems(text, cursorLine, cursorCol, idx, uri); ok {
+		return protocol.CompletionList{Items: items}, nil
+	}
 	if items, ok := dynamicItems(text, cursorLine, cursorCol, idx, uri); ok {
 		return protocol.CompletionList{Items: items}, nil
 	}
@@ -363,11 +366,6 @@ func suggest(ctx completionContext, root *schema.FieldSchema, idx ResourceIndexe
 		if ctx.field == valueKind && ctx.path == valueKind {
 			return kindNameCompletions(ctx.text, ctx.line, ctx.col)
 		}
-		// A `name:` value under an object with a sibling `kind:` is a resource
-		// reference → suggest resource names from the workspace index.
-		if names, ok := referenceNames(ctx, idx); ok {
-			return buildNameItems(names, ctx)
-		}
 		if len(node.Enum) > 0 || node.Default != "" {
 			return buildValueItems(node, ctx)
 		}
@@ -442,7 +440,12 @@ func buildNameItems(names []string, ctx completionContext) []protocol.Completion
 			continue
 		}
 		seen[n] = true
-		items = append(items, valueItem(n, "resource name", protocol.CompletionItemKindReference, n, ctx))
+		item := valueItem(n, "resource name", protocol.CompletionItemKindReference, n, ctx)
+		if edit, ok := referenceValueEdit(ctx, n); ok {
+			item.TextEdit = edit
+		}
+		item.Data = map[string]any{"openchoreoResourceReference": true}
+		items = append(items, item)
 	}
 	return items
 }
@@ -496,72 +499,6 @@ func valueEditRange(ctx completionContext) (protocol.Range, bool) {
 		Start: protocol.Position{Line: lsputil.PositionIndex(ctx.line - 1), Character: lsputil.PositionIndex(lsputil.UTF16Length(line[:start]))},
 		End:   protocol.Position{Line: lsputil.PositionIndex(ctx.line - 1), Character: lsputil.PositionIndex(lsputil.UTF16Length(line))},
 	}, true
-}
-
-// referenceNames resolves the indexer names for the `name:` reference on the
-// cursor line. A reference is recognized structurally: the enclosing mapping
-// has a `kind` sibling (the kind+name pattern shared by every OpenChoreo
-// reference object). Suggestions are filtered to the sibling kind's resource
-// names, falling back to all kinds when no/unknown kind is present.
-func referenceNames(ctx completionContext, idx ResourceIndexer) ([]string, bool) {
-	if idx == nil || ctx.field != "name" {
-		return nil, false
-	}
-	kindRef, ok := siblingKindValue(ctx)
-	if !ok {
-		return nil, false
-	}
-
-	byKind := idx.NamesByKind()
-	if kindRef != "" {
-		if names := byKind[kindRef]; len(names) > 0 {
-			return names, true
-		}
-		if _, cluster := idx.(interface{ ClusterNames(string) []string }); cluster {
-			return nil, true
-		}
-	}
-	var all []string
-	seen := make(map[string]bool)
-	for _, ns := range byKind {
-		for _, n := range ns {
-			if !seen[n] {
-				seen[n] = true
-				all = append(all, n)
-			}
-		}
-	}
-	return all, len(all) > 0
-}
-
-// siblingKindValue scans upward from the cursor line for a `kind:` key at the
-// same indentation (a sibling inside the enclosing mapping), returning its
-// trimmed value.
-func siblingKindValue(ctx completionContext) (string, bool) {
-	if ctx.text == "" || ctx.line < 1 {
-		return "", false
-	}
-	lines := strings.Split(ctx.text, "\n")
-	if ctx.line-1 >= len(lines) {
-		return "", false
-	}
-	curIndent := len(lines[ctx.line-1]) - len(strings.TrimLeft(lines[ctx.line-1], " "))
-
-	for i := ctx.line - 2; i >= 0; i-- {
-		trimmed := strings.TrimSpace(lines[i])
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-		ind := len(lines[i]) - len(strings.TrimLeft(lines[i], " "))
-		if ind < curIndent {
-			break // left the enclosing mapping
-		}
-		if strings.HasPrefix(trimmed, "kind:") && ind == curIndent {
-			v := strings.TrimSpace(strings.TrimPrefix(trimmed, "kind:"))
-			return strings.Trim(v, `"'`), true
-		}
-	}
-	return "", false
 }
 
 // ---------------------------------------------------------------------------
