@@ -55,14 +55,14 @@ func extractTemplateVersion(v any) string {
 }
 
 // applyTemplateVersion selects the given template version ("" and "latest"
-// resolve to the latest). Unknown versions fall back to latest so a malformed
-// client value can never break validation. It returns the now-active version.
+// resolve to the latest). An unavailable version must not silently switch a
+// client to incompatible templates.
 func applyTemplateVersion(version string) string {
 	if version == "" || version == "latest" {
 		version = template.LatestVersion
 	}
 	if err := template.SetVersion(version); err != nil {
-		_ = template.SetVersion(template.LatestVersion)
+		return ""
 	}
 	return template.CurrentVersion()
 }
@@ -78,6 +78,10 @@ func (s *Server) DidChangeConfiguration(
 		return nil
 	}
 	applied := applyTemplateVersion(version)
+	if applied == "" {
+		s.notifyShow(context, protocol.MessageTypeError, "Template version "+version+" is unavailable; select an available template version or install the matching occ release.")
+		return nil
+	}
 	if s.logger != nil {
 		s.logger.Info("template version changed", "version", applied)
 	}
@@ -144,6 +148,9 @@ func (s *Server) Initialize(
 	var activeTemplate string
 	if opts := params.InitializationOptions; opts != nil {
 		if v := extractTemplateVersion(opts); v != "" {
+			if err := template.SetVersion(v); err != nil {
+				return nil, err
+			}
 			activeTemplate = applyTemplateVersion(v)
 		}
 	}

@@ -29,10 +29,28 @@ type job struct {
 }
 
 func main() {
+	cfgFile := flag.String("config", defaultConfigPath(), "Path to config; relative paths use the working directory")
+	versionOverride := flag.String("template-version", "", "Explicit vX.Y.Z template version")
+	noManifest := flag.Bool("no-manifest", false, "Leave the shared manifest to the release coordinator")
+	listFiles := flag.Bool("list-files", false, "Print expected CEL filenames as JSON")
 	flag.Parse()
-	cfgFile := defaultConfigPath()
+	if flag.NArg() != 0 {
+		fmt.Fprintln(os.Stderr, "unexpected positional arguments")
+		os.Exit(2)
+	}
+	if *listFiles {
+		if err := json.NewEncoder(os.Stdout).Encode(environmentFiles()); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+	if *versionOverride != "" && !explicitVersionRE.MatchString(*versionOverride) {
+		fmt.Fprintln(os.Stderr, "invalid --template-version: want vX.Y.Z")
+		os.Exit(2)
+	}
 
-	jobs, templatesDir, err := resolveJobs(cfgFile)
+	jobs, templatesDir, err := resolveJobs(*cfgFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to prepare jobs: %v\n", err)
 		os.Exit(1)
@@ -40,6 +58,10 @@ func main() {
 
 	generated := make([]string, 0, len(jobs))
 	for _, j := range jobs {
+		if *versionOverride != "" {
+			j.version = *versionOverride
+			j.fromChangelog = false
+		}
 		if err := resolveJobVersion(&j); err != nil {
 			fmt.Fprintf(os.Stderr, "failed to resolve version: %v\n", err)
 			os.Exit(1)
@@ -56,6 +78,9 @@ func main() {
 		generated = append(generated, j.version)
 	}
 
+	if *noManifest {
+		return
+	}
 	if _, err := updateVersionFile(templatesDir, generated); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: update version file: %v\n", err)
 		os.Exit(1)

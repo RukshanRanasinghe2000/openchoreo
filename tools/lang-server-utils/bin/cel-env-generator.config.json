@@ -1,0 +1,8 @@
+{
+  "templatesDir": "../../templates",
+  "sources": [
+    {
+      "root": "../../.."
+    }
+  ]
+}

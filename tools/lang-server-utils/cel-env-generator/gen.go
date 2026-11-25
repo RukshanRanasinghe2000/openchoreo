@@ -45,6 +45,16 @@ var schemaBased = map[string]bool{
 	"environmentConfigs": true,
 }
 
+// environmentFiles is the complete set written by generateForJob.
+func environmentFiles() []string {
+	return []string{
+		"componenttype_celenv.json", "clustercomponenttype_celenv.json",
+		"trait_celenv.json", "clustertrait_celenv.json",
+		"resourcetype_celenv.json", "clusterresourcetype_celenv.json",
+		"workflow_celenv.json", "clusterworkflow_celenv.json",
+	}
+}
+
 func generateForJob(targetDir string) error {
 	// Component envs
 	compFields := decltype.ExtractFields(reflect.TypeFor[componentctx.ComponentContext](), schemaBased)

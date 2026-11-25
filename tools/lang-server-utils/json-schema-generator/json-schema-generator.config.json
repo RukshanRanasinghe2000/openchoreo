@@ -1,0 +1,6 @@
+{
+  "templatesDir": "tools/templates",
+  "sources": [
+    { "root": "." }
+  ]
+}
