@@ -14,12 +14,14 @@ package templates
 
 import "embed"
 
-// FS holds every template version shipped with occ, plus the manifest that
-// records which versions exist and which is the latest.
+// FS holds the template assets present in the build workspace, plus the manifest that
+// records which versions exist and which is the latest. Release builds prepare
+// an isolated workspace with only the release version; historical Git assets
+// are preserved in the original checkout.
 //
 // The manifest is template-version.json and each version is a template-v*/
 // subdirectory of JSON schema files, both produced by the schema generator
-// (cmd/schema-gen) from the Go API types in api/v1alpha1.
+// (tools/lang-server-utils/json-schema-generator) from the Go API types in api/v1alpha1.
 //
 //go:embed template-version.json template-v*/*.json cel-envs/*/*.json
 var FS embed.FS

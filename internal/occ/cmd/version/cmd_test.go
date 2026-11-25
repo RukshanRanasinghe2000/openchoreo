@@ -5,6 +5,7 @@ package version
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -181,4 +182,26 @@ func TestFetchServerVersion_InvalidJSON(t *testing.T) {
 	_, err := fetchServerVersion()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse server version")
+}
+
+func TestTemplatesInventoryDoesNotContactServer(t *testing.T) {
+	testutil.SetupTestHome(t)
+	testutil.SetTransport(t, testutil.RoundTripFunc(func(_ *http.Request) (*http.Response, error) {
+		t.Fatal("embedded template inventory must not contact a server")
+		return nil, fmt.Errorf("unexpected request")
+	}))
+	cmd := NewVersionCmd()
+	output := &bytes.Buffer{}
+	cmd.SetOut(output)
+	cmd.SetArgs([]string{"--templates"})
+	require.NoError(t, cmd.Execute())
+	var inventory struct {
+		Latest   string
+		Versions []string
+		Files    map[string]string
+	}
+	require.NoError(t, json.Unmarshal(output.Bytes(), &inventory))
+	require.NotEmpty(t, inventory.Latest)
+	require.Contains(t, inventory.Versions, inventory.Latest)
+	require.Contains(t, inventory.Files, "template-version.json")
 }

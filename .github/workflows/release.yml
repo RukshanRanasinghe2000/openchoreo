@@ -153,12 +153,24 @@ jobs:
           name: occ
           path: bin/dist
 
+      - name: Download matching template snapshot
+        uses: dawidd6/action-download-artifact@a92c7ae74cf1df8810783758581e485ac3aaa309 # v28
+        with:
+          workflow: build-and-test.yml
+          commit: ${{ env.GIT_SHA_LONG }}
+          event: push
+          name: release-templates
+          path: bin/release-templates
+
       - name: Set executable permissions
         run: |
           chmod +x bin/dist/linux/amd64/occ
           chmod +x bin/dist/linux/arm64/occ
           chmod +x bin/dist/darwin/amd64/occ
           chmod +x bin/dist/darwin/arm64/occ
+
+      - name: Verify published CLI embeds the release snapshot
+        run: go run ./hack/release-templates verify --binary bin/dist/linux/amd64/occ
 
       - name: Package the occ binaries
         run: |

@@ -15,7 +15,7 @@ RELEASE_VERSION ?= $(shell cat VERSION)
 OPENCHOREO_PUBLIC_REGISTRY ?= cr.openchoreo.dev/openchoreo
 
 # Store the short git sha of latest commit to be used in the make targets
-GIT_REV := $(shell git rev-parse --short=8 HEAD)
+GIT_REV ?= $(shell git rev-parse --short=8 HEAD)
 
 # Helper functions for logging
 define log_info

@@ -14,6 +14,7 @@ import (
 
 	"github.com/openchoreo/openchoreo/internal/occ/cmd/config"
 	"github.com/openchoreo/openchoreo/internal/version"
+	"github.com/openchoreo/openchoreo/tools/templates"
 )
 
 // serverVersionResponse represents the server version response from the API.
@@ -28,11 +29,19 @@ type serverVersionResponse struct {
 }
 
 func NewVersionCmd() *cobra.Command {
-	return &cobra.Command{
+	var showTemplates bool
+	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "Print the client and server version",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			v := version.Get()
+			if showTemplates {
+				inventory, err := templates.EmbeddedInventory(v.Version)
+				if err != nil {
+					return err
+				}
+				return json.NewEncoder(cmd.OutOrStdout()).Encode(inventory)
+			}
 			fmt.Println("Client:")
 			fmt.Printf("  Version:      %s\n", v.Version)
 			fmt.Printf("  Git Revision: %s\n", v.GitRevision)
@@ -55,6 +64,8 @@ func NewVersionCmd() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&showTemplates, "templates", false, "Print the embedded template inventory as JSON without contacting a server")
+	return cmd
 }
 
 func fetchServerVersion() (*serverVersionResponse, error) {

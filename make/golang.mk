@@ -30,8 +30,9 @@ GO_VERSION_PACKAGE := github.com/openchoreo/openchoreo/internal/version
 
 # Define link flags for the Go build
 GO_LDFLAGS_COMMON ?= -s -w
+GO_BUILD_TIME ?= $(shell date +%Y-%m-%dT%H:%M:%S%z)
 GO_LDFLAGS_BUILD_DATA ?= \
-	-X $(GO_VERSION_PACKAGE).buildTime=$(shell date +%Y-%m-%dT%H:%M:%S%z) \
+	-X $(GO_VERSION_PACKAGE).buildTime=$(GO_BUILD_TIME) \
 	-X $(GO_VERSION_PACKAGE).gitRevision=$(GIT_REV) \
 	-X $(GO_VERSION_PACKAGE).version=$(RELEASE_VERSION)
 
@@ -49,8 +50,9 @@ define go_build
 	$(eval GO_LDFLAGS := $(GO_LDFLAGS_COMMON))
 	$(eval GO_LDFLAGS += $(GO_LDFLAGS_BUILD_DATA))
 	$(eval GO_LDFLAGS += -X $(GO_VERSION_PACKAGE).componentName=$$(COMMAND))
+	$(if $(filter occ,$(COMMAND)),$(eval GO_LDFLAGS += -X github.com/openchoreo/openchoreo/tools/lsp.buildVersion=$(RELEASE_VERSION)))
 	CGO_ENABLED=0 GOOS=$(OS) GOARCH=$(ARCH) \
-		$(GO) build -buildmode=exe -o $(OUTPUT_PATH)/$(COMMAND) -ldflags "$(GO_LDFLAGS)" \
+		$(GO) build -buildmode=exe $(GO_BUILD_FLAGS) -o $(OUTPUT_PATH)/$(COMMAND) -ldflags "$(GO_LDFLAGS)" \
 		$(MAIN_PACKAGE_PATH)
 endef
 
@@ -77,6 +79,14 @@ define package_binary
 endef
 
 ##@ Golang
+
+.PHONY: release.templates
+release.templates: ## Generate a validated latest-only template snapshot from VERSION
+	$(GO) run ./hack/release-templates generate
+
+.PHONY: go.build.release.occ
+go.build.release.occ: ## Build occ in an isolated workspace with only VERSION's templates
+	$(GO) run ./hack/release-templates build
 
 #-----------------------------------------------------------------------------
 # Go Build targets
@@ -109,7 +119,7 @@ go.build-multiarch.%: ## Build a binary for multiple platforms. Ex: make go.buil
 	)
 
 .PHONY: go.build-multiarch
-go.build-multiarch: $(addprefix go.build-multiarch., $(GO_BUILD_BINARY_NAMES)) ## Build all binaries for multiple platforms.
+go.build-multiarch: $(addprefix go.build-multiarch., $(filter-out $(GO_EXCLUDE_BINARIES),$(GO_BUILD_BINARY_NAMES))) ## Build all binaries for multiple platforms.
 
 #-----------------------------------------------------------------------------
 # Go Package targets

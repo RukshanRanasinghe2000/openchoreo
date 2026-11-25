@@ -25,6 +25,24 @@ env:
   CLI_EXTRA_PLATFORMS: ${{ github.event_name == 'push' && 'darwin/amd64 darwin/arm64 windows/amd64 windows/arm64' || '' }}
 
 jobs:
+  templates:
+    name: Generate release templates
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Go
+        uses: ./.github/actions/setup-go
+      - name: Test release template coordinator
+        run: go test ./hack/release-templates -count=1
+      - name: Generate and validate latest-only snapshot
+        run: make release.templates
+      - name: Upload release template snapshot
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-templates
+          path: bin/release-templates/
+          if-no-files-found: error
   lint:
     name: Lint
     runs-on: ubuntu-24.04
@@ -58,6 +76,7 @@ jobs:
         run: make code.gen-check
 
   test:
+    needs: templates
     name: Tests
     runs-on: ubuntu-24.04
     permissions:
@@ -70,9 +89,17 @@ jobs:
       - name: Setup Go
         uses: ./.github/actions/setup-go
 
+      - name: Download validated templates
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-templates
+          path: bin/release-templates
+      - name: Prepare isolated test source
+        run: go run ./hack/release-templates prepare --workspace "$RUNNER_TEMP/occ-test-source"
       - name: Running Tests
         run: |
-          make go.test
+          make -C "$RUNNER_TEMP/occ-test-source" go.test
+          cp "$RUNNER_TEMP/occ-test-source/cover.out" cover.out
 
       - name: Upload coverage to Codecov
         if: vars.CODECOV_ENABLED != 'false'
@@ -83,6 +110,7 @@ jobs:
           use_oidc: ${{ !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork) }}
 
   build:
+    needs: [templates, test]
     name: Build
     runs-on: ubuntu-24.04
     steps:
@@ -92,14 +120,18 @@ jobs:
       - name: Setup Go
         uses: ./.github/actions/setup-go
 
+      - name: Download validated templates
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-templates
+          path: bin/release-templates
       - name: Build multiarch binaries
         run: |
-          make go.build-multiarch GO_TARGET_PLATFORMS="${{ env.IMAGE_PLATFORMS }}"
+          make go.build-multiarch GO_EXCLUDE_BINARIES=occ GO_TARGET_PLATFORMS="${{ env.IMAGE_PLATFORMS }}"
+          go run ./hack/release-templates build --snapshot bin/release-templates --platforms "${{ env.IMAGE_PLATFORMS }} ${{ env.CLI_EXTRA_PLATFORMS }}"
 
-          # Build occ for extra platforms (push only)
-          if [[ -n "${{ env.CLI_EXTRA_PLATFORMS }}" ]]; then
-            make go.build-multiarch.occ GO_TARGET_PLATFORMS="${{ env.CLI_EXTRA_PLATFORMS }}"
-          fi
+      - name: Smoke test compiled release outside checkout
+        run: OCC_RELEASE_BINARY="$PWD/bin/dist/linux/amd64/occ" go test ./hack/release-templates -run '^TestReleaseBinary$' -count=1
 
       - name: Upload occ binaries
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

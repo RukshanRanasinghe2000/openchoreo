@@ -2,6 +2,12 @@
 
 ##@ Code Generation and Linting
 
+JSON_SCHEMA_CONFIG ?= tools/lang-server-utils/json-schema-generator/json-schema-generator.config.json
+
+.PHONY: lint-schemas
+lint-schemas: ## Regenerate minimal LSP/linter schemas from the configured API sources
+	cd "$(PROJECT_DIR)" && $(GO) run ./tools/lang-server-utils/json-schema-generator --config "$(JSON_SCHEMA_CONFIG)"
+
 # All project Go files, excluding generated / vendored paths
 ALL_GO_FILES := $(shell \
 	find . -type f -name '*.go' \
