@@ -11,6 +11,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -157,12 +158,12 @@ func TestMesh_TwoNodeConvergenceAndForwarding(t *testing.T) {
 	// Live delta convergence after bootstrap.
 	a.mesh.LocalUpsert(AgentEntry{PlaneIdentifier: "dataplane/dp-1", ConnID: "conn-2"})
 	waitFor(t, "delta add on gw-b", func() bool {
-		return b.registry.CountForPlane("dataplane/dp-1") == 2
+		return b.registry.SummaryForPlane("dataplane/dp-1").Count == 2
 	})
 
 	a.mesh.LocalRemove("dataplane/dp-1", "conn-2")
 	waitFor(t, "delta remove on gw-b", func() bool {
-		return b.registry.CountForPlane("dataplane/dp-1") == 1
+		return b.registry.SummaryForPlane("dataplane/dp-1").Count == 1
 	})
 
 	// Worst case is one hop: gw-b forwards to gw-a, which answers as if it
@@ -193,7 +194,7 @@ func TestMesh_TwoNodeConvergenceAndForwarding(t *testing.T) {
 	waitFor(t, "draining visible on gw-b", func() bool {
 		return len(b.registry.Lookup("dataplane/dp-1", "")) == 0
 	})
-	if got := b.registry.CountForPlane("dataplane/dp-1"); got != 1 {
+	if got := b.registry.SummaryForPlane("dataplane/dp-1").Count; got != 1 {
 		t.Fatalf("expected draining owner still counted, got %d", got)
 	}
 }
@@ -260,12 +261,12 @@ func TestMesh_PeerRemovalPurgesRegistry(t *testing.T) {
 	b.disc.ch <- []Peer{{ID: "gw-a", Addr: a.addr}}
 
 	waitFor(t, "entry replicated to gw-b", func() bool {
-		return b.registry.CountForPlane("dataplane/dp-1") == 1
+		return b.registry.SummaryForPlane("dataplane/dp-1").Count == 1
 	})
 
 	b.disc.ch <- []Peer{}
 	waitFor(t, "purge after peer removal", func() bool {
-		return b.registry.CountForPlane("dataplane/dp-1") == 0
+		return b.registry.SummaryForPlane("dataplane/dp-1").Count == 0
 	})
 }
 
@@ -912,8 +913,8 @@ func TestMesh_BuildTLSConfigsRequiresMutualVerification(t *testing.T) {
 	if serverTLS.ClientCAs == nil {
 		t.Fatal("server side must verify peers against the mesh CA")
 	}
-	if serverTLS.MinVersion != tls.VersionTLS12 {
-		t.Fatalf("MinVersion = %x, want TLS 1.2", serverTLS.MinVersion)
+	if serverTLS.MinVersion != tls.VersionTLS13 {
+		t.Fatalf("MinVersion = %x, want TLS 1.3", serverTLS.MinVersion)
 	}
 	if len(serverTLS.Certificates) != 1 {
 		t.Fatal("server side must present the mesh certificate")
@@ -928,8 +929,113 @@ func TestMesh_BuildTLSConfigsRequiresMutualVerification(t *testing.T) {
 	if m.clientTLS.InsecureSkipVerify {
 		t.Fatal("client side must not skip verification")
 	}
+	if m.clientTLS.MinVersion != tls.VersionTLS13 {
+		t.Fatalf("client MinVersion = %x, want TLS 1.3", m.clientTLS.MinVersion)
+	}
 	if m.clientTLS.ServerName != "cluster-gateway-mesh.openchoreo-control-plane.svc" {
 		t.Fatalf("ServerName = %q, want the mesh Service name", m.clientTLS.ServerName)
+	}
+}
+
+// meshTLSHandshake runs a TLS handshake over loopback TCP and returns the
+// client's connection state with the errors from both sides. Loopback rather
+// than net.Pipe because a TLS 1.3 server that requires client certificates
+// writes session tickets after the client's handshake has already returned.
+func meshTLSHandshake(t *testing.T, serverCfg, clientCfg *tls.Config) (tls.ConnectionState, error) {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to listen: %v", err)
+	}
+	defer ln.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	serverErr := make(chan error, 1)
+	go func() {
+		conn, err := ln.Accept()
+		if err != nil {
+			serverErr <- err
+			return
+		}
+		defer conn.Close()
+		serverErr <- tls.Server(conn, serverCfg).HandshakeContext(ctx)
+	}()
+
+	var dialer net.Dialer
+	conn, err := dialer.DialContext(ctx, "tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatalf("failed to dial: %v", err)
+	}
+	defer conn.Close()
+
+	client := tls.Client(conn, clientCfg)
+	clientErr := client.HandshakeContext(ctx)
+	if clientErr != nil {
+		_ = conn.Close()
+	}
+	return client.ConnectionState(), errors.Join(clientErr, <-serverErr)
+}
+
+// Mesh links only connect gateway replicas, so both ends require TLS 1.3 and
+// with it the hybrid post-quantum key exchange. A peer capped at TLS 1.2 on
+// either side must fail the handshake rather than fall back to classical ECDHE.
+func TestMesh_TLSConfigsRequireTLS13(t *testing.T) {
+	certPath, keyPath, caPath := writeMeshCertFiles(t)
+
+	m := NewMesh(MeshConfig{
+		Self:       Peer{ID: "gw-self"},
+		CertFile:   certPath,
+		KeyFile:    keyPath,
+		CAFile:     caPath,
+		ServerName: "cluster-gateway-mesh.openchoreo-control-plane.svc",
+	}, NewRegistry(testLogger()), newStaticDiscovery(), nil, testLogger())
+
+	serverTLS, err := m.buildTLSConfigs()
+	if err != nil {
+		t.Fatalf("buildTLSConfigs failed: %v", err)
+	}
+	tls12Only := func(cfg *tls.Config) *tls.Config {
+		capped := cfg.Clone()
+		capped.MinVersion = tls.VersionTLS12
+		capped.MaxVersion = tls.VersionTLS12
+		return capped
+	}
+
+	tests := []struct {
+		name      string
+		serverCfg *tls.Config
+		clientCfg *tls.Config
+		wantErr   bool
+	}{
+		{name: "both peers use the mesh configs", serverCfg: serverTLS, clientCfg: m.clientTLS},
+		{name: "dialing peer capped at TLS 1.2", serverCfg: serverTLS, clientCfg: tls12Only(m.clientTLS), wantErr: true},
+		{name: "accepting peer capped at TLS 1.2", serverCfg: tls12Only(serverTLS), clientCfg: m.clientTLS, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			state, err := meshTLSHandshake(t, tt.serverCfg, tt.clientCfg)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected the handshake to fail, it succeeded")
+				}
+				if !strings.Contains(err.Error(), "protocol version") {
+					t.Fatalf("error = %v, want a protocol version failure", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("handshake failed: %v", err)
+			}
+			if state.Version != tls.VersionTLS13 {
+				t.Fatalf("Version = %x, want TLS 1.3", state.Version)
+			}
+			if state.CurveID != tls.X25519MLKEM768 {
+				t.Fatalf("CurveID = %v, want X25519MLKEM768", state.CurveID)
+			}
+		})
 	}
 }
 
@@ -1447,4 +1553,131 @@ func TestMesh_ForwardAbandonedWhenTheCallerGivesUp(t *testing.T) {
 	if left != 0 {
 		t.Fatalf("abandoned forward left %d pending entries behind", left)
 	}
+}
+
+// drainDeltas returns the delta frames queued on an unstarted mesh's outbox.
+func drainDeltas(m *Mesh) []*Delta {
+	var out []*Delta
+	for {
+		select {
+		case f := <-m.outbox:
+			if f.Type == frameDelta {
+				out = append(out, f.Delta)
+			}
+		default:
+			return out
+		}
+	}
+}
+
+// The owner publishes LastSeen on pong, at most once per
+// lastSeenPublishInterval per connection, and never loses it when the entry is
+// republished for another reason.
+func TestMesh_LocalTouchThrottlesAndPreservesLastSeen(t *testing.T) {
+	m := NewMesh(MeshConfig{Self: Peer{ID: "gw-self"}}, NewRegistry(testLogger()),
+		&staticDiscovery{ch: make(chan []Peer, 1)}, nil, testLogger())
+	t0 := time.Date(2026, 11, 25, 6, 0, 0, 0, time.UTC)
+
+	m.LocalUpsert(AgentEntry{PlaneIdentifier: "dataplane/dp-1", ConnID: "conn-1", LastSeen: t0})
+	if got := drainDeltas(m); len(got) != 1 || !got[0].Entry.LastSeen.Equal(t0) {
+		t.Fatalf("registration must publish its LastSeen, got %+v", got)
+	}
+
+	m.LocalTouch("conn-1", t0.Add(lastSeenPublishInterval-time.Second))
+	if got := drainDeltas(m); len(got) != 0 {
+		t.Fatalf("touch inside the publish interval must not publish, got %+v", got)
+	}
+
+	t1 := t0.Add(lastSeenPublishInterval)
+	m.LocalTouch("conn-1", t1)
+	got := drainDeltas(m)
+	if len(got) != 1 || got[0].Op != DeltaOpAdd || got[0].Seq != 2 || !got[0].Entry.LastSeen.Equal(t1) {
+		t.Fatalf("touch after the publish interval must publish an upsert, got %+v", got)
+	}
+
+	// A CR authorization change republishes the entry without a LastSeen of
+	// its own: the published one must carry over, not reset to zero.
+	m.LocalUpsert(AgentEntry{PlaneIdentifier: "dataplane/dp-1", ConnID: "conn-1", ValidCRs: []string{"ns/cr-1"}})
+	got = drainDeltas(m)
+	if len(got) != 1 || !got[0].Entry.LastSeen.Equal(t1) {
+		t.Fatalf("CR change must keep the published LastSeen, got %+v", got)
+	}
+	if snap := m.localSnapshot(); len(snap.Entries) != 1 || !snap.Entries[0].LastSeen.Equal(t1) {
+		t.Fatalf("snapshot must carry LastSeen to joining peers, got %+v", snap)
+	}
+
+	// Unknown and removed connections are ignored.
+	m.LocalTouch("conn-unknown", t1.Add(time.Hour))
+	m.LocalRemove("dataplane/dp-1", "conn-1")
+	m.LocalTouch("conn-1", t1.Add(time.Hour))
+	got = drainDeltas(m)
+	if len(got) != 1 || got[0].Op != DeltaOpRemove {
+		t.Fatalf("expected only the remove delta, got %+v", got)
+	}
+}
+
+// legacyAgentEntry is AgentEntry as gateways before published LastSeen define it.
+type legacyAgentEntry struct {
+	PlaneIdentifier string   `json:"planeIdentifier"`
+	ConnID          string   `json:"connID"`
+	ValidCRs        []string `json:"validCRs,omitempty"`
+}
+
+// During a rolling upgrade old and new replicas share the mesh. Each must
+// decode the other's entries, and an entry without LastSeen must read as
+// "unknown" (zero) rather than fail.
+func TestAgentEntry_LastSeenWireCompat(t *testing.T) {
+	seen := time.Date(2026, 11, 25, 6, 0, 0, 0, time.UTC)
+
+	newer, err := json.Marshal(AgentEntry{PlaneIdentifier: "dataplane/dp-1", ConnID: "c1", LastSeen: seen})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var asLegacy legacyAgentEntry
+	if err := json.Unmarshal(newer, &asLegacy); err != nil || asLegacy.ConnID != "c1" {
+		t.Fatalf("legacy replica cannot decode a new entry: %v %+v", err, asLegacy)
+	}
+
+	legacy, err := json.Marshal(legacyAgentEntry{PlaneIdentifier: "dataplane/dp-1", ConnID: "c1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fromLegacy AgentEntry
+	if err := json.Unmarshal(legacy, &fromLegacy); err != nil || fromLegacy.ConnID != "c1" || !fromLegacy.LastSeen.IsZero() {
+		t.Fatalf("new replica cannot decode a legacy entry: %v %+v", err, fromLegacy)
+	}
+
+	unknown, err := json.Marshal(AgentEntry{PlaneIdentifier: "dataplane/dp-1", ConnID: "c1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(unknown), "lastSeen") {
+		t.Fatalf("an unknown LastSeen must be left off the wire, got %s", unknown)
+	}
+}
+
+// End-to-end over loopback: a LastSeen refresh on the owner reaches the peer's
+// registry, which is what a peer answers plane status from.
+func TestMesh_LastSeenPropagatesToPeers(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	a := startMeshNode(t, ctx, "gw-a")
+	b := startMeshNode(t, ctx, "gw-b")
+
+	t0 := time.Now().Add(-time.Minute).Round(0)
+	a.mesh.LocalUpsert(AgentEntry{PlaneIdentifier: "dataplane/dp-1", ConnID: "conn-1", LastSeen: t0})
+
+	a.disc.ch <- []Peer{{ID: "gw-b", Addr: b.addr}}
+	b.disc.ch <- []Peer{{ID: "gw-a", Addr: a.addr}}
+
+	waitFor(t, "snapshot carries LastSeen to gw-b", func() bool {
+		return b.registry.SummaryForPlane("dataplane/dp-1").LastSeen.Equal(t0)
+	})
+
+	t1 := t0.Add(lastSeenPublishInterval)
+	a.mesh.LocalTouch("conn-1", t1)
+	waitFor(t, "LastSeen refresh on gw-b", func() bool {
+		return b.registry.SummaryForPlane("dataplane/dp-1").LastSeen.Equal(t1)
+	})
 }
