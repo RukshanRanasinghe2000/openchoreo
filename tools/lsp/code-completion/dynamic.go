@@ -78,7 +78,7 @@ func dynamicItems(text string, line, col int, idx ResourceIndexer, uri string, r
 	ctx.path = strings.TrimPrefix(strings.TrimPrefix(ctx.path, rootPath), ".")
 	schemaPath := ctx.path
 	ctx.text, ctx.line = originalText, originalLine
-	items := suggest(ctx, fields, nil)
+	items := suggest(ctx, fields)
 	for i := range items {
 		path := schemaPath
 		if ctx.mode != modeValue || schema.FindSchema(fields, path) == nil || schema.FindSchema(fields, path).Type == valueObject {

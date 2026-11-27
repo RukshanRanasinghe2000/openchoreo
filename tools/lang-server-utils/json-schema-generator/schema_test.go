@@ -37,7 +37,7 @@ func TestFillTypeNamedStringWithConstants(t *testing.T) {
 	f := &Field{}
 	g.fillType(f, named)
 
-	if f.Type != "string" {
+	if f.Type != schemaTypeString {
 		t.Errorf("expected type string, got %q", f.Type)
 	}
 	if len(f.Enum) != 2 || f.Enum[0] != "A" || f.Enum[1] != "B" {
@@ -53,7 +53,7 @@ func TestFillTypeNamedStringWithoutConstants(t *testing.T) {
 	f := &Field{}
 	g.fillType(f, named)
 
-	if f.Type != "string" {
+	if f.Type != schemaTypeString {
 		t.Errorf("expected type string, got %q", f.Type)
 	}
 	if len(f.Enum) != 0 {
@@ -66,7 +66,7 @@ func TestFillTypePlainStringField(t *testing.T) {
 	f := &Field{}
 	g.fillType(f, types.Typ[types.String])
 
-	if f.Type != "string" {
+	if f.Type != schemaTypeString {
 		t.Errorf("expected type string, got %q", f.Type)
 	}
 	if len(f.Enum) != 0 {

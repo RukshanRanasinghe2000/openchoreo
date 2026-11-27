@@ -105,7 +105,7 @@ func newNamed(pkg *types.Package, name string, underlying types.Type) *types.Nam
 	return types.NewNamed(obj, underlying, nil)
 }
 
-func newField(pkg *types.Package, name, tag string, typ types.Type) *types.Var {
+func newField(pkg *types.Package, name string, typ types.Type) *types.Var {
 	return types.NewField(token.NoPos, pkg, name, typ, false)
 }
 
@@ -125,27 +125,27 @@ func fabricateMetaV1() *types.Package {
 		timeT,
 		newStruct(pkg, "Duration", nil),
 		newStruct(pkg, "TypeMeta", []*types.Var{
-			newField(pkg, "Kind", `json:"kind,omitempty"`, str),
-			newField(pkg, "APIVersion", `json:"apiVersion,omitempty"`, str),
+			newField(pkg, "Kind", str),
+			newField(pkg, "APIVersion", str),
 		}),
 		newStruct(pkg, "ObjectMeta", []*types.Var{
-			newField(pkg, "Name", `json:"name,omitempty"`, str),
-			newField(pkg, "Namespace", `json:"namespace,omitempty"`, str),
-			newField(pkg, "UID", `json:"uid,omitempty"`, str),
-			newField(pkg, "CreationTimestamp", `json:"creationTimestamp,omitempty"`, timeT),
-			newField(pkg, "Labels", `json:"labels,omitempty"`, strMap),
-			newField(pkg, "Annotations", `json:"annotations,omitempty"`, strMap),
+			newField(pkg, "Name", str),
+			newField(pkg, "Namespace", str),
+			newField(pkg, "UID", str),
+			newField(pkg, "CreationTimestamp", timeT),
+			newField(pkg, "Labels", strMap),
+			newField(pkg, "Annotations", strMap),
 		}),
 		newStruct(pkg, "Condition", []*types.Var{
-			newField(pkg, "Type", `json:"type"`, str),
-			newField(pkg, "Status", `json:"status"`, str),
-			newField(pkg, "ObservedGeneration", `json:"observedGeneration,omitempty"`, i64),
-			newField(pkg, "LastTransitionTime", `json:"lastTransitionTime"`, timeT),
-			newField(pkg, "Reason", `json:"reason"`, str),
-			newField(pkg, "Message", `json:"message"`, str),
+			newField(pkg, "Type", str),
+			newField(pkg, "Status", str),
+			newField(pkg, "ObservedGeneration", i64),
+			newField(pkg, "LastTransitionTime", timeT),
+			newField(pkg, "Reason", str),
+			newField(pkg, "Message", str),
 		}),
 		newStruct(pkg, "ListMeta", []*types.Var{
-			newField(pkg, "ResourceVersion", `json:"resourceVersion,omitempty"`, str),
+			newField(pkg, "ResourceVersion", str),
 		}),
 	}
 	insertNamed(pkg, insert...)
@@ -159,8 +159,8 @@ func fabricateRuntime() *types.Package {
 	bytesT := types.NewSlice(types.Typ[types.Byte])
 	emptyIface := types.NewInterfaceType(nil, nil).Complete()
 	rawExt := newStruct(pkg, "RawExtension", []*types.Var{
-		newField(pkg, "Raw", `json:"raw,omitempty"`, bytesT),
-		newField(pkg, "Object", `json:"-"`, emptyIface),
+		newField(pkg, "Raw", bytesT),
+		newField(pkg, "Object", emptyIface),
 	})
 	insertNamed(pkg, objectT, rawExt)
 	return pkg

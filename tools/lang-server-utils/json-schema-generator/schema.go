@@ -41,10 +41,10 @@ func (g *generator) generateKind(ks kindSpec) *Field {
 		return nil
 	}
 
-	root := &Field{Type: "object", omitRequired: true}
+	root := &Field{Type: schemaTypeObject, omitRequired: true}
 	root.Properties = map[string]*Field{
-		"apiVersion": {Type: "string", Required: true, Default: json.RawMessage(`"openchoreo.dev/v1alpha1"`)},
-		"kind":       {Type: "string", Required: true, Default: kindDefault(ks.GoTypeName)},
+		"apiVersion": {Type: schemaTypeString, Required: true, Default: json.RawMessage(`"openchoreo.dev/v1alpha1"`)},
+		"kind":       {Type: schemaTypeString, Required: true, Default: kindDefault(ks.GoTypeName)},
 	}
 	root.Properties["metadata"] = ks.metadataBuilder()
 
@@ -55,9 +55,11 @@ func (g *generator) generateKind(ks kindSpec) *Field {
 			tag := st.Tag(i)
 			_, _, omitempty, _ := parseJSONTag(tag)
 			ms := g.markers.fields[ks.GoTypeName][f.Name()]
-			root.Properties["spec"] = &Field{Type: "object", Required: isRequired(ms, omitempty), Properties: g.structProps(f.Type())}
+			root.Properties["spec"] = &Field{
+				Type: schemaTypeObject, Required: isRequired(ms, omitempty), Properties: g.structProps(f.Type()),
+			}
 		case "Status":
-			root.Properties["status"] = &Field{Type: "object", Required: false, Properties: g.structProps(f.Type())}
+			root.Properties["status"] = &Field{Type: schemaTypeObject, Required: false, Properties: g.structProps(f.Type())}
 		}
 	}
 	return root
@@ -178,16 +180,16 @@ func (g *generator) fillType(f *Field, t types.Type) {
 		case *types.Basic:
 			g.basicType(f, u)
 		case *types.Struct:
-			f.Type = "object"
+			f.Type = schemaTypeObject
 			f.Properties = g.structProps(named)
 		case *types.Slice:
 			f.Type = "array"
 			f.Items = g.elementSchema(u.Elem())
 		case *types.Map:
-			f.Type = "object"
+			f.Type = schemaTypeObject
 			f.Preserve = true
 		default:
-			f.Type = "object"
+			f.Type = schemaTypeObject
 			f.Preserve = true
 		}
 		return
@@ -197,19 +199,19 @@ func (g *generator) fillType(f *Field, t types.Type) {
 	case *types.Basic:
 		g.basicType(f, u)
 	case *types.Struct:
-		f.Type = "object"
+		f.Type = schemaTypeObject
 		f.Properties = g.structProps(t)
 	case *types.Slice:
 		f.Type = "array"
 		f.Items = g.elementSchema(u.Elem())
 	case *types.Map:
-		f.Type = "object"
+		f.Type = schemaTypeObject
 		f.Preserve = true
 	case *types.Interface:
-		f.Type = "object"
+		f.Type = schemaTypeObject
 		f.Preserve = true
 	default:
-		f.Type = "object"
+		f.Type = schemaTypeObject
 		f.Preserve = true
 	}
 }
@@ -230,23 +232,23 @@ func (g *generator) specialType(f *Field, named *types.Named) bool {
 	name := obj.Name()
 	switch {
 	case pkgPath == "k8s.io/apimachinery/pkg/runtime" && name == "RawExtension":
-		f.Type = "object"
+		f.Type = schemaTypeObject
 		f.Preserve = true
 		return true
 	case strings.HasSuffix(pkgPath, "apis/meta/v1") && name == "Time":
-		f.Type = "string"
+		f.Type = schemaTypeString
 		f.Format = "date-time"
 		return true
 	case strings.HasSuffix(pkgPath, "apis/meta/v1") && name == "Duration":
-		f.Type = "string"
+		f.Type = schemaTypeString
 		return true
 	case strings.HasSuffix(pkgPath, "apis/meta/v1") && name == "Condition":
-		f.Type = "object"
+		f.Type = schemaTypeObject
 		f.Properties = conditionProps()
 		return true
 	case strings.HasSuffix(pkgPath, "apis/meta/v1") &&
 		(name == "ObjectMeta" || name == "TypeMeta" || name == "ListMeta"):
-		f.Type = "object"
+		f.Type = schemaTypeObject
 		return true
 	}
 	return false
@@ -255,15 +257,18 @@ func (g *generator) specialType(f *Field, named *types.Named) bool {
 // conditionProps is the standard schema for metav1.Condition.
 func conditionProps() map[string]*Field {
 	reasonPattern := "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$"
-	typePattern := "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$"
+	typePattern := "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?" +
+		"(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$"
 	min0 := int64(0)
 	return map[string]*Field{
-		"lastTransitionTime": {Type: "string", Required: false, Format: "date-time"},
-		"message":            {Type: "string", Required: false, MaxLength: 32768},
+		"lastTransitionTime": {Type: schemaTypeString, Required: false, Format: "date-time"},
+		"message":            {Type: schemaTypeString, Required: false, MaxLength: 32768},
 		"observedGeneration": {Type: "integer", Required: false, Format: "int64", Minimum: &min0},
-		"reason":             {Type: "string", Required: false, MinLength: 1, MaxLength: 1024, Pattern: reasonPattern},
-		"status":             {Type: "string", Required: false, Enum: []string{"True", "False", "Unknown"}},
-		"type":               {Type: "string", Required: false, MaxLength: 316, Pattern: typePattern},
+		"reason": {
+			Type: schemaTypeString, Required: false, MinLength: 1, MaxLength: 1024, Pattern: reasonPattern,
+		},
+		"status": {Type: schemaTypeString, Required: false, Enum: []string{"True", "False", "Unknown"}},
+		"type":   {Type: schemaTypeString, Required: false, MaxLength: 316, Pattern: typePattern},
 	}
 }
 
@@ -273,7 +278,7 @@ func (g *generator) basicType(f *Field, u *types.Basic) {
 	case types.Bool:
 		f.Type = "boolean"
 	case types.String:
-		f.Type = "string"
+		f.Type = schemaTypeString
 	case types.Int, types.Int8, types.Int16, types.Int32, types.Int64,
 		types.Uint, types.Uint8, types.Uint16, types.Uint32, types.Uint64:
 		f.Type = "integer"
@@ -286,7 +291,7 @@ func (g *generator) basicType(f *Field, u *types.Basic) {
 	case types.Float32, types.Float64:
 		f.Type = "number"
 	default:
-		f.Type = "object"
+		f.Type = schemaTypeObject
 		f.Preserve = true
 	}
 }

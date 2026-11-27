@@ -1,5 +1,6 @@
 // Copyright 2026 The OpenChoreo Authors
 // SPDX-License-Identifier: Apache-2.0
+
 package lsp
 
 import (
@@ -8,9 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/openchoreo/openchoreo/internal/pathutil"
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
+
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 )
 
 func TestPathIdentityIndexNavigationAndOverlay(t *testing.T) {

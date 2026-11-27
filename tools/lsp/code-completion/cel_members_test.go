@@ -1,5 +1,6 @@
 // Copyright 2026 The OpenChoreo Authors
 // SPDX-License-Identifier: Apache-2.0
+
 package codecompletion
 
 import (
@@ -8,8 +9,9 @@ import (
 	"testing"
 	"unicode/utf16"
 
-	lsputil "github.com/openchoreo/openchoreo/tools/lsp/lsp-util"
 	protocol "github.com/tliron/glsp/protocol_3_16"
+
+	lsputil "github.com/openchoreo/openchoreo/tools/lsp/lsp-util"
 )
 
 const celCompletionHeader = `apiVersion: openchoreo.dev/v1alpha1
@@ -210,10 +212,12 @@ func TestCELMemberConcurrentRequests(t *testing.T) {
 		line, col int
 		field     string
 	}
-	var requests []request
+	requests := make([]request, 0, len(sources))
 	for i, source := range sources {
-		at := strings.Index(source, "¦")
-		before := source[:at]
+		before, _, found := strings.Cut(source, "¦")
+		if !found {
+			t.Fatal("missing completion cursor")
+		}
 		field := "componentName"
 		if i == 1 {
 			field = "workflowRunName"

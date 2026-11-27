@@ -7,69 +7,69 @@ package main
 // labels and annotations are free-form maps, so they preserve unknown keys.
 func metadataNamespacedUser() *Field {
 	return &Field{
-		Type:     "object",
+		Type:     schemaTypeObject,
 		Required: false,
 		Properties: map[string]*Field{
-			"name":              {Type: "string", Required: false},
-			"namespace":         {Type: "string", Required: false},
-			"uid":               {Type: "string", Required: false},
-			"creationTimestamp": {Type: "string", Required: false},
-			"labels":            {Type: "object", Required: false, Preserve: true},
-			"annotations":       {Type: "object", Required: false, Preserve: true},
+			"name":              {Type: schemaTypeString, Required: false},
+			"namespace":         {Type: schemaTypeString, Required: false},
+			"uid":               {Type: schemaTypeString, Required: false},
+			"creationTimestamp": {Type: schemaTypeString, Required: false},
+			"labels":            {Type: schemaTypeObject, Required: false, Preserve: true},
+			"annotations":       {Type: schemaTypeObject, Required: false, Preserve: true},
 		},
 	}
 }
 
 func metadataNamespacedWorkflow() *Field {
 	return &Field{
-		Type:     "object",
+		Type:     schemaTypeObject,
 		Required: false,
 		Properties: map[string]*Field{
-			"name":        {Type: "string", Required: false},
-			"namespace":   {Type: "string", Required: false},
-			"labels":      {Type: "object", Required: false, Preserve: true},
-			"annotations": {Type: "object", Required: false, Preserve: true},
+			"name":        {Type: schemaTypeString, Required: false},
+			"namespace":   {Type: schemaTypeString, Required: false},
+			"labels":      {Type: schemaTypeObject, Required: false, Preserve: true},
+			"annotations": {Type: schemaTypeObject, Required: false, Preserve: true},
 		},
 	}
 }
 
 func metadataClusterDefault() *Field {
 	return &Field{
-		Type:     "object",
+		Type:     schemaTypeObject,
 		Required: false,
 		Properties: map[string]*Field{
-			"name":              {Type: "string", Required: false},
-			"uid":               {Type: "string", Required: false},
-			"creationTimestamp": {Type: "string", Required: false},
-			"annotations":       {Type: "object", Required: false, Preserve: true},
+			"name":              {Type: schemaTypeString, Required: false},
+			"uid":               {Type: schemaTypeString, Required: false},
+			"creationTimestamp": {Type: schemaTypeString, Required: false},
+			"annotations":       {Type: schemaTypeObject, Required: false, Preserve: true},
 		},
 	}
 }
 
 func metadataClusterProjectType() *Field {
 	return &Field{
-		Type:     "object",
+		Type:     schemaTypeObject,
 		Required: false,
 		Properties: map[string]*Field{
-			"name":              {Type: "string", Required: false},
-			"uid":               {Type: "string", Required: false},
-			"creationTimestamp": {Type: "string", Required: false},
-			"labels":            {Type: "object", Required: false, Preserve: true},
-			"annotations":       {Type: "object", Required: false, Preserve: true},
+			"name":              {Type: schemaTypeString, Required: false},
+			"uid":               {Type: schemaTypeString, Required: false},
+			"creationTimestamp": {Type: schemaTypeString, Required: false},
+			"labels":            {Type: schemaTypeObject, Required: false, Preserve: true},
+			"annotations":       {Type: schemaTypeObject, Required: false, Preserve: true},
 		},
 	}
 }
 
 func metadataClusterWorkflow() *Field {
 	return &Field{
-		Type:     "object",
+		Type:     schemaTypeObject,
 		Required: false,
 		Properties: map[string]*Field{
-			"name":              {Type: "string", Required: false},
-			"uid":               {Type: "string", Required: false},
-			"creationTimestamp": {Type: "string", Required: false},
-			"labels":            {Type: "object", Required: false, Preserve: true},
-			"annotations":       {Type: "object", Required: false, Preserve: true},
+			"name":              {Type: schemaTypeString, Required: false},
+			"uid":               {Type: schemaTypeString, Required: false},
+			"creationTimestamp": {Type: schemaTypeString, Required: false},
+			"labels":            {Type: schemaTypeObject, Required: false, Preserve: true},
+			"annotations":       {Type: schemaTypeObject, Required: false, Preserve: true},
 		},
 	}
 }

@@ -96,22 +96,7 @@ func Handle(docText string, cursorLine, cursorCol int, sourceURI string, idx Kin
 
 		// 2b. Try implicit kind inference from parent field name
 		if kind == "" {
-			yamlPath := lsputil.BuildPathToNode(document.Root, parentMapping)
-			normalized := lsputil.NormalizePath(yamlPath)
-			segments := lsputil.SplitPath(normalized)
-			if len(segments) > 0 {
-				fieldName := segments[len(segments)-1]
-				registeredKinds := append([]string(nil), idx.FindAllKinds()...)
-				// Prefer ComponentType over Component for componentType.name.
-				// Index iteration order must not decide the inferred kind.
-				sort.Slice(registeredKinds, func(i, j int) bool {
-					if len(registeredKinds[i]) != len(registeredKinds[j]) {
-						return len(registeredKinds[i]) > len(registeredKinds[j])
-					}
-					return registeredKinds[i] < registeredKinds[j]
-				})
-				kind = lsputil.FindKindByFieldName(fieldName, registeredKinds)
-			}
+			kind = implicitDefinitionKind(document.Root, parentMapping, idx)
 		}
 
 		// 2c. Walk up ancestors to find "kind" (for metadata.name in same file)
@@ -263,4 +248,25 @@ func toLSPLocations(locations []indexer.Location) []protocol.Location {
 		})
 	}
 	return result
+}
+
+func implicitDefinitionKind(root, parentMapping *yaml.Node, idx KindIndexer) string {
+	kind := ""
+	yamlPath := lsputil.BuildPathToNode(root, parentMapping)
+	normalized := lsputil.NormalizePath(yamlPath)
+	segments := lsputil.SplitPath(normalized)
+	if len(segments) > 0 {
+		fieldName := segments[len(segments)-1]
+		registeredKinds := append([]string(nil), idx.FindAllKinds()...)
+		// Prefer ComponentType over Component for componentType.name.
+		// Index iteration order must not decide the inferred kind.
+		sort.Slice(registeredKinds, func(i, j int) bool {
+			if len(registeredKinds[i]) != len(registeredKinds[j]) {
+				return len(registeredKinds[i]) > len(registeredKinds[j])
+			}
+			return registeredKinds[i] < registeredKinds[j]
+		})
+		kind = lsputil.FindKindByFieldName(fieldName, registeredKinds)
+	}
+	return kind
 }

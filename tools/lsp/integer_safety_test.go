@@ -12,6 +12,7 @@ import (
 
 	"github.com/sourcegraph/jsonrpc2"
 	protocol "github.com/tliron/glsp/protocol_3_16"
+	"gopkg.in/yaml.v3"
 
 	"github.com/openchoreo/openchoreo/tools/lint/parser"
 	post "github.com/openchoreo/openchoreo/tools/lint/post-render-validator"
@@ -24,6 +25,35 @@ func TestIntegerSafetySubtractBeforeClamping(t *testing.T) {
 	got := toLSPPosition(parser.Position{Line: math.MinInt, Column: math.MinInt})
 	if got.Line != 0 || got.Character != 0 {
 		t.Fatalf("negative input wrapped: %+v; want zero position", got)
+	}
+}
+
+func TestReferenceRangePositionBounds(t *testing.T) {
+	cases := []struct {
+		name     string
+		line     int
+		column   int
+		wantLine uint32
+	}{
+		{"origin", 1, 1, 0},
+		{"negative", math.MinInt, math.MinInt, 0},
+	}
+	if math.MaxInt > math.MaxInt32 {
+		maximum := math.MaxInt32
+		cases = append(cases, struct {
+			name     string
+			line     int
+			column   int
+			wantLine uint32
+		}{"oversized", maximum + 2, 1, math.MaxInt32})
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rng, valid := referenceValueRange("x", &yaml.Node{Line: tc.line, Column: tc.column, Value: "x"})
+			if !valid || rng.Start.Line != tc.wantLine || rng.Start.Character != 0 || rng.End.Character != 1 {
+				t.Fatalf("range = %+v, valid = %v", rng, valid)
+			}
+		})
 	}
 }
 func TestIntegerSafetyUnsignedProtocolLimit(t *testing.T) {

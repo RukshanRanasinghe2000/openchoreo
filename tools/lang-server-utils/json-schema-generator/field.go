@@ -5,6 +5,11 @@ package main
 
 import "encoding/json"
 
+const (
+	schemaTypeObject = "object"
+	schemaTypeString = "string"
+)
+
 // Field is a node in the generated minimal JSON schema.
 type Field struct {
 	Type       string            `json:"type,omitempty"`

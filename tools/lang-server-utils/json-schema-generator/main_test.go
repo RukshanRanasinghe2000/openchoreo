@@ -22,7 +22,7 @@ func TestLatestVersionFromChangelog(t *testing.T) {
 		{
 			name: "plain version",
 			body: "# Changelog\n\nAll notable changes...\n\n## v1.3.0\n\n### Features\n",
-			want: "v1.3.0",
+			want: testTemplateV130,
 		},
 		{
 			name: "pre-release tag strips to stable version",
@@ -55,7 +55,7 @@ func TestLatestVersionFromChangelog(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "CHANGELOG.md")
 			if tc.body != "" {
-				if err := os.WriteFile(path, []byte(tc.body), 0o644); err != nil {
+				if err := os.WriteFile(path, []byte(tc.body), 0o600); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -86,11 +86,11 @@ func TestUpdateVersionFile(t *testing.T) {
 		}
 	}
 
-	latest, err := updateVersionFile(dir, []string{"v1.3.0"})
+	latest, err := updateVersionFile(dir, []string{testTemplateV130})
 	if err != nil {
 		t.Fatalf("updateVersionFile: %v", err)
 	}
-	if latest != "v1.3.0" {
+	if latest != testTemplateV130 {
 		t.Errorf("updates latest = %q, want v1.3.0", latest)
 	}
 
@@ -103,10 +103,10 @@ func TestUpdateVersionFile(t *testing.T) {
 		t.Fatalf("parse manifest: %v (raw: %s)", err, data)
 	}
 
-	if got.Latest != "v1.3.0" {
+	if got.Latest != testTemplateV130 {
 		t.Errorf("latest = %q, want v1.3.0", got.Latest)
 	}
-	if len(got.Versions) != 2 || got.Versions[0] != "v1.2.0" || got.Versions[1] != "v1.3.0" {
+	if len(got.Versions) != 2 || got.Versions[0] != "v1.2.0" || got.Versions[1] != testTemplateV130 {
 		t.Errorf("versions = %v, want [v1.2.0 v1.3.0]", got.Versions)
 	}
 }
@@ -122,7 +122,7 @@ func TestUpdateVersionFileDropsStaleVersions(t *testing.T) {
 	if err := os.RemoveAll(filepath.Join(dir, "template-v1.1.0")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := updateVersionFile(dir, []string{"v1.3.0"}); err != nil {
+	if _, err := updateVersionFile(dir, []string{testTemplateV130}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -134,7 +134,7 @@ func TestUpdateVersionFileDropsStaleVersions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Versions) != 1 || got.Versions[0] != "v1.3.0" {
+	if len(got.Versions) != 1 || got.Versions[0] != testTemplateV130 {
 		t.Errorf("versions = %v, want [v1.3.0]", got.Versions)
 	}
 }
@@ -152,7 +152,7 @@ func TestUpdateVersionFileOlderTagKeepsLatest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("updateVersionFile: %v", err)
 	}
-	if latest != "v1.3.0" {
+	if latest != testTemplateV130 {
 		t.Errorf("latesst = %q, want v1.3.0", latest)
 	}
 
@@ -164,7 +164,7 @@ func TestUpdateVersionFileOlderTagKeepsLatest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Latest != "v1.3.0" {
+	if got.Latest != testTemplateV130 {
 		t.Errorf("latest = %q, want v1.3.0", got.Latest)
 	}
 }

@@ -21,3 +21,8 @@ const valueKind = "kind"
 const valueNumber = "number"
 
 const valueTrait = "Trait"
+
+const (
+	valueComponentRelease = "ComponentRelease"
+	yamlDocumentStart     = "---"
+)

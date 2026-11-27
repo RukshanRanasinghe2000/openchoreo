@@ -1,5 +1,6 @@
 // Copyright 2026 The OpenChoreo Authors
 // SPDX-License-Identifier: Apache-2.0
+
 package codecompletion
 
 import (
@@ -7,9 +8,10 @@ import (
 	"testing"
 	"unicode/utf16"
 
-	lsputil "github.com/openchoreo/openchoreo/tools/lsp/lsp-util"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 	"gopkg.in/yaml.v3"
+
+	lsputil "github.com/openchoreo/openchoreo/tools/lsp/lsp-util"
 )
 
 type referenceTestIndex map[string][]string

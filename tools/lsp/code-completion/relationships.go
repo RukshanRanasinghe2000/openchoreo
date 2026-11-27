@@ -26,15 +26,15 @@ var completionRelationships = map[string]completionRelationship{
 type snapshotRelationship struct{ definition, values string }
 
 var snapshotRelationships = map[string]snapshotRelationship{
-	"ComponentRelease": {"componentType", "componentProfile.parameters"},
-	"ResourceRelease":  {"resourceType", "parameters"},
-	"ProjectRelease":   {"projectType", "parameters"},
+	valueComponentRelease: {"componentType", "componentProfile.parameters"},
+	"ResourceRelease":     {"resourceType", "parameters"},
+	"ProjectRelease":      {"projectType", "parameters"},
 }
 
 type bindingRelationship struct{ pin, release, definition, values string }
 
 var bindingRelationships = map[string]bindingRelationship{
-	valueReleaseBinding:      {"releaseName", "ComponentRelease", "componentType", "componentTypeEnvironmentConfigs"},
+	valueReleaseBinding:      {"releaseName", valueComponentRelease, "componentType", "componentTypeEnvironmentConfigs"},
 	"ResourceReleaseBinding": {"resourceRelease", "ResourceRelease", "resourceType", "resourceTypeEnvironmentConfigs"},
 	"ProjectReleaseBinding":  {"projectRelease", "ProjectRelease", "projectType", "environmentConfigs"},
 }
@@ -136,7 +136,7 @@ func dynamicRelationship(doc *parser.DocumentNode, path string, line int, docs [
 		return root, uniqueDefinition(docs, doc, kind, dynamicScalar(dynamicNode(ref, "name"))), false
 	}
 	if rel, ok := snapshotRelationships[doc.Kind]; ok {
-		if doc.Kind == "ComponentRelease" && strings.HasPrefix(path, "spec.componentType.spec.traits") {
+		if doc.Kind == valueComponentRelease && strings.HasPrefix(path, "spec.componentType.spec.traits") {
 			instance := selectedInstance(dynamicAt(doc.Spec, "componentType.spec.traits"), line)
 			section := "parameters"
 			environment := strings.Contains(path, ".environmentConfigs")
@@ -146,7 +146,7 @@ func dynamicRelationship(doc *parser.DocumentNode, path string, line int, docs [
 			return "spec.componentType.spec.traits." + section, frozenTrait(doc.Spec, instance), environment
 		}
 
-		if doc.Kind == "ComponentRelease" && strings.HasPrefix(path, "spec.componentProfile.traits") {
+		if doc.Kind == valueComponentRelease && strings.HasPrefix(path, "spec.componentProfile.traits") {
 			instance := selectedInstance(dynamicAt(doc.Spec, "componentProfile.traits"), line)
 			return "spec.componentProfile.traits.parameters", frozenTrait(doc.Spec, instance), false
 		}

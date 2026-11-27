@@ -1,19 +1,21 @@
 // Copyright 2026 The OpenChoreo Authors
 // SPDX-License-Identifier: Apache-2.0
+
 package lsp
 
 import (
 	"context"
 	"encoding/json"
-	"github.com/sourcegraph/jsonrpc2"
 	"net"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	completion "github.com/openchoreo/openchoreo/tools/lsp/code-completion"
+	"github.com/sourcegraph/jsonrpc2"
 	"github.com/tliron/glsp"
+
+	completion "github.com/openchoreo/openchoreo/tools/lsp/code-completion"
 )
 
 func TestClusterNotificationSnapshots(t *testing.T) {

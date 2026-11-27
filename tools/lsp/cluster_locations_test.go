@@ -1,5 +1,6 @@
 // Copyright 2026 The OpenChoreo Authors
 // SPDX-License-Identifier: Apache-2.0
+
 package lsp
 
 import (
@@ -14,10 +15,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openchoreo/openchoreo/internal/pathutil"
 	"github.com/sourcegraph/jsonrpc2"
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
+
+	"github.com/openchoreo/openchoreo/internal/pathutil"
+	lsputil "github.com/openchoreo/openchoreo/tools/lsp/lsp-util"
+)
+
+const (
+	clusterTestNamespace = "default"
+	clusterTestComponent = "app"
+	clusterTestOther     = "other"
 )
 
 func definitionURI(path string) string {
@@ -38,7 +47,7 @@ func callDefinition(t *testing.T, s *Server, uri, text, needle string) []protoco
 			break
 		}
 	}
-	got, err := s.Definition(&glsp.Context{}, &protocol.DefinitionParams{TextDocumentPositionParams: protocol.TextDocumentPositionParams{TextDocument: protocol.TextDocumentIdentifier{URI: uri}, Position: protocol.Position{Line: uint32(line), Character: uint32(col)}}})
+	got, err := s.Definition(&glsp.Context{}, &protocol.DefinitionParams{TextDocumentPositionParams: protocol.TextDocumentPositionParams{TextDocument: protocol.TextDocumentIdentifier{URI: uri}, Position: protocol.Position{Line: lsputil.PositionIndex(line), Character: lsputil.PositionIndex(col)}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +58,7 @@ func callDefinition(t *testing.T, s *Server, uri, text, needle string) []protoco
 }
 func putLocations(t *testing.T, s *Server, contextID string, generation uint64, resources ...clusterLocation) {
 	t.Helper()
-	ns := "default"
+	ns := clusterTestNamespace
 	if resources == nil {
 		resources = []clusterLocation{}
 	}
@@ -74,7 +83,7 @@ func TestDefinitionLocalAndClusterPriority(t *testing.T) {
 			if err := s.indexer.IndexWorkspace(root); err != nil {
 				t.Fatal(err)
 			}
-			ns := "default"
+			ns := clusterTestNamespace
 			remoteNS := ns
 			if strings.HasPrefix(kind, "Cluster") {
 				remoteNS = ""
@@ -85,7 +94,7 @@ func TestDefinitionLocalAndClusterPriority(t *testing.T) {
 			if strings.Contains(kind, "Trait") {
 				source = fmt.Sprintf("apiVersion: openchoreo.dev/v1alpha1\nkind: Component\nmetadata: {name: app, namespace: default}\nspec:\n  traits:\n  - kind: %s\n    name: service\n", kind)
 			}
-			virtual := "openchoreo://ctx/namespaces/default/component/app.yaml"
+			virtual := referenceURI
 			got := callDefinition(t, s, virtual, source, "service")
 			if len(got) != 1 || got[0].URI != remote.URI || got[0].Range.Start != got[0].Range.End {
 				t.Fatalf("remote: %+v", got)
@@ -110,16 +119,16 @@ func TestDefinitionLocalAndClusterPriority(t *testing.T) {
 }
 func TestDefinitionIdentityAndSnapshots(t *testing.T) {
 	s := NewServer()
-	r := target("ComponentType", "service", "default")
+	r := target("ComponentType", "service", clusterTestNamespace)
 	putLocations(t, s, "ctx", 1, r)
-	text := definitionSource("ComponentType", "service", "default")
-	source := "openchoreo://ctx/namespaces/default/component/app.yaml"
+	text := definitionSource("ComponentType", "service", clusterTestNamespace)
+	source := referenceURI
 	for _, uri := range []string{"openchoreo://other/namespaces/default/component/app.yaml", "openchoreo:/namespaces/default/component/app.yaml", "https://ctx/app.yaml"} {
 		if got := callDefinition(t, s, uri, text, "service"); len(got) != 0 {
 			t.Fatal(uri, got)
 		}
 	}
-	for _, tt := range []struct{ k, n string }{{"Trait", "default"}, {"ComponentType", "other"}} {
+	for _, tt := range []struct{ k, n string }{{"Trait", clusterTestNamespace}, {"ComponentType", clusterTestOther}} {
 		if got := callDefinition(t, s, definitionURI(filepath.Join(t.TempDir(), "source.yaml")), definitionSource(tt.k, "service", tt.n), "service"); len(got) != 0 {
 			t.Fatal(got)
 		}
@@ -148,17 +157,17 @@ func TestDefinitionIdentityAndSnapshots(t *testing.T) {
 	if got := callDefinition(t, s, source, text, "service"); len(got) != 0 {
 		t.Fatal("clear failed", got)
 	}
-	putLocations(t, s, "other", 5)
+	putLocations(t, s, clusterTestOther, 5)
 	if got := callDefinition(t, s, source, text, "service"); len(got) != 0 {
 		t.Fatal("context change retained navigation", got)
 	}
 }
 func TestDefinitionScopedReleasesAndDuplicates(t *testing.T) {
 	s := NewServer()
-	first := target("ComponentRelease", "r1", "default")
-	first.ComponentName = "app"
-	other := target("ComponentRelease", "r2", "default")
-	other.ComponentName = "other"
+	first := target("ComponentRelease", "r1", clusterTestNamespace)
+	first.ComponentName = clusterTestComponent
+	other := target("ComponentRelease", "r2", clusterTestNamespace)
+	other.ComponentName = clusterTestOther
 	putLocations(t, s, "ctx", 1, first, first, other)
 	text := "apiVersion: openchoreo.dev/v1alpha1\nkind: ReleaseBinding\nmetadata: {name: b}\nspec:\n  owner: {componentName: app}\n  releaseName: r1\n"
 	source := "openchoreo://ctx/namespaces/default/release-binding/b.yaml"
@@ -181,30 +190,30 @@ func TestDefinitionMultiRootAndOpenedVirtualRange(t *testing.T) {
 	if err := s.indexer.IndexWorkspaces(roots); err != nil {
 		t.Fatal(err)
 	}
-	text := definitionSource("ComponentType", "service", "default")
+	text := definitionSource("ComponentType", "service", clusterTestNamespace)
 	for _, root := range roots {
 		got := callDefinition(t, s, definitionURI(filepath.Join(root, "app.yaml")), text, "service")
 		if len(got) != 1 || got[0].URI != definitionURI(filepath.Join(root, "type.yaml")) {
 			t.Fatal(got)
 		}
 	}
-	putLocations(t, s, "ctx", 1, target("ComponentType", "service", "default"))
-	got := callDefinition(t, s, "openchoreo://ctx/namespaces/default/component/app.yaml", text, "service")
+	putLocations(t, s, "ctx", 1, target("ComponentType", "service", clusterTestNamespace))
+	got := callDefinition(t, s, referenceURI, text, "service")
 	if len(got) != 2 {
 		t.Fatal("virtual source must not guess a workspace", got)
 	}
 	s = NewServer()
-	r := target("ComponentType", "service", "default")
+	r := target("ComponentType", "service", clusterTestNamespace)
 	putLocations(t, s, "ctx", 1, r)
 	s.OpenDocument(r.URI, "apiVersion: openchoreo.dev/v1alpha1\nkind: ComponentType\nmetadata:\n  name: service\nspec: {}", 1)
-	got = callDefinition(t, s, "openchoreo://ctx/namespaces/default/component/app.yaml", text, "service")
+	got = callDefinition(t, s, referenceURI, text, "service")
 	if len(got) != 1 || got[0].Range.Start.Line != 3 {
 		t.Fatal(got)
 	}
 }
 func TestDefinitionConcurrentUpdates(t *testing.T) {
 	s := NewServer()
-	r := target("ComponentType", "service", "default")
+	r := target("ComponentType", "service", clusterTestNamespace)
 	putLocations(t, s, "ctx", 1, r)
 	var wg sync.WaitGroup
 	for i := 0; i < 6; i++ {
@@ -213,7 +222,7 @@ func TestDefinitionConcurrentUpdates(t *testing.T) {
 			defer wg.Done()
 			for j := 0; j < 30; j++ {
 				putLocations(t, s, "ctx", 1, r)
-				_ = callDefinition(t, s, "openchoreo://ctx/namespaces/default/component/app.yaml", definitionSource("ComponentType", "service", "default"), "service")
+				_ = callDefinition(t, s, referenceURI, definitionSource("ComponentType", "service", clusterTestNamespace), "service")
 			}
 		}()
 	}
@@ -233,16 +242,16 @@ func TestDefinitionNotificationOverJSONRPC(t *testing.T) {
 	defer client.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	id, ns, gen := "ctx", "default", uint64(1)
-	snapshot := locationSnapshot{ContextID: &id, Namespace: &ns, Generation: &gen, Resources: []clusterLocation{target("ComponentType", "service", "default")}}
+	id, ns, gen := "ctx", clusterTestNamespace, uint64(1)
+	snapshot := locationSnapshot{ContextID: &id, Namespace: &ns, Generation: &gen, Resources: []clusterLocation{target("ComponentType", "service", clusterTestNamespace)}}
 	if err := client.Notify(ctx, resourceLocationsMethod, snapshot); err != nil {
 		t.Fatal(err)
 	}
 	if err := client.Call(ctx, resourceLocationsMethod, snapshot, nil); err != nil {
 		t.Fatal(err)
 	}
-	source := "openchoreo://ctx/namespaces/default/component/app.yaml"
-	s.OpenDocument(source, definitionSource("ComponentType", "service", "default"), 1)
+	source := referenceURI
+	s.OpenDocument(source, definitionSource("ComponentType", "service", clusterTestNamespace), 1)
 	var initialized protocol.InitializeResult
 	if err := client.Call(ctx, "initialize", &protocol.InitializeParams{}, &initialized); err != nil {
 		t.Fatal(err)
@@ -261,7 +270,6 @@ func TestDefinitionNotificationOverJSONRPC(t *testing.T) {
 	if len(got) != 1 || got[0].URI != snapshot.Resources[0].URI {
 		t.Fatal(got)
 	}
-
 }
 
 func TestDefinitionImplicitComponentTypePrefersSpecificKind(t *testing.T) {
@@ -279,7 +287,7 @@ func TestDefinitionImplicitComponentTypePrefersSpecificKind(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	text := strings.Replace(definitionSource("ComponentType", "service", "default"), "    kind: ComponentType\n", "", 1)
+	text := strings.Replace(definitionSource("ComponentType", "service", clusterTestNamespace), "    kind: ComponentType\n", "", 1)
 	got := callDefinition(t, s, definitionURI(filepath.Join(root, "app.yaml")), text, "service")
 	if len(got) != 1 || got[0].URI != targetURI {
 		t.Fatalf("implicit componentType resolved a less-specific kind: %+v", got)

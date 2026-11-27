@@ -1,5 +1,6 @@
 // Copyright 2026 The OpenChoreo Authors
 // SPDX-License-Identifier: Apache-2.0
+
 package lsp
 
 import (
@@ -15,11 +16,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openchoreo/openchoreo/internal/pathutil"
-	completion "github.com/openchoreo/openchoreo/tools/lsp/code-completion"
 	"github.com/sourcegraph/jsonrpc2"
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
+
+	"github.com/openchoreo/openchoreo/internal/pathutil"
+	completion "github.com/openchoreo/openchoreo/tools/lsp/code-completion"
+	lsputil "github.com/openchoreo/openchoreo/tools/lsp/lsp-util"
 )
 
 func referenceSource(kind string) string {
@@ -27,7 +30,7 @@ func referenceSource(kind string) string {
 }
 func referenceParams(uri, text string) *protocol.CompletionParams {
 	lines := strings.Split(text, "\n")
-	return &protocol.CompletionParams{TextDocumentPositionParams: protocol.TextDocumentPositionParams{TextDocument: protocol.TextDocumentIdentifier{URI: uri}, Position: protocol.Position{Line: uint32(len(lines) - 1), Character: uint32(len(lines[len(lines)-1]))}}}
+	return &protocol.CompletionParams{TextDocumentPositionParams: protocol.TextDocumentPositionParams{TextDocument: protocol.TextDocumentIdentifier{URI: uri}, Position: protocol.Position{Line: lsputil.PositionIndex(len(lines) - 1), Character: lsputil.PositionIndex(len(lines[len(lines)-1]))}}}
 }
 func referenceLabels(list protocol.CompletionList) []string {
 	var labels []string

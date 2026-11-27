@@ -1,11 +1,11 @@
 // Copyright 2026 The OpenChoreo Authors
 // SPDX-License-Identifier: Apache-2.0
+
 package lsp
 
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net"
 	"path/filepath"
 	"strings"
@@ -44,10 +44,10 @@ func referenceErrors(s *Server, uri, text string) []protocol.Diagnostic {
 }
 func TestReferenceDiagnosticAndQuickFix(t *testing.T) {
 	s := NewServer()
-	resource := target("ComponentType", "auto-scale", "default")
+	resource := target("ComponentType", "auto-scale", clusterTestNamespace)
 	resource.WorkloadType = "deployment"
-	completeReferences(t, s, "ctx", "default", 1, []string{"ComponentType"}, resource)
-	text := definitionSource("ComponentType", `'deployment/auto-scal'`, "default")
+	completeReferences(t, s, "ctx", clusterTestNamespace, 1, []string{"ComponentType"}, resource)
+	text := definitionSource("ComponentType", `'deployment/auto-scal'`, clusterTestNamespace)
 	s.OpenDocument(referenceURI, text, 7)
 	diags := referenceErrors(s, referenceURI, text)
 	if len(diags) != 1 || *diags[0].Severity != protocol.DiagnosticSeverityError || diags[0].Message != "ComponentType 'deployment/auto-scal' was not found." {
@@ -88,24 +88,24 @@ func TestReferenceDiagnosticAndQuickFix(t *testing.T) {
 }
 func TestReferenceReadinessAndSnapshotLifecycle(t *testing.T) {
 	s := NewServer()
-	text := definitionSource("ComponentType", "deployment/missing", "default")
+	text := definitionSource("ComponentType", "deployment/missing", clusterTestNamespace)
 	for _, tc := range []struct {
 		ctx, ns string
 		kinds   []string
 		want    int
 	}{
-		{"ctx", "default", nil, 0},               // refresh clear or legacy client
-		{"ctx", "default", []string{"Trait"}, 0}, // failed ComponentType list
+		{"ctx", clusterTestNamespace, nil, 0},               // refresh clear or legacy client
+		{"ctx", clusterTestNamespace, []string{"Trait"}, 0}, // failed ComponentType list
 		{"ctx", "other", []string{"ComponentType"}, 0},
-		{"ctx", "default", []string{"ComponentType"}, 1},  // empty successful list
-		{"next", "default", []string{"ComponentType"}, 0}, // stale source context
+		{"ctx", clusterTestNamespace, []string{"ComponentType"}, 1},  // empty successful list
+		{"next", clusterTestNamespace, []string{"ComponentType"}, 0}, // stale source context
 	} {
 		completeReferences(t, s, tc.ctx, tc.ns, 1, tc.kinds)
 		if got := len(referenceErrors(s, referenceURI, text)); got != tc.want {
 			t.Fatalf("%+v: got %d", tc, got)
 		}
 	}
-	completeReferences(t, s, "ctx", "default", 2, []string{"ComponentType"})
+	completeReferences(t, s, "ctx", clusterTestNamespace, 2, []string{"ComponentType"})
 	if err := s.locations.update([]byte(`{"contextId":"ctx","generation":3,"resources":[],"completeKinds":[""]}`)); err == nil {
 		t.Fatal("accepted malformed readiness")
 	}
@@ -125,19 +125,19 @@ func TestReferenceScopeAndLocalPrecedence(t *testing.T) {
 	if err := s.indexer.IndexWorkspace(root); err != nil {
 		t.Fatal(err)
 	}
-	local := fmt.Sprintf("apiVersion: openchoreo.dev/v1alpha1\nkind: ComponentType\nmetadata: {name: service, namespace: default}\nspec: {workloadType: deployment}\n")
+	local := "apiVersion: openchoreo.dev/v1alpha1\nkind: ComponentType\nmetadata: {name: service, namespace: default}\nspec: {workloadType: deployment}\n"
 	if err := s.IndexFile(definitionURI(filepath.Join(root, "type.yaml")), []byte(local)); err != nil {
 		t.Fatal(err)
 	}
 	remote := target("ComponentType", "service", "other")
 	remote.WorkloadType = "deployment"
-	trait := target("Trait", "service", "default")
-	completeReferences(t, s, "ctx", "default", 1, []string{"ComponentType", "Trait"}, remote, trait)
-	text := definitionSource("ComponentType", "deployment/service", "default")
+	trait := target("Trait", "service", clusterTestNamespace)
+	completeReferences(t, s, "ctx", clusterTestNamespace, 1, []string{"ComponentType", "Trait"}, remote, trait)
+	text := definitionSource("ComponentType", "deployment/service", clusterTestNamespace)
 	if len(referenceErrors(s, referenceURI, text)) != 0 {
 		t.Fatal("local target did not take precedence")
 	}
-	text = definitionSource("ComponentType", "statefulset/service", "default")
+	text = definitionSource("ComponentType", "statefulset/service", clusterTestNamespace)
 	if len(referenceErrors(s, referenceURI, text)) != 1 {
 		t.Fatal("wrong workload accepted")
 	}
@@ -146,7 +146,7 @@ func TestReferenceScopeAndLocalPrecedence(t *testing.T) {
 	if len(referenceErrors(s, referenceURI, text)) != 0 {
 		t.Fatal("mismatched source namespace checked")
 	}
-	text = definitionSource("ComponentType", "deployment/servic", "default")
+	text = definitionSource("ComponentType", "deployment/servic", clusterTestNamespace)
 	refs := s.referenceChecks(referenceURI, text)
 	if len(refs) != 1 || len(refs[0].candidates) != 1 || refs[0].candidates[0] != "deployment/service" {
 		t.Fatalf("bad candidate scope: %+v", refs)
@@ -178,19 +178,19 @@ func TestReferenceRanking(t *testing.T) {
 }
 func TestReferenceFilteringAndUTF16(t *testing.T) {
 	s := NewServer()
-	completeReferences(t, s, "ctx", "default", 1, []string{"ComponentType", "Trait"})
+	completeReferences(t, s, "ctx", clusterTestNamespace, 1, []string{"ComponentType", "Trait"})
 	for _, name := range []string{`"deployment/missing"`, `'deployment/missing'`, `deployment/missing`} {
-		text := definitionSource("ComponentType", name, "default") + "  parameters:\n    reference: {kind: Trait, name: user-value}\n  environmentConfigs:\n    name: ordinary\n  template:\n    ref: {kind: Trait, name: template-value}\n"
+		text := definitionSource("ComponentType", name, clusterTestNamespace) + "  parameters:\n    reference: {kind: Trait, name: user-value}\n  environmentConfigs:\n    name: ordinary\n  template:\n    ref: {kind: Trait, name: template-value}\n"
 		if d := referenceErrors(s, referenceURI, text); len(d) != 1 {
 			t.Fatalf("%s: %+v", name, d)
 		}
 	}
 	for _, name := range []string{`"${parameters.type}"`, `""`, `|\n      deployment/missing`} {
-		if d := referenceErrors(s, referenceURI, definitionSource("ComponentType", name, "default")); len(d) != 0 {
+		if d := referenceErrors(s, referenceURI, definitionSource("ComponentType", name, clusterTestNamespace)); len(d) != 0 {
 			t.Fatalf("dynamic or incomplete scalar checked: %+v", d)
 		}
 	}
-	text := strings.Replace(definitionSource("ComponentType", "missing", "default"), "    name: missing", `    other: "😀", name: missing`, 1)
+	text := strings.Replace(definitionSource("ComponentType", "missing", clusterTestNamespace), "    name: missing", `    other: "😀", name: missing`, 1)
 	// An actual flow mapping puts a non-BMP character before the reference.
 	text = strings.Replace(text, "  componentType:\n    kind: ComponentType\n    other: \"😀\", name: missing", "  componentType: {other: \"😀\", kind: ComponentType, name: \"missing\"}", 1)
 	d := referenceErrors(s, referenceURI, text)
@@ -205,10 +205,10 @@ func TestReferenceFilteringAndUTF16(t *testing.T) {
 }
 func TestReferenceReleaseScopingAndDeduplication(t *testing.T) {
 	s := NewServer()
-	a, b := target("ComponentRelease", "app-v1", "default"), target("ComponentRelease", "other-v1", "default")
-	a.ComponentName = "app"
+	a, b := target("ComponentRelease", "app-v1", clusterTestNamespace), target("ComponentRelease", "other-v1", clusterTestNamespace)
+	a.ComponentName = clusterTestComponent
 	b.ComponentName = "other"
-	completeReferences(t, s, "ctx", "default", 1, []string{"ComponentRelease"}, a, a, b)
+	completeReferences(t, s, "ctx", clusterTestNamespace, 1, []string{"ComponentRelease"}, a, a, b)
 	text := "apiVersion: openchoreo.dev/v1alpha1\nkind: ReleaseBinding\nmetadata: {name: binding}\nspec:\n  owner: {componentName: app}\n  releaseName: app-v2\n"
 	refs := s.referenceChecks(referenceURI, text)
 	if len(refs) != 1 || !refs[0].missing || len(refs[0].candidates) != 1 || refs[0].candidates[0] != "app-v1" {
@@ -217,7 +217,7 @@ func TestReferenceReleaseScopingAndDeduplication(t *testing.T) {
 }
 func TestReferenceConcurrentUpdates(t *testing.T) {
 	s := NewServer()
-	text := definitionSource("ComponentType", "missing", "default")
+	text := definitionSource("ComponentType", "missing", clusterTestNamespace)
 	s.OpenDocument(referenceURI, text, 1)
 	var wg sync.WaitGroup
 	for i := 0; i < 4; i++ {
@@ -225,7 +225,7 @@ func TestReferenceConcurrentUpdates(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < 20; j++ {
-				completeReferences(t, s, "ctx", "default", 1, []string{"ComponentType"})
+				completeReferences(t, s, "ctx", clusterTestNamespace, 1, []string{"ComponentType"})
 				_ = referenceErrors(s, referenceURI, text)
 				_ = s.referenceActions(referenceURI, text, 1, protocol.Range{End: protocol.Position{Line: 20}})
 			}
@@ -252,10 +252,10 @@ func TestReferenceQuickFixOverJSONRPC(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.StopWatcher()
-	text := definitionSource("ComponentType", "servic", "default")
+	text := definitionSource("ComponentType", "servic", clusterTestNamespace)
 	s.OpenDocument(referenceURI, text, 4)
-	id, ns, gen := "ctx", "default", uint64(1)
-	snapshot := locationSnapshot{ContextID: &id, Namespace: &ns, Generation: &gen, CompleteKinds: []string{"ComponentType"}, Resources: []clusterLocation{target("ComponentType", "service", "default")}}
+	id, ns, gen := "ctx", clusterTestNamespace, uint64(1)
+	snapshot := locationSnapshot{ContextID: &id, Namespace: &ns, Generation: &gen, CompleteKinds: []string{"ComponentType"}, Resources: []clusterLocation{target("ComponentType", "service", clusterTestNamespace)}}
 	if err := client.Call(ctx, resourceLocationsMethod, snapshot, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -290,11 +290,11 @@ func TestReferenceInitializationWaitsForClusterFeeds(t *testing.T) {
 		t.Fatal(err)
 	}
 	uri := definitionURI(filepath.Join(root, "app.yaml"))
-	text := definitionSource("ComponentType", "deployment/missing", "default")
+	text := definitionSource("ComponentType", "deployment/missing", clusterTestNamespace)
 	if len(referenceErrors(s, uri, text)) != 0 {
 		t.Fatal("reported missing cluster reference before first feed")
 	}
-	completeReferences(t, s, "ctx", "default", 1, []string{"ComponentType"})
+	completeReferences(t, s, "ctx", clusterTestNamespace, 1, []string{"ComponentType"})
 	if len(referenceErrors(s, uri, text)) != 1 {
 		t.Fatal("complete empty feed did not enable validation")
 	}
@@ -302,7 +302,7 @@ func TestReferenceInitializationWaitsForClusterFeeds(t *testing.T) {
 
 func TestReferenceActionsTiesAndLimit(t *testing.T) {
 	s := NewServer()
-	completeReferences(t, s, "ctx", "default", 1, []string{"Trait"}, target("Trait", "service-a", "default"), target("Trait", "service-b", "default"), target("Trait", "service-d", "default"), target("Trait", "service-e", "default"), target("Trait", "service-c", "other"))
+	completeReferences(t, s, "ctx", clusterTestNamespace, 1, []string{"Trait"}, target("Trait", "service-a", clusterTestNamespace), target("Trait", "service-b", clusterTestNamespace), target("Trait", "service-d", clusterTestNamespace), target("Trait", "service-e", clusterTestNamespace), target("Trait", "service-c", "other"))
 	text := "apiVersion: openchoreo.dev/v1alpha1\nkind: Component\nmetadata: {name: app}\nspec:\n  traits: [{kind: Trait, name: service-c}]\n"
 	actions := s.referenceActions(referenceURI, text, 1, protocol.Range{})
 	if len(actions) != 3 {

@@ -12,7 +12,7 @@ import (
 func writeConfig(t *testing.T, body string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	return path
@@ -24,7 +24,11 @@ func TestLoadConfigValid(t *testing.T) {
 		"templatesDir": "internal/ruleengine/template",
 		"sources": [
 			{ "root": "../openchoreo" },
-			{ "root": "../openchoreo-v1.3.0/openchoreo", "api": "../openchoreo-v1.3.0/openchoreo/api/v1alpha1", "version": "v1.3.0" }
+			{
+				"root": "../openchoreo-v1.3.0/openchoreo",
+				"api": "../openchoreo-v1.3.0/openchoreo/api/v1alpha1",
+				"version": "v1.3.0"
+			}
 		]
 	}`)
 	cfg, err := loadConfig(path)
@@ -37,7 +41,7 @@ func TestLoadConfigValid(t *testing.T) {
 	if len(cfg.Sources) != 2 {
 		t.Fatalf("sources = %d, want 2", len(cfg.Sources))
 	}
-	if cfg.Sources[1].Version != "v1.3.0" {
+	if cfg.Sources[1].Version != testTemplateV130 {
 		t.Errorf("source[1].version = %q, want v1.3.0", cfg.Sources[1].Version)
 	}
 }
@@ -90,10 +94,10 @@ func TestResolveJobsFromConfig(t *testing.T) {
 	if jobs[0].root != "../openchoreo" || jobs[0].version != "" {
 		t.Errorf("job[0] = %+v (want version resolved from CHANGELOG later)", jobs[0])
 	}
-	if jobs[1].root != "../openchoreo-v1.3.0/openchoreo" || jobs[1].version != "v1.3.0" {
+	if jobs[1].root != "../openchoreo-v1.3.0/openchoreo" || jobs[1].version != testTemplateV130 {
 		t.Errorf("job[1] = %+v", jobs[1])
 	}
-	if jobs[1].apiDir != filepath.Join("../openchoreo-v1.3.0/openchoreo", "api", "v1alpha1") {
+	if jobs[1].apiDir != filepath.Join("..", "openchoreo-v1.3.0", "openchoreo", "api", "v1alpha1") {
 		t.Errorf("job[1].apiDir = %q", jobs[1].apiDir)
 	}
 	if templates != defaultTemplatesDir {
@@ -104,7 +108,7 @@ func TestResolveJobsFromConfig(t *testing.T) {
 func TestResolveJobVersion(t *testing.T) {
 	// An unpinned job takes its version from CHANGELOG.md; a pinned one keeps it.
 	repo := t.TempDir()
-	if err := os.WriteFile(filepath.Join(repo, "CHANGELOG.md"), []byte("## v1.2.0-rc.1\n\nChanges\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(repo, "CHANGELOG.md"), []byte("## v1.2.0-rc.1\n\nChanges\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	j := &job{root: repo, apiDir: filepath.Join(repo, "api", "v1alpha1")}
@@ -115,11 +119,11 @@ func TestResolveJobVersion(t *testing.T) {
 		t.Errorf("job = %+v, want version v1.2.0 from changelog", *j)
 	}
 
-	j2 := &job{root: repo, apiDir: filepath.Join(repo, "api", "v1alpha1"), version: "v1.3.0"}
+	j2 := &job{root: repo, apiDir: filepath.Join(repo, "api", "v1alpha1"), version: testTemplateV130}
 	if err := resolveJobVersion(j2); err != nil {
 		t.Fatalf("resolveJobVersion (explicit): %v", err)
 	}
-	if j2.version != "v1.3.0" || j2.fromChangelog {
+	if j2.version != testTemplateV130 || j2.fromChangelog {
 		t.Errorf("job = %+v, want pinned version v1.3.0", *j2)
 	}
 }

@@ -13,6 +13,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const markerDefault = "kubebuilder:default"
+
 // markerSet holds the kubebuilder/+ markers parsed from doc comments: fields
 // maps "Type" -> "Field" -> markers, types maps "Type" -> markers.
 type markerSet struct {
@@ -72,8 +74,7 @@ func collectMarkers(files []*ast.File) markerSet {
 // parseTypeMarkers extracts the markers attached to a type declaration, from
 // both the GenDecl doc and the TypeSpec.
 func parseTypeMarkers(gen *ast.GenDecl, ts *ast.TypeSpec) []marker {
-	var mm []marker
-	mm = append(mm, parseMarkers(gen.Doc)...)
+	mm := parseMarkers(gen.Doc)
 	mm = append(mm, parseMarkers(ts.Doc)...)
 	mm = append(mm, parseMarkers(ts.Comment)...)
 	return mm
@@ -110,9 +111,9 @@ func parseMarkers(cg *ast.CommentGroup) []marker {
 		// The `+kubebuilder:default:=<value>` form leaves a trailing colon on
 		// the name; normalize it so both forms map to the same marker.
 		if name == "kubebuilder:default:" {
-			name = "kubebuilder:default"
+			name = markerDefault
 		}
-		if name == "kubebuilder:default" {
+		if name == markerDefault {
 			// Keep the default value raw (quotes included): it is parsed as
 			// YAML so the emitted JSON default has the correct type.
 			ms = append(ms, marker{name: name, value: value})
@@ -166,7 +167,7 @@ func applyMarkers(f *Field, ms []marker) {
 			f.Format = m.value
 		case "kubebuilder:validation:Enum":
 			f.Enum = splitEnum(m.value)
-		case "kubebuilder:default":
+		case markerDefault:
 			if dv := typedDefault(m.value); len(dv) > 0 {
 				f.Default = dv
 			}
@@ -181,7 +182,7 @@ func applyMarkers(f *Field, ms []marker) {
 		case "kubebuilder:pruning:PreserveUnknownFields":
 			f.Preserve = true
 		case "kubebuilder:validation:Schemaless":
-			f.Type = "object"
+			f.Type = schemaTypeObject
 			f.Preserve = true
 		case "kubebuilder:validation:Type":
 			f.Type = m.value

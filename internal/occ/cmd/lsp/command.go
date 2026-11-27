@@ -4,12 +4,14 @@
 package lsp
 
 import (
+	"log/slog"
+	"os"
+
+	"github.com/spf13/cobra"
+
 	"github.com/openchoreo/openchoreo/internal/occ/auth"
 	"github.com/openchoreo/openchoreo/internal/occ/cmd/config"
 	server "github.com/openchoreo/openchoreo/tools/lsp"
-	"github.com/spf13/cobra"
-	"log/slog"
-	"os"
 )
 
 // NewLSPCmd runs the language server in the CLI process.
