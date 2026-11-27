@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -1243,6 +1244,206 @@ func TestInternalListener_MTLSDisabled_AcceptsNoClientCert(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }
 
+// --- listener TLS version tests ---
+
+const testServerName = "cluster-gateway.test"
+
+// generateTestServerKeyPair creates a server certificate for testServerName
+// signed by the given CA.
+func generateTestServerKeyPair(t *testing.T, caCert *x509.Certificate, caKey *ecdsa.PrivateKey) tls.Certificate {
+	t.Helper()
+	serverKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+
+	serverTemplate := &x509.Certificate{
+		SerialNumber: big.NewInt(4),
+		Subject:      pkix.Name{CommonName: testServerName},
+		DNSNames:     []string{testServerName},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+	}
+
+	serverDER, err := x509.CreateCertificate(rand.Reader, serverTemplate, caCert, &serverKey.PublicKey, caKey)
+	require.NoError(t, err)
+
+	return tls.Certificate{Certificate: [][]byte{serverDER}, PrivateKey: serverKey}
+}
+
+// tlsHandshake runs a TLS handshake over loopback TCP and returns the client's
+// connection state with the errors from both sides. Loopback rather than
+// net.Pipe because a TLS 1.3 server that requests client certificates writes
+// session tickets after the client's handshake has already returned.
+func tlsHandshake(t *testing.T, serverCfg, clientCfg *tls.Config) (tls.ConnectionState, error) {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer ln.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	serverErr := make(chan error, 1)
+	go func() {
+		conn, err := ln.Accept()
+		if err != nil {
+			serverErr <- err
+			return
+		}
+		defer conn.Close()
+		serverErr <- tls.Server(conn, serverCfg).HandshakeContext(ctx)
+	}()
+
+	var dialer net.Dialer
+	conn, err := dialer.DialContext(ctx, "tcp", ln.Addr().String())
+	require.NoError(t, err)
+	defer conn.Close()
+
+	client := tls.Client(conn, clientCfg)
+	clientErr := client.HandshakeContext(ctx)
+	if clientErr != nil {
+		_ = conn.Close()
+	}
+	return client.ConnectionState(), errors.Join(clientErr, <-serverErr)
+}
+
+// TestListenerTLSConfigs_MinimumVersion checks every listener against a client
+// capped at TLS 1.2 and a default client. Only the public listener in
+// forwarded-header mode, where a TLS-terminating proxy is the peer, accepts
+// TLS 1.2; everything else requires TLS 1.3. The internal listener is derived
+// from a TLS 1.2 base to show it never inherits the lower floor.
+func TestListenerTLSConfigs_MinimumVersion(t *testing.T) {
+	caCert, caKey := generateTestCA(t)
+	caPool := x509.NewCertPool()
+	caPool.AddCert(caCert)
+
+	base := baseTestTLSConfig()
+	base.Certificates = []tls.Certificate{generateTestServerKeyPair(t, caCert, caKey)}
+
+	internalConfig := func(t *testing.T, cfg *Config) *tls.Config {
+		t.Helper()
+		tlsConfig, err := buildInternalTLSConfig(base, cfg)
+		require.NoError(t, err)
+		return tlsConfig
+	}
+	internalMTLS := func(mode AgentAuthMode) *Config {
+		return &Config{
+			AgentAuthMode:        mode,
+			InternalMTLSEnabled:  true,
+			InternalClientCAPath: writeTestCAFile(t, caCert),
+		}
+	}
+
+	tests := []struct {
+		name         string
+		serverCfg    *tls.Config
+		acceptsTLS12 bool
+	}{
+		{name: "public listener, default agent auth mode", serverCfg: buildPublicTLSConfig(base, "")},
+		{name: "public listener, mtls", serverCfg: buildPublicTLSConfig(base, AgentAuthModeMTLS)},
+		{name: "public listener, forwarded-header", serverCfg: buildPublicTLSConfig(base, AgentAuthModeForwardedHeader), acceptsTLS12: true},
+		{name: "internal listener, mtls", serverCfg: internalConfig(t, &Config{AgentAuthMode: AgentAuthModeMTLS})},
+		{name: "internal listener, forwarded-header", serverCfg: internalConfig(t, &Config{AgentAuthMode: AgentAuthModeForwardedHeader})},
+		{name: "internal listener with mTLS, mtls", serverCfg: internalConfig(t, internalMTLS(AgentAuthModeMTLS))},
+		{name: "internal listener with mTLS, forwarded-header", serverCfg: internalConfig(t, internalMTLS(AgentAuthModeForwardedHeader))},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clientCfg := &tls.Config{
+				Certificates: []tls.Certificate{generateTestClientKeyPair(t, caCert, caKey)},
+				RootCAs:      caPool,
+				ServerName:   testServerName,
+				MinVersion:   tls.VersionTLS12,
+			}
+
+			state, err := tlsHandshake(t, tt.serverCfg, clientCfg)
+			require.NoError(t, err)
+			assert.Equal(t, uint16(tls.VersionTLS13), state.Version)
+
+			tls12Client := clientCfg.Clone()
+			tls12Client.MaxVersion = tls.VersionTLS12
+			state, err = tlsHandshake(t, tt.serverCfg, tls12Client)
+			if tt.acceptsTLS12 {
+				require.NoError(t, err)
+				assert.Equal(t, uint16(tls.VersionTLS12), state.Version)
+				return
+			}
+			require.Error(t, err, "a client capped at TLS 1.2 must be rejected")
+			assert.Contains(t, err.Error(), "protocol version")
+		})
+	}
+}
+
+// TestPublicListener_AgentNegotiatesHybridKeyExchange handshakes a client
+// configured like the cluster-agent dialer (TLS 1.2 floor, default curve
+// preferences) with the public listener and expects the hybrid post-quantum
+// key exchange in every agent auth mode.
+func TestPublicListener_AgentNegotiatesHybridKeyExchange(t *testing.T) {
+	caCert, caKey := generateTestCA(t)
+	caPool := x509.NewCertPool()
+	caPool.AddCert(caCert)
+
+	base := baseTestTLSConfig()
+	base.Certificates = []tls.Certificate{generateTestServerKeyPair(t, caCert, caKey)}
+
+	tests := []struct {
+		name string
+		mode AgentAuthMode
+	}{
+		{name: "default agent auth mode", mode: ""},
+		{name: "mtls", mode: AgentAuthModeMTLS},
+		{name: "forwarded-header", mode: AgentAuthModeForwardedHeader},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			agentCfg := &tls.Config{
+				Certificates: []tls.Certificate{generateTestClientKeyPair(t, caCert, caKey)},
+				RootCAs:      caPool,
+				ServerName:   testServerName,
+				MinVersion:   tls.VersionTLS12,
+			}
+
+			state, err := tlsHandshake(t, buildPublicTLSConfig(base, tt.mode), agentCfg)
+			require.NoError(t, err)
+			assert.Equal(t, uint16(tls.VersionTLS13), state.Version)
+			assert.Equal(t, tls.X25519MLKEM768, state.CurveID)
+		})
+	}
+}
+
+// TestBuildListeners_TLSMinVersion checks the TLS floors on the servers Start
+// installs for each agent auth mode, without binding any port.
+func TestBuildListeners_TLSMinVersion(t *testing.T) {
+	tests := []struct {
+		name            string
+		mode            AgentAuthMode
+		wantPublicMin   uint16
+		wantInternalMin uint16
+	}{
+		{name: "default agent auth mode", mode: "", wantPublicMin: tls.VersionTLS13, wantInternalMin: tls.VersionTLS13},
+		{name: "mtls", mode: AgentAuthModeMTLS, wantPublicMin: tls.VersionTLS13, wantInternalMin: tls.VersionTLS13},
+		{name: "forwarded-header", mode: AgentAuthModeForwardedHeader, wantPublicMin: tls.VersionTLS12, wantInternalMin: tls.VersionTLS13},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := New(&Config{AgentAuthMode: tt.mode}, nil, testLogger())
+
+			require.NoError(t, s.buildListeners(&tls.Config{
+				ClientAuth: tls.RequestClientCert,
+				MinVersion: tls.VersionTLS13,
+			}))
+			require.NotNil(t, s.httpServer.TLSConfig)
+			require.NotNil(t, s.internalServer.TLSConfig)
+			assert.Equal(t, tt.wantPublicMin, s.httpServer.TLSConfig.MinVersion, "public listener MinVersion")
+			assert.Equal(t, tt.wantInternalMin, s.internalServer.TLSConfig.MinVersion, "internal listener MinVersion")
+		})
+	}
+}
+
 // --- handleWebSocket tests ---
 
 func TestHandleWebSocket_ParamValidation(t *testing.T) {
@@ -1622,7 +1823,8 @@ func TestServer_ForwardViaMesh_EndToEnd(t *testing.T) {
 	require.NoError(t, err)
 
 	waitForCondition(t, "registry convergence on gw-b", func() bool {
-		return registryB.CountForCR("dataplane/prod", "ns/dp1") == 1
+		forCR, _ := registryB.CountForCRAndPlane("dataplane/prod", "ns/dp1")
+		return forCR == 1
 	})
 
 	// Simulate the agent: answer the tunnel request that gw-a writes to the
@@ -1666,7 +1868,7 @@ func TestServer_ForwardViaMesh_EndToEnd(t *testing.T) {
 	// Unregistering on gw-a must converge on gw-b too.
 	serverA.connMgr.DisconnectAllForPlane("dataplane", "prod")
 	waitForCondition(t, "removal convergence on gw-b", func() bool {
-		return registryB.CountForPlane("dataplane/prod") == 0
+		return registryB.SummaryForPlane("dataplane/prod").Count == 0
 	})
 }
 
@@ -1694,7 +1896,8 @@ func TestServer_ForwardViaMesh_ConvergesWhenRegisteredBeforeDial(t *testing.T) {
 
 	discB.ch <- []fabric.Peer{{ID: "gw-a", Addr: addrA}}
 	waitForCondition(t, "gw-b pulls gw-a's initial snapshot", func() bool {
-		return registryB.CountForCR("workflowplane/canary", "ns/wf1") == 1
+		forCR, _ := registryB.CountForCRAndPlane("workflowplane/canary", "ns/wf1")
+		return forCR == 1
 	})
 
 	// Now register the real connection — gw-a doesn't know about gw-b yet,
@@ -1707,7 +1910,8 @@ func TestServer_ForwardViaMesh_ConvergesWhenRegisteredBeforeDial(t *testing.T) {
 	discA.ch <- []fabric.Peer{{ID: "gw-b", Addr: addrB}}
 
 	waitForCondition(t, "registry convergence on gw-b despite pre-dial registration", func() bool {
-		return registryB.CountForCR("dataplane/prod", "ns/dp1") == 1
+		forCR, _ := registryB.CountForCRAndPlane("dataplane/prod", "ns/dp1")
+		return forCR == 1
 	})
 
 	// Convergence must be real, not just a registry entry: a forwarded
@@ -1789,6 +1993,178 @@ func TestServer_PlaneStatusIncludesRemoteAgents(t *testing.T) {
 	all = s.AllPlaneStatuses()
 	require.Len(t, all, 1)
 	assert.Equal(t, 2, all[0].ConnectedAgents)
+}
+
+// A replica that does not own the agent connection must still report its
+// liveness: controllers poll status through the load balancer and record
+// LastSeen as the plane's heartbeat. Local and remote LastSeen merge to the
+// latest, and a peer that publishes none (an older gateway) adds to the count
+// without hiding a known LastSeen.
+func TestServer_StatusMergesRemoteLastSeen(t *testing.T) {
+	fakeClient := fake.NewClientBuilder().WithScheme(testScheme()).Build()
+	s := New(&Config{}, fakeClient, testLogger())
+
+	registry := fabric.NewRegistry(testLogger())
+	disc := &staticPeerDiscovery{ch: make(chan []fabric.Peer, 1)}
+	mesh := fabric.NewMesh(fabric.MeshConfig{Self: fabric.Peer{ID: "gw-self"}}, registry, disc, s, testLogger())
+	s.SetFabric(mesh, registry)
+
+	peerSeen := time.Now().Add(-10 * time.Second).Round(0)
+	require.True(t, registry.ApplyDelta(fabric.Delta{
+		Op: fabric.DeltaOpAdd, Owner: "gw-peer", Seq: 1,
+		Entry: fabric.AgentEntry{
+			PlaneIdentifier: "dataplane/prod", ConnID: "c1", ValidCRs: []string{"ns/dp1"}, LastSeen: peerSeen,
+		},
+	}))
+	require.True(t, registry.ApplyDelta(fabric.Delta{
+		Op: fabric.DeltaOpAdd, Owner: "gw-old", Seq: 1,
+		Entry: fabric.AgentEntry{PlaneIdentifier: "dataplane/prod", ConnID: "c2", ValidCRs: []string{"ns/dp1"}},
+	}))
+
+	// No local connection: LastSeen comes from the peer that published one.
+	status := s.PlaneStatus("dataplane", "prod")
+	assert.Equal(t, 2, status.ConnectedAgents)
+	assert.True(t, status.LastSeen.Equal(peerSeen), "got %v", status.LastSeen)
+	crStatus := s.CRAuthorizationStatus("dataplane", "prod", "ns", "dp1")
+	assert.Equal(t, 2, crStatus.ConnectedAgents)
+	assert.Equal(t, 2, crStatus.PlaneConnectedAgents)
+	assert.True(t, crStatus.LastSeen.Equal(peerSeen), "got %v", crStatus.LastSeen)
+	all := s.AllPlaneStatuses()
+	require.Len(t, all, 1)
+	assert.True(t, all[0].Connected)
+	assert.True(t, all[0].LastSeen.Equal(peerSeen), "got %v", all[0].LastSeen)
+
+	// A local connection registered now is the latest.
+	_, err := s.connMgr.Register("dataplane", "prod", &mockGatewayConn{}, []string{"ns/dp1"}, nil, nil)
+	require.NoError(t, err)
+	localSeen := s.connMgr.GetPlaneStatus("dataplane", "prod").LastSeen
+	require.True(t, localSeen.After(peerSeen))
+	assert.True(t, s.PlaneStatus("dataplane", "prod").LastSeen.Equal(localSeen))
+	assert.True(t, s.CRAuthorizationStatus("dataplane", "prod", "ns", "dp1").LastSeen.Equal(localSeen))
+	assert.True(t, s.AllPlaneStatuses()[0].LastSeen.Equal(localSeen))
+
+	// A peer that heard from its agent after the local one did wins.
+	newer := localSeen.Add(time.Minute)
+	require.True(t, registry.ApplyDelta(fabric.Delta{
+		Op: fabric.DeltaOpAdd, Owner: "gw-peer", Seq: 2,
+		Entry: fabric.AgentEntry{
+			PlaneIdentifier: "dataplane/prod", ConnID: "c1", ValidCRs: []string{"ns/dp1"}, LastSeen: newer,
+		},
+	}))
+	assert.True(t, s.PlaneStatus("dataplane", "prod").LastSeen.Equal(newer))
+	assert.Equal(t, 3, s.PlaneStatus("dataplane", "prod").ConnectedAgents)
+}
+
+// The reported bug, end to end: the agent is connected to gw-a and the status
+// request lands on gw-b. gw-b must answer with the agent's LastSeen, not zero.
+func TestServer_PlaneStatusLastSeenOnNonOwnerReplica(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	serverA, _, discA, addrA := newFabricServer(t, ctx, "gw-a")
+	serverB, registryB, discB, addrB := newFabricServer(t, ctx, "gw-b")
+
+	discA.ch <- []fabric.Peer{{ID: "gw-b", Addr: addrB}}
+	discB.ch <- []fabric.Peer{{ID: "gw-a", Addr: addrA}}
+
+	before := time.Now()
+	_, err := serverA.connMgr.Register("dataplane", "prod", &mockGatewayConn{}, []string{"ns/dp1"}, nil, nil)
+	require.NoError(t, err)
+
+	waitForCondition(t, "registry convergence on gw-b", func() bool {
+		forCR, _ := registryB.CountForCRAndPlane("dataplane/prod", "ns/dp1")
+		return forCR == 1
+	})
+
+	status := serverB.PlaneStatus("dataplane", "prod")
+	assert.True(t, status.Connected)
+	assert.False(t, status.LastSeen.Before(before.Round(0)), "non-owner LastSeen %v predates registration", status.LastSeen)
+	crStatus := serverB.CRAuthorizationStatus("dataplane", "prod", "ns", "dp1")
+	assert.True(t, crStatus.Connected)
+	assert.False(t, crStatus.LastSeen.IsZero())
+}
+
+// pongGatewayConn hands the pong handler handleConnection installs to the test
+// and keeps the connection open until Close.
+type pongGatewayConn struct {
+	mockGatewayConn
+	pongHandler chan func(string) error
+	closed      chan struct{}
+	closeOnce   sync.Once
+}
+
+func newPongGatewayConn() *pongGatewayConn {
+	return &pongGatewayConn{
+		pongHandler: make(chan func(string) error, 1),
+		closed:      make(chan struct{}),
+	}
+}
+
+func (c *pongGatewayConn) ReadMessage() (int, []byte, error) {
+	<-c.closed
+	return 0, nil, errors.New("connection closed")
+}
+
+func (c *pongGatewayConn) SetPongHandler(h func(string) error) { c.pongHandler <- h }
+
+func (c *pongGatewayConn) Close() error {
+	c.closeOnce.Do(func() { close(c.closed) })
+	return nil
+}
+
+// Registration publishes LastSeen once. After that the agent's pongs are the
+// only thing that moves it on peers, so the pong handler has to republish: a
+// non-owner replica would otherwise report the registration time forever.
+func TestServer_PongRefreshesLastSeenOnNonOwnerReplica(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	serverA, _, discA, addrA := newFabricServer(t, ctx, "gw-a")
+	serverB, _, discB, addrB := newFabricServer(t, ctx, "gw-b")
+
+	discA.ch <- []fabric.Peer{{ID: "gw-b", Addr: addrB}}
+	discB.ch <- []fabric.Peer{{ID: "gw-a", Addr: addrA}}
+
+	conn := newPongGatewayConn()
+	connID, err := serverA.connMgr.Register("dataplane", "prod", conn, []string{"ns/dp1"}, nil, nil)
+	require.NoError(t, err)
+
+	handlerDone := make(chan struct{})
+	go func() {
+		defer close(handlerDone)
+		serverA.handleConnection("dataplane/prod", connID, conn)
+	}()
+	t.Cleanup(func() {
+		_ = conn.Close()
+		<-handlerDone
+	})
+	pong := <-conn.pongHandler
+
+	// Age the published entry past the publish throttle, as if the agent
+	// registered a minute ago, so the pong below is due a refresh.
+	stale := time.Now().Add(-time.Minute).Round(0)
+	serverA.fabricMesh.LocalUpsert(fabric.AgentEntry{
+		PlaneIdentifier: "dataplane/prod",
+		ConnID:          connID,
+		ValidCRs:        []string{"ns/dp1"},
+		LastSeen:        stale,
+	})
+	waitForCondition(t, "aged entry on gw-b", func() bool {
+		return serverB.PlaneStatus("dataplane", "prod").LastSeen.Equal(stale)
+	})
+
+	before := time.Now().Round(0)
+	require.NoError(t, pong(""))
+
+	waitForCondition(t, "pong refresh on gw-b", func() bool {
+		return !serverB.PlaneStatus("dataplane", "prod").LastSeen.Before(before)
+	})
+	crStatus := serverB.CRAuthorizationStatus("dataplane", "prod", "ns", "dp1")
+	assert.True(t, crStatus.Connected)
+	assert.False(t, crStatus.LastSeen.Before(before), "CR LastSeen %v predates the pong", crStatus.LastSeen)
+	all := serverB.AllPlaneStatuses()
+	require.Len(t, all, 1)
+	assert.False(t, all[0].LastSeen.Before(before), "listed LastSeen %v predates the pong", all[0].LastSeen)
 }
 
 // With no remote candidates the caller gets the original routing error, so
