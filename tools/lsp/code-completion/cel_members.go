@@ -1,5 +1,6 @@
 // Copyright 2026 The OpenChoreo Authors
 // SPDX-License-Identifier: Apache-2.0
+
 package codecompletion
 
 import (
@@ -7,11 +8,12 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	protocol "github.com/tliron/glsp/protocol_3_16"
+	"gopkg.in/yaml.v3"
+
 	celvalidator "github.com/openchoreo/openchoreo/tools/lint/cel-validator"
 	"github.com/openchoreo/openchoreo/tools/lint/parser"
 	lsputil "github.com/openchoreo/openchoreo/tools/lsp/lsp-util"
-	protocol "github.com/tliron/glsp/protocol_3_16"
-	"gopkg.in/yaml.v3"
 )
 
 var celMemberPrefix = regexp.MustCompile(`([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\.([A-Za-z_][A-Za-z0-9_]*)?$`)
@@ -68,36 +70,7 @@ func celMemberItems(text string, line, column int) ([]protocol.CompletionItem, b
 	}
 	patched := append([]string(nil), lines...)
 	patched[line-1] = current[:start] + marker + current[end:]
-	var docs []*parser.DocumentNode
-	var target *yaml.Node
-	// First preserve the entire document. If YAML is unfinished, try closing the
-	// current scalar and finally ignore incomplete text below the cursor line.
-	for _, truncate := range []bool{false, true} {
-		for _, quote := range []string{"", "'", "\""} {
-			candidate := append([]string(nil), patched...)
-			candidate[line-1] += quote
-			if truncate {
-				candidate = candidate[:line]
-			}
-			parsed, err := parser.ParseYAML([]byte(strings.Join(candidate, "\n")))
-			if err != nil {
-				continue
-			}
-			for _, doc := range parsed {
-				if n := scalarWithMarker(doc.Root, marker); n != nil {
-					docs = []*parser.DocumentNode{doc}
-					target = n
-					break
-				}
-			}
-			if target != nil {
-				break
-			}
-		}
-		if target != nil {
-			break
-		}
-	}
+	docs, target := celCompletionDocument(patched, line, marker)
 	if target == nil || !insideCELMember(target.Value, marker) {
 		return nil, false
 	}
@@ -191,19 +164,7 @@ func insideCELMember(value, marker string) bool {
 			continue
 		}
 		if quote != 0 {
-			if c == '\\' && !raw {
-				i++
-				continue
-			}
-			if c == quote {
-				if !triple {
-					quote = 0
-				} else if i+2 < stop && value[i+1] == quote && value[i+2] == quote {
-					quote = 0
-					triple = false
-					i += 2
-				}
-			}
+			i, quote, triple = consumeCELQuoted(value, i, stop, quote, triple, raw)
 			continue
 		}
 		if c == '/' && i+1 < stop && value[i+1] == '/' {
@@ -228,4 +189,54 @@ func insideCELMember(value, marker string) bool {
 		}
 	}
 	return depth > 0 && quote == 0 && !comment
+}
+
+func celCompletionDocument(patched []string, line int, marker string) ([]*parser.DocumentNode, *yaml.Node) {
+	var docs []*parser.DocumentNode
+	var target *yaml.Node
+	// First preserve the entire document. If YAML is unfinished, try closing the
+	// current scalar and finally ignore incomplete text below the cursor line.
+	for _, truncate := range []bool{false, true} {
+		for _, quote := range []string{"", "'", "\""} {
+			candidate := append([]string(nil), patched...)
+			candidate[line-1] += quote
+			if truncate {
+				candidate = candidate[:line]
+			}
+			parsed, err := parser.ParseYAML([]byte(strings.Join(candidate, "\n")))
+			if err != nil {
+				continue
+			}
+			for _, doc := range parsed {
+				if n := scalarWithMarker(doc.Root, marker); n != nil {
+					docs = []*parser.DocumentNode{doc}
+					target = n
+					break
+				}
+			}
+			if target != nil {
+				break
+			}
+		}
+		if target != nil {
+			break
+		}
+	}
+	return docs, target
+}
+
+func consumeCELQuoted(value string, i, stop int, quote byte, triple, raw bool) (int, byte, bool) {
+	if value[i] == '\\' && !raw {
+		return i + 1, quote, triple
+	}
+	if value[i] != quote {
+		return i, quote, triple
+	}
+	if !triple {
+		return i, 0, triple
+	}
+	if i+2 < stop && value[i+1] == quote && value[i+2] == quote {
+		return i + 2, 0, false
+	}
+	return i, quote, triple
 }

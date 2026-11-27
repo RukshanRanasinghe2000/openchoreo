@@ -28,9 +28,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/openchoreo/openchoreo/internal/occ/cmd/config"
-	"github.com/openchoreo/openchoreo/internal/occ/testutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -40,6 +37,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
+
+	"github.com/openchoreo/openchoreo/internal/occ/cmd/config"
+	"github.com/openchoreo/openchoreo/internal/occ/testutil"
 	"github.com/openchoreo/openchoreo/tools/lint/templateconfig"
 )
 

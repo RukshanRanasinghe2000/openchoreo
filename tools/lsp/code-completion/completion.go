@@ -83,13 +83,13 @@ func HandleWithIndex(text string, cursorLine, cursorCol int, idx ResourceIndexer
 	}
 	docs, err := parser.ParseYAML([]byte(text))
 	if err != nil || len(docs) == 0 {
-		return completionFromText(text, cursorLine, cursorCol, idx)
+		return completionFromText(text, cursorLine, cursorCol)
 	}
-	return completionFromAST(docs[0], cursorLine, cursorCol, idx)
+	return completionFromAST(docs[0], cursorLine, cursorCol)
 }
 
 // completionFromAST generates completions from a successfully parsed document.
-func completionFromAST(doc *parser.DocumentNode, cursorLine, cursorCol int, idx ResourceIndexer) (any, error) {
+func completionFromAST(doc *parser.DocumentNode, cursorLine, cursorCol int) (any, error) {
 	schemaRoot := template.SchemaFor(doc.Kind)
 	if schemaRoot == nil {
 		// The document parsed but the resource kind isn't known yet (e.g. an
@@ -99,7 +99,7 @@ func completionFromAST(doc *parser.DocumentNode, cursorLine, cursorCol int, idx 
 		if doc.Source != nil {
 			text = string(doc.Source)
 		}
-		return completionFromText(text, cursorLine, cursorCol, idx)
+		return completionFromText(text, cursorLine, cursorCol)
 	}
 
 	text := ""
@@ -107,7 +107,7 @@ func completionFromAST(doc *parser.DocumentNode, cursorLine, cursorCol int, idx 
 		text = string(doc.Source)
 	}
 	ctx := resolveContext(text, cursorLine, cursorCol)
-	items := suggest(ctx, schemaRoot, idx)
+	items := suggest(ctx, schemaRoot)
 
 	if ctx.mode == modeFields || ctx.mode == modeArrayItem {
 		items = filterExistingItems(items, existingKeysInBlock(text, cursorLine))
@@ -118,7 +118,7 @@ func completionFromAST(doc *parser.DocumentNode, cursorLine, cursorCol int, idx 
 
 // completionFromText generates completions by analyzing raw text when YAML
 // parsing fails or the resource kind is unresolved.
-func completionFromText(text string, cursorLine, cursorCol int, idx ResourceIndexer) (any, error) {
+func completionFromText(text string, cursorLine, cursorCol int) (any, error) {
 	kind := extractKindFromText(text)
 	if kind != "" {
 		schemaRoot := template.SchemaFor(kind)
@@ -126,7 +126,7 @@ func completionFromText(text string, cursorLine, cursorCol int, idx ResourceInde
 			return protocol.CompletionList{IsIncomplete: false, Items: nil}, nil
 		}
 		ctx := resolveContext(text, cursorLine, cursorCol)
-		items := suggest(ctx, schemaRoot, idx)
+		items := suggest(ctx, schemaRoot)
 		if ctx.mode == modeFields || ctx.mode == modeArrayItem {
 			items = filterExistingItems(items, existingKeysInBlock(text, cursorLine))
 		}
@@ -167,7 +167,7 @@ func completionFromText(text string, cursorLine, cursorCol int, idx ResourceInde
 	// slot of a partially typed root key.
 	ctx := resolveContext(text, cursorLine, cursorCol)
 	if ctx.mode == modeValue && ctx.field != "" {
-		items := suggest(ctx, rootSchema, idx)
+		items := suggest(ctx, rootSchema)
 		return protocol.CompletionList{IsIncomplete: false, Items: items}, nil
 	}
 
@@ -344,7 +344,7 @@ func existingKeysInBlock(text string, cursorLine int) map[string]bool {
 // the kind's schema. It only surfaces what the schema declares (fields from
 // properties, values from enum/default, reference names from the index) —
 // nothing is invented.
-func suggest(ctx completionContext, root *schema.FieldSchema, idx ResourceIndexer) []protocol.CompletionItem {
+func suggest(ctx completionContext, root *schema.FieldSchema) []protocol.CompletionItem {
 	switch ctx.mode {
 	case modeValue:
 		node := schema.FindSchema(root, ctx.path)

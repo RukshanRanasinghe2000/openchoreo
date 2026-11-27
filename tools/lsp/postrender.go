@@ -158,7 +158,7 @@ func (s *Server) ExecuteCommand(
 			return nil, e
 		}
 		project = &renderingProjectScope{}
-		if e = json.Unmarshal(raw, project); e != nil {
+		if e := json.Unmarshal(raw, project); e != nil {
 			return nil, e
 		}
 		project.ActiveURI = uri
@@ -226,32 +226,7 @@ func (s *Server) runPostRenderValidation(uri string, scopes ...*renderingProject
 		schemaOverlays[path] = []byte(text)
 	}
 	schemaScope := s.freshTargetSchemaScope(uri, schemaOverlays)
-	var sources []renderingSource
-	for _, path := range files {
-		text, ok := overlays[pathutil.PathKey(path)]
-		if !ok {
-			data, exists := schemaScope.Content(path)
-			var e error
-			if !exists {
-				data, e = os.ReadFile(path)
-			}
-			if e != nil {
-				continue
-			}
-			text = string(data)
-		}
-		if !parser.HasOpenChoreoAPIVersion([]byte(text)) {
-			continue
-		}
-		docs, e := parser.ParseYAML([]byte(text))
-		if e != nil {
-			sources = append(sources, renderingSource{URI: pathToDocumentURI(path), Text: text, Err: e})
-			continue
-		}
-		for _, doc := range docs {
-			sources = append(sources, renderingSource{URI: pathToDocumentURI(path), Text: text, Doc: doc})
-		}
-	}
+	sources := loadRenderingSources(files, overlays, schemaScope)
 	var project *renderingProjectScope
 	if len(scopes) > 0 {
 		project = scopes[0]
@@ -299,11 +274,11 @@ func (s *Server) runPostRenderValidation(uri string, scopes ...*renderingProject
 			if d.Severity != nil {
 				switch *d.Severity {
 				case protocol.DiagnosticSeverityWarning:
-					severity = "warning"
+					severity = severityWarning
 				case protocol.DiagnosticSeverityInformation:
-					severity = "info"
+					severity = severityInfo
 				case protocol.DiagnosticSeverityHint:
-					severity = "hint"
+					severity = severityHint
 				}
 			}
 			findings = append(findings, postrendervalidator.Finding{Path: path, Code: code, Severity: severity, Message: d.Message, Line: int(d.Range.Start.Line) + 1, Column: int(d.Range.Start.Character) + 1})
@@ -448,7 +423,7 @@ func (s *Server) publishPostRenderFindings(
 		switch finding.Severity {
 		case valueError:
 			errors++
-		case "warning":
+		case severityWarning:
 			warnings++
 		}
 		details = append(details, formatPostRenderFinding(finding))
@@ -527,9 +502,9 @@ func postRenderDiagnostic(finding postrendervalidator.Finding) protocol.Diagnost
 	switch finding.Severity {
 	case valueError:
 		severity = protocol.DiagnosticSeverityError
-	case "info":
+	case severityInfo:
 		severity = protocol.DiagnosticSeverityInformation
-	case "hint":
+	case severityHint:
 		severity = protocol.DiagnosticSeverityHint
 	}
 	message := finding.Message
@@ -566,7 +541,7 @@ func (s *Server) documentText(uri string) (string, bool) {
 		return doc.Text, true
 	}
 	parsed, err := url.Parse(uri)
-	if err != nil || parsed.Scheme != "file" {
+	if err != nil || parsed.Scheme != uriSchemeFile {
 		return "", false
 	}
 	data, err := os.ReadFile(fileURIToPath(uri))
@@ -691,4 +666,34 @@ func uniqueManualFindings(findings []postrendervalidator.Finding) []postrenderva
 		}
 	}
 	return out
+}
+
+func loadRenderingSources(files []string, overlays map[string]string, schemaScope *targetschema.Scope) []renderingSource {
+	var sources []renderingSource
+	for _, path := range files {
+		text, ok := overlays[pathutil.PathKey(path)]
+		if !ok {
+			data, exists := schemaScope.Content(path)
+			var e error
+			if !exists {
+				data, e = os.ReadFile(path)
+			}
+			if e != nil {
+				continue
+			}
+			text = string(data)
+		}
+		if !parser.HasOpenChoreoAPIVersion([]byte(text)) {
+			continue
+		}
+		docs, e := parser.ParseYAML([]byte(text))
+		if e != nil {
+			sources = append(sources, renderingSource{URI: pathToDocumentURI(path), Text: text, Err: e})
+			continue
+		}
+		for _, doc := range docs {
+			sources = append(sources, renderingSource{URI: pathToDocumentURI(path), Text: text, Doc: doc})
+		}
+	}
+	return sources
 }

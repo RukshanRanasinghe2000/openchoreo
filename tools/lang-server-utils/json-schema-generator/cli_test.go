@@ -15,6 +15,8 @@ import (
 	"testing"
 )
 
+const testTemplateV130 = "v1.3.0"
+
 func TestGeneratorCLI(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "working directory with spaces")
 	if err := os.MkdirAll(root, 0o755); err != nil {
@@ -34,7 +36,7 @@ func TestGeneratorCLI(t *testing.T) {
 		if err := os.MkdirAll(filepath.Dir(name), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(name, []byte(content), 0o644); err != nil {
+		if err := os.WriteFile(name, []byte(content), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -82,7 +84,7 @@ func TestGeneratorCLI(t *testing.T) {
 		return files
 	}
 	first := snapshot()
-	for _, version := range []string{"v1.2.0", "v1.3.0"} {
+	for _, version := range []string{"v1.2.0", testTemplateV130} {
 		name := filepath.Join(root, "generated schemas", "template-"+version, "project_minimal_defi.json")
 		var schema Field
 		if err := json.Unmarshal(first[name], &schema); err != nil {
@@ -104,7 +106,7 @@ func TestGeneratorCLI(t *testing.T) {
 	if err := json.Unmarshal(first[manifest], &got); err != nil {
 		t.Fatal(err)
 	}
-	if got.Latest != "v1.3.0" || !reflect.DeepEqual(got.Versions, []string{"v1.2.0", "v1.3.0"}) {
+	if got.Latest != testTemplateV130 || !reflect.DeepEqual(got.Versions, []string{"v1.2.0", testTemplateV130}) {
 		t.Fatalf("invalid manifest: %+v", got)
 	}
 	run(true, "--config", filepath.Join("configs with spaces", "generator.json"))

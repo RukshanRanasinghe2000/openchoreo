@@ -1,5 +1,6 @@
 // Copyright 2026 The OpenChoreo Authors
 // SPDX-License-Identifier: Apache-2.0
+
 package lsp
 
 import (
@@ -10,10 +11,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/openchoreo/openchoreo/tools/lint/indexer"
-	"github.com/openchoreo/openchoreo/tools/lint/parser"
 	"github.com/tliron/glsp"
 	"gopkg.in/yaml.v3"
+
+	"github.com/openchoreo/openchoreo/tools/lint/indexer"
+	"github.com/openchoreo/openchoreo/tools/lint/parser"
 )
 
 type clusterSchema struct {

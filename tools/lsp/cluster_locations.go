@@ -1,5 +1,6 @@
 // Copyright 2026 The OpenChoreo Authors
 // SPDX-License-Identifier: Apache-2.0
+
 package lsp
 
 import (
@@ -10,12 +11,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/openchoreo/openchoreo/tools/lint/indexer"
-	"github.com/openchoreo/openchoreo/tools/lint/parser"
-	codedefinition "github.com/openchoreo/openchoreo/tools/lsp/code-definition"
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 	"gopkg.in/yaml.v3"
+
+	"github.com/openchoreo/openchoreo/tools/lint/indexer"
+	"github.com/openchoreo/openchoreo/tools/lint/parser"
+	codedefinition "github.com/openchoreo/openchoreo/tools/lsp/code-definition"
 )
 
 const resourceLocationsMethod = "openchoreo/updateResourceLocations"
@@ -62,28 +64,8 @@ func (c *clusterLocations) update(data []byte) error {
 			return fmt.Errorf("invalid complete resource kind")
 		}
 	}
-	for _, r := range next.Resources {
-		u, err := url.Parse(r.URI)
-		if err != nil || u.Scheme != "openchoreo" || u.Host == "" || next.ContextID == nil || u.Host != *next.ContextID || u.User != nil || u.Fragment != "" || r.Kind == "" || r.Name == "" {
-			return fmt.Errorf("invalid resource location identity")
-		}
-		parts := strings.Split(strings.Trim(u.Path, "/"), "/")
-		if r.Namespace != "" {
-			if len(parts) != 4 || parts[0] != "namespaces" || parts[1] != r.Namespace {
-				return fmt.Errorf("location namespace mismatch")
-			}
-		} else if len(parts) != 2 {
-			return fmt.Errorf("invalid cluster location path")
-		}
-		if !strings.HasSuffix(u.Path, "/"+r.Name+".yaml") {
-			return fmt.Errorf("location name mismatch")
-		}
-		if r.Range != nil {
-			a, b := r.Range.Start, r.Range.End
-			if a.Line > 2147483647 || b.Line > 2147483647 || a.Character > 2147483647 || b.Character > 2147483647 || b.Line < a.Line || (b.Line == a.Line && b.Character < a.Character) {
-				return fmt.Errorf("invalid location range")
-			}
-		}
+	if err := validateClusterLocations(next); err != nil {
+		return err
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -115,10 +97,10 @@ func (d *definitionIndex) FindAllKinds() []string {
 		seen[r.Kind] = true
 	}
 	// Infer standard reference kinds even when their target is missing locally.
-	for _, k := range []string{"ComponentType", "ClusterComponentType", "Trait", "ClusterTrait", "Workflow", "ClusterWorkflow", "Project", "Component", "ResourceType", "ClusterResourceType", "ProjectType", "ClusterProjectType", "ComponentRelease", "ResourceRelease", "ProjectRelease"} {
+	for _, k := range []string{"ComponentType", "ClusterComponentType", "Trait", "ClusterTrait", "Workflow", "ClusterWorkflow", kindProject, kindComponent, "ResourceType", "ClusterResourceType", "ProjectType", "ClusterProjectType", kindComponentRelease, "ResourceRelease", "ProjectRelease"} {
 		seen[k] = true
 	}
-	var out []string
+	out := make([]string, 0, len(seen))
 	for k := range seen {
 		out = append(out, k)
 	}
@@ -173,73 +155,17 @@ func (d *definitionIndex) FindScopedDefinition(kind, namespace, name, _ string) 
 	namespace = indexer.NamespaceOrDefault(namespace)
 	d.server.logger.Debug("definition reference", "kind", kind, "name", name, "namespace", namespace, "component", d.component)
 	normalized := indexer.ReferenceName(kind, name)
-	var local []indexer.Location
-	for _, entry := range d.documents {
-		doc := entry.Document
-		if doc.Kind != kind || (name != "" && doc.Metadata.Name != normalized) || (!strings.HasPrefix(kind, "Cluster") && indexer.NamespaceOrDefault(doc.Metadata.Namespace) != namespace) {
-			continue
-		}
-		if normalized != name && scalarAt(doc.Spec, "workloadType") != strings.Split(name, "/")[0] {
-			continue
-		}
-		if d.component != "" && kind == "ComponentRelease" && scalarAt(doc.Spec, "owner", "componentName") != d.component {
-			continue
-		}
-		local = append(local, d.localLocation(entry))
-	}
+	local := d.localDefinitions(kind, namespace, name, normalized)
 	if len(local) > 0 {
 		return local
 	}
-	source, _ := url.Parse(d.source)
-	if d.snapshot.ContextID == nil || (source.Scheme == "openchoreo" && source.Host != *d.snapshot.ContextID) {
-		return nil
-	}
-	var remote []indexer.Location
-	seen := map[string]bool{}
-	for _, r := range d.snapshot.Resources {
-		if r.Kind != kind || (name != "" && r.Name != normalized) || (r.Namespace != "" && r.Namespace != namespace) {
-			continue
-		}
-		if normalized != name && r.WorkloadType != strings.Split(name, "/")[0] {
-			continue
-		}
-		if d.component != "" && kind == "ComponentRelease" && r.ComponentName != d.component {
-			continue
-		}
-		if seen[r.URI] {
-			continue
-		}
-		seen[r.URI] = true
-		start := protocol.Position{}
-		if r.Range != nil {
-			start = r.Range.Start
-		}
-		if open := d.server.GetDocument(r.URI); open != nil {
-			if docs, err := parser.ParseYAML([]byte(open.Text)); err == nil {
-				for _, doc := range docs {
-					if doc.Kind == kind && doc.Metadata.Name == r.Name && doc.Metadata.Node != nil {
-						start = protocol.Position{Line: protocol.UInteger(doc.Metadata.Node.Line - 1), Character: protocol.UInteger(doc.Metadata.Node.Column - 1)}
-					}
-				}
-			}
-		}
-		rng := protocol.Range{Start: start, End: start}
-		if r.Range != nil {
-			rng = *r.Range
-		}
-		if open := d.server.GetDocument(r.URI); open != nil {
-			rng = protocol.Range{Start: start, End: start}
-		}
-		d.ranges[r.URI] = rng
-		remote = append(remote, indexer.Location{URI: r.URI, Line: int(start.Line) + 1, Column: int(start.Character) + 1})
-	}
-	return remote
+	return d.remoteDefinitions(kind, namespace, name, normalized)
 }
 
-func (s *Server) definitionLocations(ctx *glsp.Context, p *protocol.DefinitionParams) (any, error) {
+func (s *Server) definitionLocations(_ *glsp.Context, p *protocol.DefinitionParams) (any, error) {
 	uri := p.TextDocument.URI
 	u, err := url.Parse(uri)
-	if err != nil || (u.Scheme != "file" && u.Scheme != "openchoreo") {
+	if err != nil || (u.Scheme != uriSchemeFile && u.Scheme != uriSchemeOpenChoreo) {
 		return nil, nil
 	}
 	doc := s.GetDocument(uri)
@@ -255,9 +181,9 @@ func (s *Server) definitionLocations(ctx *glsp.Context, p *protocol.DefinitionPa
 		return nil, nil
 	}
 	namespace := indexer.NamespaceOrDefault(source.Metadata.Namespace)
-	if u.Scheme == "openchoreo" {
+	if u.Scheme == uriSchemeOpenChoreo {
 		parts := strings.Split(strings.Trim(u.Path, "/"), "/")
-		if len(parts) == 4 && parts[0] == "namespaces" {
+		if len(parts) == 4 && parts[0] == uriNamespaces {
 			if source.Metadata.Namespace != "" && source.Metadata.Namespace != parts[1] {
 				return nil, nil
 			}
@@ -267,13 +193,13 @@ func (s *Server) definitionLocations(ctx *glsp.Context, p *protocol.DefinitionPa
 	s.locations.mu.RLock()
 	snapshot := s.locations.snapshot
 	s.locations.mu.RUnlock()
-	if u.Scheme == "openchoreo" && (snapshot.ContextID == nil || u.Host != *snapshot.ContextID) {
+	if u.Scheme == uriSchemeOpenChoreo && (snapshot.ContextID == nil || u.Host != *snapshot.ContextID) {
 		return nil, nil
 	}
 	candidates := s.indexer.DefinitionSnapshot(uri)
 	local := make([]indexer.SnapshotDocument, 0, len(candidates))
 	for _, entry := range candidates {
-		if target, e := url.Parse(entry.URI); e == nil && target.Scheme == "file" {
+		if target, e := url.Parse(entry.URI); e == nil && target.Scheme == uriSchemeFile {
 			local = append(local, entry)
 		}
 	}
@@ -296,4 +222,96 @@ func (s *Server) definitionLocations(ctx *glsp.Context, p *protocol.DefinitionPa
 	}
 	s.logger.Debug("definition result", "uri", uri, "locations", result)
 	return result, nil
+}
+
+func validateClusterLocations(next locationSnapshot) error {
+	for _, r := range next.Resources {
+		u, err := url.Parse(r.URI)
+		if err != nil || u.Scheme != uriSchemeOpenChoreo || u.Host == "" || next.ContextID == nil || u.Host != *next.ContextID || u.User != nil || u.Fragment != "" || r.Kind == "" || r.Name == "" {
+			return fmt.Errorf("invalid resource location identity")
+		}
+		parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+		if r.Namespace != "" {
+			if len(parts) != 4 || parts[0] != uriNamespaces || parts[1] != r.Namespace {
+				return fmt.Errorf("location namespace mismatch")
+			}
+		} else if len(parts) != 2 {
+			return fmt.Errorf("invalid cluster location path")
+		}
+		if !strings.HasSuffix(u.Path, "/"+r.Name+".yaml") {
+			return fmt.Errorf("location name mismatch")
+		}
+		if r.Range != nil {
+			a, b := r.Range.Start, r.Range.End
+			if a.Line > 2147483647 || b.Line > 2147483647 || a.Character > 2147483647 || b.Character > 2147483647 || b.Line < a.Line || (b.Line == a.Line && b.Character < a.Character) {
+				return fmt.Errorf("invalid location range")
+			}
+		}
+	}
+	return nil
+}
+
+func (d *definitionIndex) localDefinitions(kind, namespace, name, normalized string) []indexer.Location {
+	var local []indexer.Location
+	for _, entry := range d.documents {
+		doc := entry.Document
+		if doc.Kind != kind || (name != "" && doc.Metadata.Name != normalized) || (!strings.HasPrefix(kind, "Cluster") && indexer.NamespaceOrDefault(doc.Metadata.Namespace) != namespace) {
+			continue
+		}
+		if normalized != name && scalarAt(doc.Spec, "workloadType") != strings.Split(name, "/")[0] {
+			continue
+		}
+		if d.component != "" && kind == kindComponentRelease && scalarAt(doc.Spec, "owner", "componentName") != d.component {
+			continue
+		}
+		local = append(local, d.localLocation(entry))
+	}
+	return local
+}
+
+func (d *definitionIndex) remoteDefinitions(kind, namespace, name, normalized string) []indexer.Location {
+	source, _ := url.Parse(d.source)
+	if d.snapshot.ContextID == nil || (source.Scheme == uriSchemeOpenChoreo && source.Host != *d.snapshot.ContextID) {
+		return nil
+	}
+	var remote []indexer.Location
+	seen := map[string]bool{}
+	for _, r := range d.snapshot.Resources {
+		if r.Kind != kind || (name != "" && r.Name != normalized) || (r.Namespace != "" && r.Namespace != namespace) {
+			continue
+		}
+		if normalized != name && r.WorkloadType != strings.Split(name, "/")[0] {
+			continue
+		}
+		if d.component != "" && kind == kindComponentRelease && r.ComponentName != d.component {
+			continue
+		}
+		if seen[r.URI] {
+			continue
+		}
+		seen[r.URI] = true
+		start := protocol.Position{}
+		if r.Range != nil {
+			start = r.Range.Start
+		}
+		if open := d.server.GetDocument(r.URI); open != nil {
+			if docs, err := parser.ParseYAML([]byte(open.Text)); err == nil {
+				for _, doc := range docs {
+					if doc.Kind == kind && doc.Metadata.Name == r.Name && doc.Metadata.Node != nil {
+						start = toLSPPosition(parser.Position{Line: doc.Metadata.Node.Line, Column: doc.Metadata.Node.Column})
+					}
+				}
+			}
+		}
+		rng := protocol.Range{Start: start, End: start}
+		if r.Range != nil {
+			rng = *r.Range
+		}
+		if open := d.server.GetDocument(r.URI); open != nil {
+			rng = protocol.Range{Start: start, End: start}
+		}
+		d.ranges[r.URI] = rng
+		remote = append(remote, indexer.Location{URI: r.URI, Line: int(start.Line) + 1, Column: int(start.Character) + 1})
+	}
+	return remote
 }

@@ -9,8 +9,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/openchoreo/openchoreo/internal/pathutil"
 	protocol "github.com/tliron/glsp/protocol_3_16"
+
+	"github.com/openchoreo/openchoreo/internal/pathutil"
 )
 
 func TestUnchangedWatchEventsPreservePlayFindings(t *testing.T) {

@@ -1,5 +1,6 @@
 // Copyright 2026 The OpenChoreo Authors
 // SPDX-License-Identifier: Apache-2.0
+
 package lsp
 
 import (
@@ -8,8 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/openchoreo/openchoreo/tools/lint/parser"
 	protocol "github.com/tliron/glsp/protocol_3_16"
+
+	"github.com/openchoreo/openchoreo/tools/lint/parser"
 )
 
 func projectSource(t *testing.T, uri, text string) renderingSource {
@@ -80,7 +82,6 @@ func TestClusterRenderingOnlyCurrentProject(t *testing.T) {
 	if result.Files != 3 {
 		t.Fatal("an unrelated editor affected the selected project")
 	}
-
 }
 func TestLocalRenderingOnlyCurrentProject(t *testing.T) {
 	s, r := clusterValidationFixture(t)

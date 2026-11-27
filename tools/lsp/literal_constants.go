@@ -4,5 +4,14 @@
 package lsp
 
 const (
-	valueError = "error"
+	valueError           = "error"
+	severityWarning      = "warning"
+	severityInfo         = "info"
+	severityHint         = "hint"
+	uriSchemeFile        = "file"
+	uriSchemeOpenChoreo  = "openchoreo"
+	uriNamespaces        = "namespaces"
+	kindProject          = "Project"
+	kindComponent        = "Component"
+	kindComponentRelease = "ComponentRelease"
 )

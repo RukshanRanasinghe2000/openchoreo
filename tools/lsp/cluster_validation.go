@@ -1,5 +1,6 @@
 // Copyright 2026 The OpenChoreo Authors
 // SPDX-License-Identifier: Apache-2.0
+
 package lsp
 
 import (
@@ -12,12 +13,13 @@ import (
 	"sync"
 	"unicode"
 
+	protocol "github.com/tliron/glsp/protocol_3_16"
+	"gopkg.in/yaml.v3"
+
 	"github.com/openchoreo/openchoreo/tools/lint/parser"
 	post "github.com/openchoreo/openchoreo/tools/lint/post-render-validator"
 	pre "github.com/openchoreo/openchoreo/tools/lint/pre-render-validator"
 	"github.com/openchoreo/openchoreo/tools/lint/targetschema"
-	protocol "github.com/tliron/glsp/protocol_3_16"
-	"gopkg.in/yaml.v3"
 )
 
 const clusterValidationCommand = "openchoreo.runClusterValidation"
@@ -84,32 +86,21 @@ func (s *Server) validateClusterSnapshot(r clusterValidationRequest) error {
 	seen := map[string]bool{}
 	identities := map[string]bool{}
 	for _, d := range r.Documents {
-		u, err := url.Parse(d.URI)
-		if err != nil || u.Scheme != "openchoreo" || u.Host != r.ContextID || u.User != nil || u.Fragment != "" || (u.RawQuery != "" && u.RawQuery != "readonly") {
-			return fmt.Errorf("invalid cluster validation resource URI")
-		}
-		parts := strings.Split(strings.Trim(u.Path, "/"), "/")
-		if !(len(parts) == 2 || len(parts) == 4 && parts[0] == "namespaces" && parts[1] == r.Namespace) || !strings.HasSuffix(u.Path, ".yaml") {
-			return fmt.Errorf("resource URI is outside the validation namespace")
+		parts, err := clusterValidationURI(r, d)
+		if err != nil {
+			return err
 		}
 		if seen[d.URI] {
 			return fmt.Errorf("duplicate resource URI in validation snapshot")
 		}
 		seen[d.URI] = true
-		if d.Version != nil && (*d.Version < math.MinInt32 || *d.Version > math.MaxInt32) {
-			return fmt.Errorf("invalid document version")
-		}
-		if open := s.GetDocument(d.URI); open != nil && (d.Version == nil || *d.Version != open.Version || d.Text != open.Text) {
-			return fmt.Errorf("Explorer document changed; run validation again")
-		}
-		docs, err := parser.ParseYAML([]byte(d.Text))
+		doc, err := s.clusterValidationDocument(d)
 		if err != nil {
-			continue
-		} // syntax errors are findings, not transport failures
-		if len(docs) != 1 || !parser.IsOpenChoreoAPIVersion(docs[0].APIVersion) {
-			return fmt.Errorf("cluster validation expects one OpenChoreo resource per URI")
+			return err
 		}
-		doc := docs[0]
+		if doc == nil {
+			continue
+		} // Syntax errors are findings, not transport failures.
 		identity := doc.Kind + "/" + doc.Metadata.Name
 		if identities[identity] {
 			return fmt.Errorf("duplicate resource identity in validation snapshot")
@@ -123,6 +114,35 @@ func (s *Server) validateClusterSnapshot(r clusterValidationRequest) error {
 	return nil
 }
 
+func clusterValidationURI(r clusterValidationRequest, d clusterValidationDocument) ([]string, error) {
+	u, err := url.Parse(d.URI)
+	if err != nil || u.Scheme != uriSchemeOpenChoreo || u.Host != r.ContextID || u.User != nil || u.Fragment != "" || (u.RawQuery != "" && u.RawQuery != "readonly") {
+		return nil, fmt.Errorf("invalid cluster validation resource URI")
+	}
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if !(len(parts) == 2 || len(parts) == 4 && parts[0] == uriNamespaces && parts[1] == r.Namespace) || !strings.HasSuffix(u.Path, ".yaml") {
+		return nil, fmt.Errorf("resource URI is outside the validation namespace")
+	}
+	return parts, nil
+}
+
+func (s *Server) clusterValidationDocument(d clusterValidationDocument) (*parser.DocumentNode, error) {
+	if d.Version != nil && (*d.Version < math.MinInt32 || *d.Version > math.MaxInt32) {
+		return nil, fmt.Errorf("invalid document version")
+	}
+	if open := s.GetDocument(d.URI); open != nil && (d.Version == nil || *d.Version != open.Version || d.Text != open.Text) {
+		return nil, fmt.Errorf("explorer document changed; run validation again")
+	}
+	docs, err := parser.ParseYAML([]byte(d.Text))
+	if err != nil {
+		return nil, nil
+	}
+	if len(docs) != 1 || !parser.IsOpenChoreoAPIVersion(docs[0].APIVersion) {
+		return nil, fmt.Errorf("cluster validation expects one OpenChoreo resource per URI")
+	}
+	return docs[0], nil
+}
+
 // Cluster rendering is an adapter around the same in-memory validation engines
 // used for local projects. The server performs no API requests or disk writes.
 func (s *Server) runClusterValidation(args []any) (any, error) {
@@ -134,47 +154,15 @@ func (s *Server) runClusterValidation(args []any) (any, error) {
 		return nil, err
 	}
 	var request clusterValidationRequest
-	if err = json.Unmarshal(raw, &request); err != nil {
+	if err := json.Unmarshal(raw, &request); err != nil {
 		return nil, err
 	}
-	if request.ProjectName != "" {
-		if request.ContextID == "" || request.Namespace == "" || request.Documents == nil || !s.clusterValidationContextCurrent(request) {
-			return nil, fmt.Errorf("cluster validation snapshot is stale or missing a context/namespace; refresh resources and retry")
-		}
-
-		var sources []renderingSource
-		for _, input := range request.Documents {
-			docs, e := parser.ParseYAML([]byte(input.Text))
-			if e != nil {
-				sources = append(sources, renderingSource{URI: input.URI, Text: input.Text, Err: e})
-				continue
-			}
-			for _, doc := range docs {
-				if !strings.HasPrefix(doc.Kind, "Cluster") && doc.Metadata.Namespace == "" {
-					setSnapshotNamespace(doc, request.Namespace)
-				}
-				sources = append(sources, renderingSource{URI: input.URI, Text: input.Text, Doc: doc})
-			}
-		}
-		chosen, e := selectRenderingProject(sources, &renderingProjectScope{ProjectName: request.ProjectName, Namespace: request.Namespace, ActiveURI: request.ActiveURI})
-		if e != nil {
-			s.invalidateClusterValidation("")
-			return nil, e
-		}
-		keep := map[string]bool{}
-		for _, source := range chosen {
-			keep[source.URI] = true
-		}
-		filtered := request.Documents[:0]
-		for _, input := range request.Documents {
-			if keep[input.URI] {
-				filtered = append(filtered, input)
-			}
-		}
-		request.Documents = filtered
+	request, err = s.selectClusterValidationProject(request)
+	if err != nil {
+		return nil, err
 	}
 
-	if err = s.validateClusterSnapshot(request); err != nil {
+	if err := s.validateClusterSnapshot(request); err != nil {
 		return nil, err
 	}
 	s.postRenderMu.Lock()
@@ -194,49 +182,7 @@ func (s *Server) runClusterValidation(args []any) (any, error) {
 	s.clusterValidation.mu.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), postRenderTimeout)
 	defer cancel()
-	var sources []post.SourceDocument
-	var resources []pre.Resource
-	var findings []post.Finding
-	components := 0
-	for _, d := range request.Documents {
-		docs, parseErr := parser.ParseYAML([]byte(d.Text))
-		if parseErr != nil {
-			findings = append(findings, post.Finding{Path: d.URI, Severity: valueError, Code: "yaml-parse-error", Message: parseErr.Error(), Line: 1, Column: 1})
-			continue
-		}
-		doc := docs[0]
-		if !strings.HasPrefix(doc.Kind, "Cluster") && doc.Metadata.Namespace == "" {
-			setSnapshotNamespace(doc, request.Namespace)
-		}
-		doc.ValidationContext = targetschema.WithResolver(doc.ValidationContext, targetschema.Default())
-		for _, diag := range validateDocs(docs) {
-			severity := valueError
-			if diag.Severity != nil {
-				switch *diag.Severity {
-				case protocol.DiagnosticSeverityWarning:
-					severity = "warning"
-				case protocol.DiagnosticSeverityInformation:
-					severity = "info"
-				case protocol.DiagnosticSeverityHint:
-					severity = "hint"
-				}
-			}
-			code := ""
-			if diag.Code != nil {
-				code = fmt.Sprint(diag.Code.Value)
-			}
-			findings = append(findings, post.Finding{Path: d.URI, Severity: severity, Code: code, Message: diag.Message, Line: int(diag.Range.Start.Line) + 1, Column: int(diag.Range.Start.Character) + 1})
-		}
-		resources = append(resources, pre.Resource{Path: d.URI, Document: doc})
-		sources = append(sources, post.SourceDocument{Path: d.URI, Document: doc})
-		if doc.Kind == "Component" {
-			components++
-		}
-	}
-	for _, f := range pre.ValidateDocuments(ctx, resources) {
-		findings = append(findings, post.Finding{Path: f.Path, Severity: string(f.Severity), Code: f.Code, Message: f.Message, Line: f.Line, Column: f.Column})
-	}
-	findings = uniqueManualFindings(append(findings, post.ValidateWorkspace(ctx, sources)...))
+	findings, components := clusterValidationFindings(ctx, request)
 	if ctx.Err() != nil {
 		return nil, fmt.Errorf("cluster validation timed out; no results were published")
 	}
@@ -273,7 +219,7 @@ func (s *Server) runClusterValidation(args []any) (any, error) {
 		byURI[f.Path] = append(byURI[f.Path], diag)
 		if f.Severity == valueError {
 			result.Errors++
-		} else if f.Severity == "warning" {
+		} else if f.Severity == severityWarning {
 			result.Warnings++
 		}
 		result.Details = append(result.Details, fmt.Sprintf("%s:%d:%d: %s: %s", f.Path, f.Line, f.Column, f.Severity, f.Message))
@@ -337,4 +283,92 @@ func clusterResourceURIType(kind string) string {
 		result.WriteRune(unicode.ToLower(r))
 	}
 	return result.String()
+}
+
+func (s *Server) selectClusterValidationProject(request clusterValidationRequest) (clusterValidationRequest, error) {
+	if request.ProjectName == "" {
+		return request, nil
+	}
+	if request.ContextID == "" || request.Namespace == "" || request.Documents == nil || !s.clusterValidationContextCurrent(request) {
+		return request, fmt.Errorf("cluster validation snapshot is stale or missing a context/namespace; refresh resources and retry")
+	}
+
+	var sources []renderingSource
+	for _, input := range request.Documents {
+		docs, e := parser.ParseYAML([]byte(input.Text))
+		if e != nil {
+			sources = append(sources, renderingSource{URI: input.URI, Text: input.Text, Err: e})
+			continue
+		}
+		for _, doc := range docs {
+			if !strings.HasPrefix(doc.Kind, "Cluster") && doc.Metadata.Namespace == "" {
+				setSnapshotNamespace(doc, request.Namespace)
+			}
+			sources = append(sources, renderingSource{URI: input.URI, Text: input.Text, Doc: doc})
+		}
+	}
+	chosen, e := selectRenderingProject(sources, &renderingProjectScope{ProjectName: request.ProjectName, Namespace: request.Namespace, ActiveURI: request.ActiveURI})
+	if e != nil {
+		s.invalidateClusterValidation("")
+		return request, e
+	}
+	keep := map[string]bool{}
+	for _, source := range chosen {
+		keep[source.URI] = true
+	}
+	filtered := request.Documents[:0]
+	for _, input := range request.Documents {
+		if keep[input.URI] {
+			filtered = append(filtered, input)
+		}
+	}
+	request.Documents = filtered
+	return request, nil
+}
+
+func clusterValidationFindings(ctx context.Context, request clusterValidationRequest) ([]post.Finding, int) {
+	var sources []post.SourceDocument
+	var resources []pre.Resource
+	var findings []post.Finding
+	components := 0
+	for _, d := range request.Documents {
+		docs, parseErr := parser.ParseYAML([]byte(d.Text))
+		if parseErr != nil {
+			findings = append(findings, post.Finding{Path: d.URI, Severity: valueError, Code: "yaml-parse-error", Message: parseErr.Error(), Line: 1, Column: 1})
+			continue
+		}
+		doc := docs[0]
+		if !strings.HasPrefix(doc.Kind, "Cluster") && doc.Metadata.Namespace == "" {
+			setSnapshotNamespace(doc, request.Namespace)
+		}
+		doc.ValidationContext = targetschema.WithResolver(doc.ValidationContext, targetschema.Default())
+		for _, diag := range validateDocs(docs) {
+			severity := valueError
+			if diag.Severity != nil {
+				switch *diag.Severity {
+				case protocol.DiagnosticSeverityWarning:
+					severity = severityWarning
+				case protocol.DiagnosticSeverityInformation:
+					severity = severityInfo
+				case protocol.DiagnosticSeverityHint:
+					severity = severityHint
+				}
+			}
+			code := ""
+			if diag.Code != nil {
+				code = fmt.Sprint(diag.Code.Value)
+			}
+			findings = append(findings, post.Finding{Path: d.URI, Severity: severity, Code: code, Message: diag.Message, Line: int(diag.Range.Start.Line) + 1, Column: int(diag.Range.Start.Character) + 1})
+		}
+		resources = append(resources, pre.Resource{Path: d.URI, Document: doc})
+		sources = append(sources, post.SourceDocument{Path: d.URI, Document: doc})
+		if doc.Kind == kindComponent {
+			components++
+		}
+	}
+	for _, f := range pre.ValidateDocuments(ctx, resources) {
+		findings = append(findings, post.Finding{Path: f.Path, Severity: string(f.Severity), Code: f.Code, Message: f.Message, Line: f.Line, Column: f.Column})
+	}
+	findings = uniqueManualFindings(append(findings, post.ValidateWorkspace(ctx, sources)...))
+	return findings, components
 }

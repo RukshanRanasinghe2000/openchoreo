@@ -10,11 +10,12 @@ import (
 	"strings"
 	"unicode/utf16"
 
+	protocol "github.com/tliron/glsp/protocol_3_16"
+	"gopkg.in/yaml.v3"
+
 	"github.com/openchoreo/openchoreo/tools/lint/indexer"
 	"github.com/openchoreo/openchoreo/tools/lint/parser"
 	lsputil "github.com/openchoreo/openchoreo/tools/lsp/lsp-util"
-	protocol "github.com/tliron/glsp/protocol_3_16"
-	"gopkg.in/yaml.v3"
 )
 
 const missingReferenceCode = "unresolved-resource-reference"
@@ -32,7 +33,7 @@ type resourceReference struct {
 // after a successful, complete list of the corresponding kind.
 func (s *Server) referenceChecks(uri, text string) []resourceReference {
 	u, err := url.Parse(uri)
-	if err != nil || (u.Scheme != "file" && u.Scheme != "openchoreo") || !parser.HasOpenChoreoAPIVersion([]byte(text)) {
+	if err != nil || (u.Scheme != uriSchemeFile && u.Scheme != uriSchemeOpenChoreo) || !parser.HasOpenChoreoAPIVersion([]byte(text)) {
 		return nil
 	}
 	docs, err := parser.ParseYAML([]byte(text))
@@ -46,7 +47,7 @@ func (s *Server) referenceChecks(uri, text string) []resourceReference {
 	s.cluster.mu.RLock()
 	clusterStarted := s.cluster.names != nil || s.cluster.schemas != nil
 	s.cluster.mu.RUnlock()
-	if u.Scheme == "openchoreo" && (snapshot.ContextID == nil || *snapshot.ContextID != u.Host) {
+	if u.Scheme == uriSchemeOpenChoreo && (snapshot.ContextID == nil || *snapshot.ContextID != u.Host) {
 		return nil
 	}
 	var local []indexer.SnapshotDocument
@@ -61,9 +62,9 @@ func (s *Server) referenceChecks(uri, text string) []resourceReference {
 			continue
 		}
 		namespace := indexer.NamespaceOrDefault(doc.Metadata.Namespace)
-		if u.Scheme == "openchoreo" {
+		if u.Scheme == uriSchemeOpenChoreo {
 			parts := strings.Split(strings.Trim(u.Path, "/"), "/")
-			if len(parts) == 4 && parts[0] == "namespaces" {
+			if len(parts) == 4 && parts[0] == uriNamespaces {
 				if doc.Metadata.Namespace != "" && doc.Metadata.Namespace != parts[1] {
 					continue
 				}
@@ -81,104 +82,15 @@ func (s *Server) referenceChecks(uri, text string) []resourceReference {
 			}
 			return kinds[i] < kinds[j]
 		})
-		var walk func(*yaml.Node, string)
-		walk = func(n *yaml.Node, field string) {
-			if n == nil {
-				return
-			}
-			if n.Kind == yaml.SequenceNode {
-				for _, child := range n.Content {
-					walk(child, field)
-				}
-				return
-			}
-			if n.Kind != yaml.MappingNode {
-				return
-			}
-			for i := 0; i+1 < len(n.Content); i += 2 {
-				key, v := n.Content[i].Value, n.Content[i+1]
-				switch key {
-				case "template", "parameters", "environmentConfigs", "metadata":
-					continue
-				}
-				if (key == "name" || key == "releaseName" || key == "resourceRelease" || key == "projectRelease") && v.Kind == yaml.ScalarNode && v.Tag == "!!str" && v.Value != "" && !strings.Contains(v.Value, "${") && !strings.ContainsAny(v.Value, "\n\r") && v.Style&(yaml.LiteralStyle|yaml.FoldedStyle) == 0 {
-					kind := map[string]string{"releaseName": "ComponentRelease", "resourceRelease": "ResourceRelease", "projectRelease": "ProjectRelease"}[key]
-					if sibling := lsputil.FindSiblingKey(n, "kind"); sibling != nil {
-						kind = sibling.Value
-					}
-					if kind == "" {
-						kind = lsputil.FindKindByFieldName(field, kinds)
-					}
-					known := false
-					for _, k := range kinds {
-						if kind == k {
-							known = true
-							break
-						}
-					}
-					if known {
-						rng, valid := referenceValueRange(text, v)
-						if !valid {
-							continue
-						}
-						r := resourceReference{kind: kind, name: v.Value, rng: rng}
-						ready := !clusterStarted && !locationsStarted && snapshot.ContextID == nil && u.Scheme == "file" && s.indexer.HasWorkspace(uri)
-						if ready && s.initialIndexStarted {
-							select {
-							case <-s.indexDone:
-							default:
-								ready = false
-							}
-						}
-						for _, k := range snapshot.CompleteKinds {
-							if k == kind && snapshot.ContextID != nil && (strings.HasPrefix(kind, "Cluster") || snapshot.Namespace != nil && *snapshot.Namespace == namespace) {
-								ready = true
-							}
-						}
-						r.overrideLegacy = ready || clusterStarted || locationsStarted
-						r.missing = ready && len(idx.FindScopedDefinition(kind, namespace, v.Value, uri)) == 0
-						seen := map[string]bool{}
-						add := func(name, workload string) {
-							if strings.Contains(kind, "ComponentType") && workload != "" {
-								name = workload + "/" + name
-							}
-							if !seen[name] {
-								seen[name] = true
-								r.candidates = append(r.candidates, name)
-							}
-						}
-						for _, d := range local {
-							if d.Document.Kind != kind || (!strings.HasPrefix(kind, "Cluster") && indexer.NamespaceOrDefault(d.Document.Metadata.Namespace) != namespace) {
-								continue
-							}
-							if kind == "ComponentRelease" && idx.component != "" && scalarAt(d.Document.Spec, "owner", "componentName") != idx.component {
-								continue
-							}
-							add(d.Document.Metadata.Name, scalarAt(d.Document.Spec, "workloadType"))
-						}
-						if snapshot.ContextID != nil {
-							for _, target := range snapshot.Resources {
-								if target.Kind != kind || target.Namespace != "" && target.Namespace != namespace || kind == "ComponentRelease" && idx.component != "" && target.ComponentName != idx.component {
-									continue
-								}
-								add(target.Name, target.WorkloadType)
-							}
-						}
-						out = append(out, r)
-					}
-				}
-				walk(v, key)
-			}
-		}
-		walk(doc.Spec, "spec")
+		out = append(out, s.walkReferenceChecks(text, doc.Spec, "spec", idx, kinds, clusterStarted, locationsStarted)...)
 	}
 	return out
 }
 
 func referenceValueRange(text string, n *yaml.Node) (protocol.Range, bool) {
 	lines := strings.Split(text, "\n")
-	line := max(n.Line-1, 0)
-	col := max(n.Column-1, 0)
+	line := max(n.Line, 1) - 1
+	col := max(n.Column, 1) - 1
 	// yaml.v3 columns count Unicode code points, LSP columns count UTF-16 units.
 	offset := 0
 	if line < len(lines) {
@@ -215,7 +127,7 @@ func referenceValueRange(text string, n *yaml.Node) (protocol.Range, bool) {
 			return protocol.Range{}, false
 		}
 	}
-	return protocol.Range{Start: protocol.Position{Line: uint32(line), Character: uint32(offset)}, End: protocol.Position{Line: uint32(line), Character: uint32(offset + width)}}, true
+	return protocol.Range{Start: protocol.Position{Line: lsputil.PositionIndex(line), Character: lsputil.PositionIndex(offset)}, End: protocol.Position{Line: lsputil.PositionIndex(line), Character: lsputil.PositionIndex(offset + width)}}, true
 }
 
 // Legacy ranges may include an opening quote; match only this scalar, not
@@ -226,7 +138,7 @@ func replacesLegacyReference(d protocol.Diagnostic, r resourceReference) bool {
 
 func referenceDiagnostic(r resourceReference) protocol.Diagnostic {
 	severity := protocol.DiagnosticSeverityError
-	return protocol.Diagnostic{Range: r.rng, Severity: &severity, Code: &protocol.IntegerOrString{Value: missingReferenceCode}, Source: stringPtr("openchoreo"), Message: fmt.Sprintf("%s '%s' was not found.", r.kind, r.name)}
+	return protocol.Diagnostic{Range: r.rng, Severity: &severity, Code: &protocol.IntegerOrString{Value: missingReferenceCode}, Source: stringPtr(uriSchemeOpenChoreo), Message: fmt.Sprintf("%s '%s' was not found.", r.kind, r.name)}
 }
 
 func (s *Server) diagnosticsForCached(uri, text string) []protocol.Diagnostic {
@@ -312,7 +224,7 @@ func (s *Server) referenceActions(uri, text string, version int, _ protocol.Rang
 		for i, m := range matches {
 			kind := protocol.CodeActionKindQuickFix
 			preferred := i == 0 && (len(matches) == 1 || m.score > matches[1].score)
-			v := protocol.Integer(version)
+			v := lsputil.Integer(version)
 			replacement := m.name
 			// Names are resource identifiers; keep existing quotes and escape their content.
 			line := strings.Split(text, "\n")[r.rng.Start.Line]
@@ -329,4 +241,115 @@ func (s *Server) referenceActions(uri, text string, version int, _ protocol.Rang
 		}
 	}
 	return actions
+}
+
+func (s *Server) walkReferenceChecks(text string, n *yaml.Node, field string, idx *definitionIndex, kinds []string, clusterStarted, locationsStarted bool) []resourceReference {
+	if n == nil {
+		return nil
+	}
+	var out []resourceReference
+	if n.Kind == yaml.SequenceNode {
+		for _, child := range n.Content {
+			out = append(out, s.walkReferenceChecks(text, child, field, idx, kinds, clusterStarted, locationsStarted)...)
+		}
+		return out
+	}
+	if n.Kind != yaml.MappingNode {
+		return nil
+	}
+	for i := 0; i+1 < len(n.Content); i += 2 {
+		key, v := n.Content[i].Value, n.Content[i+1]
+		switch key {
+		case "template", "parameters", "environmentConfigs", "metadata":
+			continue
+		}
+		if referenceScalar(key, v) {
+			kind := map[string]string{"releaseName": kindComponentRelease, "resourceRelease": "ResourceRelease", "projectRelease": "ProjectRelease"}[key]
+			if sibling := lsputil.FindSiblingKey(n, "kind"); sibling != nil {
+				kind = sibling.Value
+			}
+			if kind == "" {
+				kind = lsputil.FindKindByFieldName(field, kinds)
+			}
+			known := false
+			for _, k := range kinds {
+				if kind == k {
+					known = true
+					break
+				}
+			}
+			if known {
+				r, valid := s.checkedReference(text, v, kind, idx, clusterStarted, locationsStarted)
+				if !valid {
+					continue
+				}
+				out = append(out, r)
+			}
+		}
+		out = append(out, s.walkReferenceChecks(text, v, key, idx, kinds, clusterStarted, locationsStarted)...)
+	}
+	return out
+}
+
+func referenceScalar(key string, v *yaml.Node) bool {
+	return (key == "name" || key == "releaseName" || key == "resourceRelease" || key == "projectRelease") && v.Kind == yaml.ScalarNode && v.Tag == "!!str" && v.Value != "" && !strings.Contains(v.Value, "${") && !strings.ContainsAny(v.Value, "\n\r") && v.Style&(yaml.LiteralStyle|yaml.FoldedStyle) == 0
+}
+
+func (s *Server) checkedReference(text string, v *yaml.Node, kind string, idx *definitionIndex, clusterStarted, locationsStarted bool) (resourceReference, bool) {
+	rng, valid := referenceValueRange(text, v)
+	if !valid {
+		return resourceReference{}, false
+	}
+	r := resourceReference{kind: kind, name: v.Value, rng: rng}
+	snapshot := idx.snapshot
+	ready := !clusterStarted && !locationsStarted && snapshot.ContextID == nil && strings.HasPrefix(idx.source, "file:") && s.indexer.HasWorkspace(idx.source)
+	if ready && s.initialIndexStarted {
+		select {
+		case <-s.indexDone:
+		default:
+			ready = false
+		}
+	}
+	for _, k := range snapshot.CompleteKinds {
+		if k == kind && snapshot.ContextID != nil && (strings.HasPrefix(kind, "Cluster") || snapshot.Namespace != nil && *snapshot.Namespace == idx.namespace) {
+			ready = true
+		}
+	}
+	r.overrideLegacy = ready || clusterStarted || locationsStarted
+	r.missing = ready && len(idx.FindScopedDefinition(kind, idx.namespace, v.Value, idx.source)) == 0
+	r.candidates = idx.referenceCandidates(kind)
+	return r, true
+}
+
+func (d *definitionIndex) referenceCandidates(kind string) []string {
+	seen := map[string]bool{}
+	var candidates []string
+	add := func(name, workload string) {
+		if strings.Contains(kind, "ComponentType") && workload != "" {
+			name = workload + "/" + name
+		}
+		if !seen[name] {
+			seen[name] = true
+			candidates = append(candidates, name)
+		}
+	}
+	for _, entry := range d.documents {
+		doc := entry.Document
+		if doc.Kind != kind || (!strings.HasPrefix(kind, "Cluster") && indexer.NamespaceOrDefault(doc.Metadata.Namespace) != d.namespace) {
+			continue
+		}
+		if kind == kindComponentRelease && d.component != "" && scalarAt(doc.Spec, "owner", "componentName") != d.component {
+			continue
+		}
+		add(doc.Metadata.Name, scalarAt(doc.Spec, "workloadType"))
+	}
+	if d.snapshot.ContextID != nil {
+		for _, target := range d.snapshot.Resources {
+			if target.Kind != kind || target.Namespace != "" && target.Namespace != d.namespace || kind == kindComponentRelease && d.component != "" && target.ComponentName != d.component {
+				continue
+			}
+			add(target.Name, target.WorkloadType)
+		}
+	}
+	return candidates
 }

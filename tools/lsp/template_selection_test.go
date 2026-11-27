@@ -6,8 +6,9 @@ package lsp
 import (
 	"testing"
 
-	"github.com/openchoreo/openchoreo/tools/lint/ruleengine/template"
 	protocol "github.com/tliron/glsp/protocol_3_16"
+
+	"github.com/openchoreo/openchoreo/tools/lint/ruleengine/template"
 )
 
 func TestUnavailableInitializationTemplateDoesNotFallBack(t *testing.T) {

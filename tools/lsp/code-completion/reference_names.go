@@ -1,5 +1,6 @@
 // Copyright 2026 The OpenChoreo Authors
 // SPDX-License-Identifier: Apache-2.0
+
 package codecompletion
 
 import (
@@ -9,13 +10,14 @@ import (
 	"strconv"
 	"strings"
 
+	protocol "github.com/tliron/glsp/protocol_3_16"
+	"gopkg.in/yaml.v3"
+
 	"github.com/openchoreo/openchoreo/tools/lint/indexer"
 	"github.com/openchoreo/openchoreo/tools/lint/parser"
 	"github.com/openchoreo/openchoreo/tools/lint/ruleengine/schema"
 	"github.com/openchoreo/openchoreo/tools/lint/ruleengine/template"
 	lsputil "github.com/openchoreo/openchoreo/tools/lsp/lsp-util"
-	protocol "github.com/tliron/glsp/protocol_3_16"
-	"gopkg.in/yaml.v3"
 )
 
 var scalarValueLine = regexp.MustCompile(`^([ \t]*(?:-[ \t]+)?(?:[A-Za-z_][A-Za-z0-9_]*|'name'|"name")[ \t]*:)([ \t]*)(.*)$`)
@@ -166,40 +168,7 @@ func referenceNameItems(text string, line, column int, idx ResourceIndexer, uri 
 	if !ok || slot.field != "name" {
 		return nil, false
 	}
-	marker := "__occ_reference_completion__"
-	for strings.Contains(text, marker) {
-		marker += "x"
-	}
-	patched := append([]string(nil), lines...)
-	patched[line-1] = slot.head + " " + marker
-	// Isolate the active YAML document so an unrelated unfinished document does
-	// not suppress suggestions. Keep following lines to find reversed kind/name.
-	first, last := line-1, line
-	for first > 0 && strings.TrimSpace(lines[first-1]) != "---" && strings.TrimSpace(lines[first-1]) != "..." {
-		first--
-	}
-	for last < len(lines) && strings.TrimSpace(lines[last]) != "---" && strings.TrimSpace(lines[last]) != "..." {
-		last++
-	}
-	// If a following field is unfinished, keep the complete current mapping
-	// (including a following kind) but omit the later sibling/sequence item.
-	boundary := last
-	indent := len(lines[line-1]) - len(strings.TrimLeft(lines[line-1], " "))
-	if strings.HasPrefix(strings.TrimSpace(lines[line-1]), "- ") {
-		indent += 2
-	}
-	for i := line; i < last; i++ {
-		trimmed := strings.TrimSpace(lines[i])
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-		level := len(lines[i]) - len(strings.TrimLeft(lines[i], " "))
-		if level <= indent && !strings.HasPrefix(trimmed, "kind:") {
-			boundary = i
-			break
-		}
-	}
-	candidates := []string{strings.Join(patched, "\n"), strings.Join(patched[first:last], "\n"), strings.Join(patched[first:boundary], "\n"), strings.Join(patched[first:line], "\n")}
+	candidates, marker := referenceCompletionCandidates(text, lines, line, slot.head)
 	for _, candidate := range candidates {
 		docs, err := parser.ParseYAML([]byte(candidate))
 		if err != nil {
@@ -308,4 +277,42 @@ func scopedReferenceNames(idx ResourceIndexer, kind, namespace, api, uri string)
 	}
 	sort.Strings(names)
 	return names
+}
+
+func referenceCompletionCandidates(text string, lines []string, line int, head string) ([]string, string) {
+	marker := "__occ_reference_completion__"
+	for strings.Contains(text, marker) {
+		marker += "x"
+	}
+	patched := append([]string(nil), lines...)
+	patched[line-1] = head + " " + marker
+	// Isolate the active YAML document so an unrelated unfinished document does
+	// not suppress suggestions. Keep following lines to find reversed kind/name.
+	first, last := line-1, line
+	for first > 0 && strings.TrimSpace(lines[first-1]) != yamlDocumentStart && strings.TrimSpace(lines[first-1]) != "..." {
+		first--
+	}
+	for last < len(lines) && strings.TrimSpace(lines[last]) != yamlDocumentStart && strings.TrimSpace(lines[last]) != "..." {
+		last++
+	}
+	// If a following field is unfinished, keep the complete current mapping
+	// (including a following kind) but omit the later sibling/sequence item.
+	boundary := last
+	indent := len(lines[line-1]) - len(strings.TrimLeft(lines[line-1], " "))
+	if strings.HasPrefix(strings.TrimSpace(lines[line-1]), "- ") {
+		indent += 2
+	}
+	for i := line; i < last; i++ {
+		trimmed := strings.TrimSpace(lines[i])
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		level := len(lines[i]) - len(strings.TrimLeft(lines[i], " "))
+		if level <= indent && !strings.HasPrefix(trimmed, "kind:") {
+			boundary = i
+			break
+		}
+	}
+	candidates := []string{strings.Join(patched, "\n"), strings.Join(patched[first:last], "\n"), strings.Join(patched[first:boundary], "\n"), strings.Join(patched[first:line], "\n")}
+	return candidates, marker
 }

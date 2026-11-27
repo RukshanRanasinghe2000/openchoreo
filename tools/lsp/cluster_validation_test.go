@@ -1,5 +1,6 @@
 // Copyright 2026 The OpenChoreo Authors
 // SPDX-License-Identifier: Apache-2.0
+
 package lsp
 
 import (
@@ -104,8 +105,8 @@ func TestClusterValidationMalformedAndStaleSnapshots(t *testing.T) {
 		name   string
 		change func(*clusterValidationRequest)
 	}{
-		{"context", func(r *clusterValidationRequest) { r.ContextID = "other" }},
-		{"namespace", func(r *clusterValidationRequest) { r.Namespace = "other" }},
+		{"context", func(r *clusterValidationRequest) { r.ContextID = clusterTestOther }},
+		{"namespace", func(r *clusterValidationRequest) { r.Namespace = clusterTestOther }},
 		{"generation", func(r *clusterValidationRequest) { r.Generation = 0 }},
 		{"file URI", func(r *clusterValidationRequest) { r.Documents[0].URI = "file:///fake.yaml" }},
 		{"wrong identity", func(r *clusterValidationRequest) {

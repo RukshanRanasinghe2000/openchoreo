@@ -1,5 +1,6 @@
 // Copyright 2026 The OpenChoreo Authors
 // SPDX-License-Identifier: Apache-2.0
+
 package lsp
 
 import (
@@ -7,10 +8,11 @@ import (
 	"sort"
 	"strings"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/openchoreo/openchoreo/tools/lint/indexer"
 	"github.com/openchoreo/openchoreo/tools/lint/parser"
 	lsputil "github.com/openchoreo/openchoreo/tools/lsp/lsp-util"
-	"gopkg.in/yaml.v3"
 )
 
 type renderingProjectScope struct {
@@ -52,19 +54,7 @@ func selectRenderingProject(all []renderingSource, scope *renderingProjectScope)
 		}
 		return knownKinds[i] < knownKinds[j]
 	})
-	eligible := func(doc *parser.DocumentNode) bool {
-		if strings.HasPrefix(doc.Kind, "Cluster") {
-			return true
-		}
-		if indexer.NamespaceOrDefault(doc.Metadata.Namespace) != scopeNS {
-			return false
-		}
-		if doc.Kind == "Project" {
-			return doc.Metadata.Name == scope.ProjectName
-		}
-		owner := scalarAt(doc.Spec, "owner", "projectName")
-		return owner == "" || owner == scope.ProjectName
-	}
+	eligible := func(doc *parser.DocumentNode) bool { return renderingEligible(doc, scope, scopeNS) }
 	selected := map[int]bool{}
 	var queue []int
 	add := func(i int) {
@@ -85,7 +75,7 @@ func selectRenderingProject(all []renderingSource, scope *renderingProjectScope)
 			continue
 		}
 		owner := scalarAt(d.Spec, "owner", "projectName")
-		if d.Kind == "Project" && d.Metadata.Name == scope.ProjectName || owner == scope.ProjectName || s.URI == scope.ActiveURI && owner == "" {
+		if d.Kind == kindProject && d.Metadata.Name == scope.ProjectName || owner == scope.ProjectName || s.URI == scope.ActiveURI && owner == "" {
 			add(i)
 		}
 	}
@@ -93,23 +83,7 @@ func selectRenderingProject(all []renderingSource, scope *renderingProjectScope)
 		return nil, fmt.Errorf("no resources for OpenChoreo project %q were found in namespace %q", scope.ProjectName, scopeNS)
 	}
 	resolve := func(kind, name, namespace string) {
-		if kind == "" || name == "" || strings.Contains(name, "${") {
-			return
-		}
-		normalized := indexer.ReferenceName(kind, name)
-		for i, s := range all {
-			d := s.Doc
-			if d == nil || !eligible(d) || d.Kind != kind || d.Metadata.Name != normalized {
-				continue
-			}
-			if !strings.HasPrefix(kind, "Cluster") && indexer.NamespaceOrDefault(d.Metadata.Namespace) != namespace {
-				continue
-			}
-			if normalized != name && scalarAt(d.Spec, "workloadType") != strings.Split(name, "/")[0] {
-				continue
-			}
-			add(i)
-		}
+		resolveRenderingReference(all, eligible, add, kind, name, namespace)
 	}
 	for next := 0; next < len(queue); next++ {
 		source := all[queue[next]]
@@ -121,62 +95,7 @@ func selectRenderingProject(all []renderingSource, scope *renderingProjectScope)
 		if strings.HasPrefix(doc.Kind, "Cluster") {
 			namespace = scopeNS
 		}
-		var walk func(*yaml.Node, string)
-		walk = func(n *yaml.Node, field string) {
-			if n == nil {
-				return
-			}
-			if n.Kind == yaml.SequenceNode {
-				for _, item := range n.Content {
-					walk(item, field)
-				}
-				return
-			}
-			if n.Kind != yaml.MappingNode {
-				return
-			}
-			for i := 0; i+1 < len(n.Content); i += 2 {
-				key, v := n.Content[i].Value, n.Content[i+1]
-				switch key {
-				case "template", "parameters", "environmentConfigs", "openAPIV3Schema":
-					continue
-				}
-				kind := ""
-				if key == "name" && v.Kind == yaml.ScalarNode {
-					if k := yamlMappingValue(n, "kind"); k != nil {
-						kind = k.Value
-					}
-					if kind == "" {
-						kind = lsputil.FindKindByFieldName(field, knownKinds)
-					}
-					if kind == "" && field == "type" {
-						switch doc.Kind {
-						case "Project":
-							kind = "ProjectType"
-						case "Resource":
-							kind = "ResourceType"
-						case "Component":
-							kind = "ComponentType"
-						}
-					}
-				}
-				if v.Kind == yaml.ScalarNode {
-					switch key {
-					case "environment":
-						kind = "Environment"
-					case "releaseName":
-						kind = "ComponentRelease"
-					case "resourceRelease":
-						kind = "ResourceRelease"
-					case "projectRelease":
-						kind = "ProjectRelease"
-					}
-					resolve(kind, v.Value, namespace)
-				}
-				walk(v, key)
-			}
-		}
-		walk(doc.Spec, "spec")
+		walkRenderingReferences(doc.Spec, "spec", doc.Kind, knownKinds, namespace, resolve)
 	}
 	var out []renderingSource
 	for i, s := range all {
@@ -185,4 +104,93 @@ func selectRenderingProject(all []renderingSource, scope *renderingProjectScope)
 		}
 	}
 	return out, nil
+}
+
+func renderingEligible(doc *parser.DocumentNode, scope *renderingProjectScope, scopeNS string) bool {
+	if strings.HasPrefix(doc.Kind, "Cluster") {
+		return true
+	}
+	if indexer.NamespaceOrDefault(doc.Metadata.Namespace) != scopeNS {
+		return false
+	}
+	if doc.Kind == kindProject {
+		return doc.Metadata.Name == scope.ProjectName
+	}
+	owner := scalarAt(doc.Spec, "owner", "projectName")
+	return owner == "" || owner == scope.ProjectName
+}
+
+func walkRenderingReferences(n *yaml.Node, field, docKind string, knownKinds []string, namespace string, resolve func(string, string, string)) {
+	if n == nil {
+		return
+	}
+	if n.Kind == yaml.SequenceNode {
+		for _, item := range n.Content {
+			walkRenderingReferences(item, field, docKind, knownKinds, namespace, resolve)
+		}
+		return
+	}
+	if n.Kind != yaml.MappingNode {
+		return
+	}
+	for i := 0; i+1 < len(n.Content); i += 2 {
+		key, v := n.Content[i].Value, n.Content[i+1]
+		switch key {
+		case "template", "parameters", "environmentConfigs", "openAPIV3Schema":
+			continue
+		}
+		kind := ""
+		if key == "name" && v.Kind == yaml.ScalarNode {
+			if k := yamlMappingValue(n, "kind"); k != nil {
+				kind = k.Value
+			}
+			if kind == "" {
+				kind = lsputil.FindKindByFieldName(field, knownKinds)
+			}
+			if kind == "" && field == "type" {
+				switch docKind {
+				case kindProject:
+					kind = "ProjectType"
+				case "Resource":
+					kind = "ResourceType"
+				case kindComponent:
+					kind = "ComponentType"
+				}
+			}
+		}
+		if v.Kind == yaml.ScalarNode {
+			switch key {
+			case "environment":
+				kind = "Environment"
+			case "releaseName":
+				kind = kindComponentRelease
+			case "resourceRelease":
+				kind = "ResourceRelease"
+			case "projectRelease":
+				kind = "ProjectRelease"
+			}
+			resolve(kind, v.Value, namespace)
+		}
+		walkRenderingReferences(v, key, docKind, knownKinds, namespace, resolve)
+	}
+}
+
+func resolveRenderingReference(all []renderingSource, eligible func(*parser.DocumentNode) bool, add func(int), kind, name, namespace string) {
+	if kind == "" || name == "" || strings.Contains(name, "${") {
+		return
+	}
+	normalized := indexer.ReferenceName(kind, name)
+	for i, s := range all {
+		d := s.Doc
+		if d == nil || !eligible(d) || d.Kind != kind || d.Metadata.Name != normalized {
+			continue
+		}
+		if !strings.HasPrefix(kind, "Cluster") && indexer.NamespaceOrDefault(d.Metadata.Namespace) != namespace {
+			continue
+		}
+		if normalized != name && scalarAt(d.Spec, "workloadType") != strings.Split(name, "/")[0] {
+			continue
+		}
+		add(i)
+	}
 }

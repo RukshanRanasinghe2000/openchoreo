@@ -48,16 +48,25 @@ func kinds() []kindSpec {
 		{GoTypeName: "ProjectReleaseBinding", Dir: "project-release-binding"},
 		{GoTypeName: "ReleaseBinding", Dir: "release_binding"},
 		{GoTypeName: "Workflow", Dir: "workflow", MetadataCategory: metaNamespacedWorkflow},
-		{GoTypeName: "ClusterWorkflow", Dir: "cluster-workflows", File: "clusterworkflows_minimal_defi.json", MetadataCategory: metaClusterWorkflow},
+		{
+			GoTypeName: "ClusterWorkflow", Dir: "cluster-workflows",
+			File: "clusterworkflows_minimal_defi.json", MetadataCategory: metaClusterWorkflow,
+		},
 		{GoTypeName: "WorkflowRun", Dir: "workflow-run"},
 		{GoTypeName: "Workload", Dir: "workload"},
 		{GoTypeName: "ClusterProjectType", Dir: "cluster-project-type", MetadataCategory: metaClusterProjectType},
 		{GoTypeName: "ClusterResourceType", Dir: "cluster-resource-type", MetadataCategory: metaClusterDefault},
 		{GoTypeName: "ResourceType", Dir: "resource-type"},
 		{GoTypeName: "ClusterDataPlane", Dir: "cluster-data-plane", MetadataCategory: metaClusterDefault},
-		{GoTypeName: "ClusterObservabilityPlane", Dir: "cluster-observability-planes", File: "clusterobservabilityplanes_minimal_defi.json", MetadataCategory: metaClusterDefault},
+		{
+			GoTypeName: "ClusterObservabilityPlane", Dir: "cluster-observability-planes",
+			File: "clusterobservabilityplanes_minimal_defi.json", MetadataCategory: metaClusterDefault,
+		},
 		{GoTypeName: "Trait", Dir: "trait"},
-		{GoTypeName: "ClusterTrait", Dir: "cluster-trait", File: "clustertrait_minimal_defi.json", MetadataCategory: metaClusterDefault},
+		{
+			GoTypeName: "ClusterTrait", Dir: "cluster-trait",
+			File: "clustertrait_minimal_defi.json", MetadataCategory: metaClusterDefault,
+		},
 
 		// Namespaced controller-managed release artifacts.
 		{GoTypeName: "AuthzRole", Dir: "authz-role"},

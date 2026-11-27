@@ -12,7 +12,8 @@ import (
 
 func TestEmbeddedInventoryIgnoresWorkingDirectoryOverrides(t *testing.T) {
 	t.Chdir(t.TempDir())
-	if err := os.WriteFile("template-version.json", []byte(`{"latest":"not-embedded","versions":["not-embedded"]}`), 0o600); err != nil {
+	manifest := []byte(`{"latest":"not-embedded","versions":["not-embedded"]}`)
+	if err := os.WriteFile("template-version.json", manifest, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	info, err := EmbeddedInventory("1.5.0-rc.1")

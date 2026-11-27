@@ -1,12 +1,15 @@
 // Copyright 2026 The OpenChoreo Authors
 // SPDX-License-Identifier: Apache-2.0
+
 package codeaction
 
 import (
-	"github.com/openchoreo/openchoreo/tools/lint/ruleengine/schema"
-	"gopkg.in/yaml.v3"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
+
+	"github.com/openchoreo/openchoreo/tools/lint/ruleengine/schema"
 )
 
 func TestBottomLineEmptyContainers(t *testing.T) {

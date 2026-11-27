@@ -1,5 +1,6 @@
 // Copyright 2026 The OpenChoreo Authors
 // SPDX-License-Identifier: Apache-2.0
+
 package celvalidator
 
 import (
@@ -8,8 +9,9 @@ import (
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
-	"github.com/openchoreo/openchoreo/tools/lint/parser"
 	"gopkg.in/yaml.v3"
+
+	"github.com/openchoreo/openchoreo/tools/lint/parser"
 )
 
 type memberInspection struct{ marker, receiver string }
